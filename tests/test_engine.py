@@ -2,6 +2,7 @@ import unittest
 from engine.universe import is_main_board
 from engine.risk import clamp_d_targets
 from engine.broker import round_lot, fee_for, _locked_at_limit
+from engine.daily_run import _previous_trade_date, _pending_is_fresh
 
 class EngineTests(unittest.TestCase):
     def test_board_filter(self):
@@ -33,5 +34,24 @@ class EngineTests(unittest.TestCase):
     def test_min_commission(self):
         self.assertEqual(fee_for('BUY',1000),5.0)
         self.assertGreater(fee_for('SELL',100000), fee_for('BUY',100000))
+
+    def test_previous_trade_date(self):
+        histories={
+            'sh.600000':[
+                {'date':'2026-08-12'},
+                {'date':'2026-08-13'},
+                {'date':'2026-08-14'},
+            ]
+        }
+        self.assertEqual(_previous_trade_date(histories,'2026-08-14'),'2026-08-13')
+
+    def test_pending_must_be_from_immediately_previous_trade_date(self):
+        state={
+            'pending_targets':[{'symbol':'sh.600000','target_weight':0.1}],
+            'pending_decision_date':'2026-08-13',
+            'decisions':[],
+        }
+        self.assertTrue(_pending_is_fresh(state,'2026-08-13'))
+        self.assertFalse(_pending_is_fresh(state,'2026-08-14'))
 
 if __name__=='__main__': unittest.main()
