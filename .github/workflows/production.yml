@@ -1,0 +1,44 @@
+name: Daily virtual-fund run
+on:
+  workflow_dispatch:
+  # Daily schedule is intentionally disabled for first deployment.
+  # Enable only after a manual real-market run succeeds.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: ai-stock-daily
+  cancel-in-progress: false
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Run real-market virtual portfolios
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: python -m engine.daily_run --real
+      - run: python -m unittest discover -s tests -v
+      - name: Persist portfolio ledger and public snapshots
+        run: |
+          git config user.name "ai-stock-bot"
+          git config user.email "ai-stock-bot@users.noreply.github.com"
+          git add state/ web/d/data.json web/e/data.json
+          git diff --cached --quiet || git commit -m "data: daily virtual-fund run"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

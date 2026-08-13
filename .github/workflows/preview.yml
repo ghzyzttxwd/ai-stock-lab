@@ -1,0 +1,22 @@
+name: Build preview data
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m engine.daily_run --demo
+      - run: python -m unittest discover -s tests -v
+      - name: Commit regenerated preview snapshots
+        run: |
+          git config user.name "ai-stock-bot"
+          git config user.email "ai-stock-bot@users.noreply.github.com"
+          git add web/d/data.json web/e/data.json state/
+          git diff --cached --quiet || git commit -m "chore: refresh preview data"
+          git push
