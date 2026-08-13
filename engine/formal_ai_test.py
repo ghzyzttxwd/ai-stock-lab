@@ -9,7 +9,7 @@ def _candidates() -> list[dict]:
     out = []
     for i in range(20):
         market = 'sh' if i % 2 == 0 else 'sz'
-        code = 600100 + i if market == 'sh' else 000700 + i
+        code = 600100 + i if market == 'sh' else 700 + i
         out.append({
             'eligible': True,
             'symbol': f'{market}.{code:06d}',
