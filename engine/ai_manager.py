@@ -1,8 +1,8 @@
 from __future__ import annotations
 import json
 import os
-import urllib.error
-import urllib.request
+import time
+import requests
 
 SYSTEM = '''你是A股虚拟基金的组合经理。你没有真实证券账户权限，也不能突破风控。
 只允许从传入候选股票中选择目标仓位。输出严格JSON，不要输出解释性前缀。
@@ -10,18 +10,106 @@ SYSTEM = '''你是A股虚拟基金的组合经理。你没有真实证券账户�
 允许targets为空。target_weight必须在0到0.15之间。'''
 
 
-def _request(base: str, key: str, payload: dict) -> dict:
-    req = urllib.request.Request(
+def _headers(key: str) -> dict:
+    return {
+        'Authorization': f'Bearer {key}',
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream, application/json',
+        'User-Agent': 'ai-stock-lab/0.5',
+    }
+
+
+def _request_json(base: str, key: str, payload: dict) -> dict:
+    r = requests.post(
         f'{base}/chat/completions',
-        data=json.dumps(payload).encode('utf-8'),
-        headers={
-            'Authorization':f'Bearer {key}',
-            'Content-Type':'application/json',
-            'User-Agent':'ai-stock-lab/0.4',
-        },
-        method='POST')
-    with urllib.request.urlopen(req, timeout=90) as r:
-        return json.loads(r.read().decode('utf-8'))
+        headers=_headers(key),
+        json=payload,
+        timeout=(15, 90),
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+def _stream_chat(base: str, key: str, payload: dict) -> str:
+    """Standard OpenAI-compatible SSE stream. Keeps the gateway connection active while Sol generates."""
+    started = time.monotonic()
+    body = {**payload, 'stream': True}
+    body_bytes = len(json.dumps(body, ensure_ascii=False).encode('utf-8'))
+    print(f'[AI] stream request bytes={body_bytes}')
+    with requests.post(
+        f'{base}/chat/completions',
+        headers=_headers(key),
+        json=body,
+        stream=True,
+        timeout=(15, 180),
+    ) as r:
+        if r.status_code >= 400:
+            preview = r.text[:300].replace('\n', ' ')
+            print(f'[AI] HTTP {r.status_code}: {preview}')
+            r.raise_for_status()
+
+        sse_parts: list[str] = []
+        plain_lines: list[str] = []
+        saw_sse = False
+        first_event = None
+        for raw in r.iter_lines(decode_unicode=True):
+            if raw is None:
+                continue
+            line = str(raw).strip()
+            if not line:
+                continue
+            if first_event is None:
+                first_event = time.monotonic()
+                print(f'[AI] first response event after {first_event-started:.2f}s')
+            if line.startswith('data:'):
+                saw_sse = True
+                data = line[5:].strip()
+                if data == '[DONE]':
+                    break
+                try:
+                    obj = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                choices = obj.get('choices') or []
+                if not choices:
+                    continue
+                choice = choices[0]
+                delta = choice.get('delta') or {}
+                content = delta.get('content')
+                if content:
+                    sse_parts.append(str(content))
+                elif choice.get('message', {}).get('content'):
+                    sse_parts.append(str(choice['message']['content']))
+            else:
+                plain_lines.append(line)
+
+        elapsed = time.monotonic() - started
+        if saw_sse:
+            text = ''.join(sse_parts).strip()
+            print(f'[AI] stream completed in {elapsed:.2f}s chars={len(text)}')
+            if not text:
+                raise RuntimeError('AI stream completed but returned no content')
+            return text
+
+        # Some relays ignore stream=true and return one normal JSON response.
+        raw_text = '\n'.join(plain_lines).strip()
+        if not raw_text:
+            raise RuntimeError('AI response was empty')
+        obj = json.loads(raw_text)
+        content = obj['choices'][0]['message']['content']
+        print(f'[AI] non-SSE response completed in {elapsed:.2f}s')
+        return content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+
+
+def _parse_json_content(content: str | dict) -> dict:
+    if isinstance(content, dict):
+        return content
+    text = str(content).strip()
+    if text.startswith('```'):
+        text = text.strip('`').strip()
+        if text.lower().startswith('json'):
+            text = text[4:].strip()
+    return json.loads(text)
 
 
 def decide_with_api(candidates: list[dict], current: dict, market_score: float) -> dict | None:
@@ -32,51 +120,54 @@ def decide_with_api(candidates: list[dict], current: dict, market_score: float) 
         return None
 
     messages = [
-        {'role':'system','content':SYSTEM},
-        {'role':'user','content':json.dumps({'market_score':market_score,'current':current,'candidates':candidates[:20]},ensure_ascii=False)}
+        {'role': 'system', 'content': SYSTEM},
+        {'role': 'user', 'content': json.dumps({
+            'market_score': market_score,
+            'current': current,
+            'candidates': candidates[:20],
+        }, ensure_ascii=False)},
     ]
-    payload = {
-        'model': model,
-        'temperature': 0.2,
-        'response_format': {'type': 'json_object'},
-        'messages': messages,
-    }
-    try:
+    # Keep the formal request close to the most widely supported Chat Completions shape.
+    # No response_format/temperature requirement: the system prompt already requires strict JSON.
+    payload = {'model': model, 'messages': messages}
+
+    # At most two network attempts. This avoids runaway API spend while covering transient 502/503/504.
+    for attempt in (1, 2):
         try:
-            obj=_request(base,key,payload)
-        except urllib.error.HTTPError as e:
-            # Some OpenAI-compatible relays/models reject response_format or temperature.
-            # Retry once with the smallest common Chat Completions payload.
-            body=e.read().decode('utf-8','replace')
-            print(f'[AI] first request HTTP {e.code}; retrying compatible payload: {body[:300]}')
-            obj=_request(base,key,{'model':model,'messages':messages})
-        content=obj['choices'][0]['message']['content']
-        if isinstance(content,dict):
-            return content
-        text=str(content).strip()
-        if text.startswith('```'):
-            text=text.strip('`').strip()
-            if text.lower().startswith('json'):
-                text=text[4:].strip()
-        return json.loads(text)
-    except Exception as e:
-        print(f'[AI] fallback because API call failed: {e}')
-        return None
+            content = _stream_chat(base, key, payload)
+            result = _parse_json_content(content)
+            if not isinstance(result.get('targets'), list):
+                raise ValueError('AI JSON missing targets list')
+            print(f'[AI] formal decision success attempt={attempt} targets={len(result["targets"])}')
+            return result
+        except requests.HTTPError as e:
+            code = e.response.status_code if e.response is not None else None
+            if attempt == 1 and code in {502, 503, 504}:
+                print(f'[AI] transient HTTP {code}; retry once after 5s')
+                time.sleep(5)
+                continue
+            print(f'[AI] fallback because API HTTP failed: {code}')
+            return None
+        except (requests.RequestException, json.JSONDecodeError, ValueError, RuntimeError) as e:
+            if attempt == 1 and isinstance(e, requests.RequestException):
+                print(f'[AI] transient network error; retry once after 5s: {e}')
+                time.sleep(5)
+                continue
+            print(f'[AI] fallback because API call failed: {e}')
+            return None
+    return None
 
 
 def smoke_test_api() -> str:
     """Small paid call used only by the manual connectivity workflow."""
-    key=os.getenv('AI_API_KEY')
-    model=os.getenv('AI_MODEL')
-    base=os.getenv('AI_BASE_URL','').rstrip('/')
+    key = os.getenv('AI_API_KEY')
+    model = os.getenv('AI_MODEL')
+    base = os.getenv('AI_BASE_URL', '').rstrip('/')
     if not key or not model or not base:
         raise RuntimeError('AI_API_KEY / AI_BASE_URL / AI_MODEL is incomplete')
-    messages=[{'role':'user','content':'只返回严格JSON：{"ok":true}'}]
-    try:
-        obj=_request(base,key,{'model':model,'messages':messages,'response_format':{'type':'json_object'}})
-    except urllib.error.HTTPError:
-        obj=_request(base,key,{'model':model,'messages':messages})
-    content=obj['choices'][0]['message']['content']
+    messages = [{'role': 'user', 'content': '只返回严格JSON：{"ok":true}'}]
+    obj = _request_json(base, key, {'model': model, 'messages': messages})
+    content = obj['choices'][0]['message']['content']
     if not content:
         raise RuntimeError('AI API returned empty content')
     return str(content)[:300]
