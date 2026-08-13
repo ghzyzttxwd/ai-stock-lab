@@ -27,11 +27,20 @@ def _tx_symbol(symbol: str) -> str:
     return s
 
 
+def _period_return(vals: list[float], sessions: int):
+    if len(vals) <= sessions:
+        return None
+    base=vals[-1-sessions]
+    if base <= 0:
+        return None
+    return round((vals[-1]/base-1)*100,2)
+
+
 class AKShareMarket:
     """V1 real-market loader with multiple independent upstreams.
 
     Full-market snapshot: Eastmoney first, Sina fallback.
-    Historical bars and trading-date detection: Tencent Securities via AKShare.
+    Historical bars, trading-date detection and benchmark histories: Tencent Securities via AKShare.
     This avoids making BaoStock availability a hard dependency on GitHub runners.
     """
     def __init__(self, history_limit: int = 120):
@@ -170,3 +179,29 @@ class AKShareMarket:
             raise RuntimeError('Tencent returned no historical data for the preselected universe')
         print(f'[market] historical source=tencent symbols={len(out)}')
         return out
+
+    def benchmarks(self, start_date: str, trade_date: str) -> list[dict]:
+        specs=[('沪深300','sh000300'),('中证500','sh000905'),('中证1000','sh000852')]
+        result=[]
+        for name,symbol in specs:
+            item={'name':name,'symbol':symbol,'return_pct':None,'return_5d_pct':None,'return_20d_pct':None,'return_60d_pct':None,'curve':[]}
+            try:
+                df=self.ak.stock_zh_index_daily_tx(symbol=symbol)
+                if df is None or df.empty:
+                    result.append(item); continue
+                df=df.copy()
+                df['date']=df['date'].astype(str).str[:10]
+                df=df[(df['date']>=start_date)&(df['date']<=trade_date)]
+                vals=[_f(x) for x in df['close'].tolist() if _f(x)>0]
+                dates=df['date'].tolist()[-len(vals):] if vals else []
+                if vals:
+                    base=vals[0]
+                    item['return_pct']=round((vals[-1]/base-1)*100,2)
+                    item['return_5d_pct']=_period_return(vals,5)
+                    item['return_20d_pct']=_period_return(vals,20)
+                    item['return_60d_pct']=_period_return(vals,60)
+                    item['curve']=[{'date':d,'equity':round(1_000_000*v/base,2)} for d,v in zip(dates,vals)]
+            except Exception as e:
+                print(f'[market] benchmark failed {symbol}: {e}')
+            result.append(item)
+        return result
