@@ -1,0 +1,52 @@
+name: 自动测试并发布网页
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'state/**'
+      - 'web/d/data.json'
+      - 'web/e/data.json'
+      - '*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-auto-deploy
+  cancel-in-progress: true
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: 读取最新代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 运行自动测试
+        run: python -m unittest discover -s tests -v
+
+      - name: 准备 GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 打包网页
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: 发布网页
+        uses: actions/deploy-pages@v4
