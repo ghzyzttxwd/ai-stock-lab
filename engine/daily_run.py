@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import json
+import os
 from datetime import date
 from pathlib import Path
 from .broker import execute_target_weights
@@ -10,6 +11,7 @@ from .reporting import mark_to_market, metrics
 from .state import load_state, save_state
 
 ROOT=Path(__file__).resolve().parents[1]
+STATE_ROOT=Path(os.getenv('FUND_STATE_DIR', str(ROOT/'state')))
 FUNDS={
     'D_MAIN':'AI 综合判断基金',
     'A':'保守稳健基金',
@@ -44,7 +46,7 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
     snapshots={}
     for fid,name in FUNDS.items():
         sid='D' if fid=='D_MAIN' else fid
-        path=ROOT/'state'/f'{fid}.json'
+        path=STATE_ROOT/f'{fid}.json'
         st=load_state(path,fid,name)
         st['name']=name
         if st.get('last_processed_date') == trade_date:
