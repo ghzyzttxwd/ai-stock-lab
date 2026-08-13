@@ -2,14 +2,22 @@ name: AI正式级流式测试（不改账本）
 
 on:
   workflow_dispatch:
+  schedule:
+    # 18:05 Beijing time (10:05 UTC), Monday-Friday, 15 minutes before production.
+    - cron: '5 10 * * 1-5'
   push:
     branches: [main]
     paths:
       - '.github/workflows/formal-ai-test.yml'
       - 'engine/formal_ai_test.py'
+      - 'engine/ai_manager.py'
 
 permissions:
   contents: read
+
+concurrency:
+  group: formal-ai-preflight
+  cancel-in-progress: true
 
 jobs:
   test:
