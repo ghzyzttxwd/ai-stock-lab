@@ -38,11 +38,42 @@ def enrich_real_candidates(candidates, snapshot_rows):
     return candidates
 
 
+def _previous_trade_date(histories: dict[str,list[dict]], trade_date: str) -> str | None:
+    dates={
+        str(row.get('date',''))[:10]
+        for rows in histories.values()
+        for row in rows
+        if str(row.get('date',''))[:10] and str(row.get('date',''))[:10] < trade_date
+    }
+    return max(dates) if dates else None
+
+
+def _pending_decision_date(state: dict) -> str | None:
+    explicit=state.get('pending_decision_date')
+    if explicit:
+        return str(explicit)[:10]
+    pending=state.get('pending_targets') or []
+    for d in reversed(state.get('decisions',[]) or []):
+        if d.get('targets') == pending and d.get('date'):
+            return str(d['date'])[:10]
+    decisions=state.get('decisions') or []
+    if decisions and decisions[-1].get('date'):
+        return str(decisions[-1]['date'])[:10]
+    return None
+
+
+def _pending_is_fresh(state: dict, previous_trade_date: str | None) -> bool:
+    if not state.get('pending_targets') or not previous_trade_date:
+        return False
+    return _pending_decision_date(state) == previous_trade_date
+
+
 def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=None):
     candidates=build_candidates(histories,names)
     if snapshot_rows is not None:
         candidates=enrich_real_candidates(candidates,snapshot_rows)
     mscore=market_temperature(candidates)
+    previous_trade_date=_previous_trade_date(histories,trade_date)
     snapshots={}
     for fid,name in FUNDS.items():
         sid='D' if fid=='D_MAIN' else fid
@@ -56,11 +87,18 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
             save_state(path,st)
             continue
         if st.get('pending_targets'):
-            fills=execute_target_weights(st,st['pending_targets'],bars,trade_date)
-            st['fills'].extend(fills)
+            if _pending_is_fresh(st,previous_trade_date):
+                fills=execute_target_weights(st,st['pending_targets'],bars,trade_date)
+                st['fills'].extend(fills)
+            else:
+                decision_date=_pending_decision_date(st)
+                print(f'[expire] {fid} pending targets from {decision_date} not valid for {trade_date}; previous trade date={previous_trade_date}')
+                st['pending_targets']=[]
+            st.pop('pending_decision_date',None)
         mtm=mark_to_market(st,bars,trade_date)
         targets,diary=targets_for(sid,candidates,mscore,st,use_ai=(use_ai and sid=='D'))
         st['pending_targets']=targets
+        st['pending_decision_date']=trade_date
         st['decisions'].append({'date':trade_date,'market_score':mscore,'targets':targets,'diary':diary})
         st['last_processed_date']=trade_date
         save_state(path,st)
