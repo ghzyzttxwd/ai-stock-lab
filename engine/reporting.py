@@ -55,7 +55,7 @@ def _health(days: int, ret_total: float, ret20, ret60, max_dd: float) -> tuple[s
 def metrics(curve: list[dict], initial_cash: float) -> dict:
     if not curve:
         return {
-            'return_pct': 0, 'max_drawdown_pct': 0, 'volatility_pct': 0,
+            'return_pct': 0, 'today_pct': 0, 'max_drawdown_pct': 0, 'volatility_pct': 0,
             'return_5d_pct': None, 'return_20d_pct': None, 'return_60d_pct': None,
             'trading_days': 0, 'losing_streak_days': 0,
             'health': '观察期', 'health_reason': '尚未开始记录真实交易日。'
@@ -72,6 +72,7 @@ def metrics(curve: list[dict], initial_cash: float) -> dict:
         var = sum((x-m)**2 for x in rets)/len(rets)
         vol = sqrt(var) * sqrt(244)
     total = round((vals[-1]/initial_cash-1)*100, 2)
+    today = round(rets[-1]*100, 2) if rets else 0
     r5 = _period_return(vals, 5)
     r20 = _period_return(vals, 20)
     r60 = _period_return(vals, 60)
@@ -80,6 +81,7 @@ def metrics(curve: list[dict], initial_cash: float) -> dict:
     health, reason = _health(days, total, r20, r60, dd)
     return {
         'return_pct': total,
+        'today_pct': today,
         'max_drawdown_pct': dd,
         'volatility_pct': round(vol*100, 2),
         'return_5d_pct': r5,
