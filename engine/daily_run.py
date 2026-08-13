@@ -11,12 +11,12 @@ from .state import load_state, save_state
 
 ROOT=Path(__file__).resolve().parents[1]
 FUNDS={
-    'D_MAIN':'AI 综合基金 D',
-    'A':'稳健基金 A',
-    'B':'趋势基金 B',
-    'C':'短线基金 C',
-    'D':'综合基金 D',
-    'L':'长线基金 L',
+    'D_MAIN':'AI 综合判断基金',
+    'A':'保守稳健基金',
+    'B':'趋势追强基金',
+    'C':'短线快攻基金',
+    'D':'综合判断基金',
+    'L':'长线价值基金',
 }
 
 
@@ -46,10 +46,13 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
         sid='D' if fid=='D_MAIN' else fid
         path=ROOT/'state'/f'{fid}.json'
         st=load_state(path,fid,name)
+        # 名字只是展示层，已有账户也随新版名称更新，不改变资金和历史交易。
+        st['name']=name
         if st.get('last_processed_date') == trade_date:
             print(f'[skip] {fid} already processed {trade_date}')
             mtm={'equity':st['equity_curve'][-1]['equity'] if st['equity_curve'] else st['cash'],'holdings':[]}
             snapshots[fid]={'state':st,'mtm':mtm,'metrics':metrics(st['equity_curve'],st['initial_cash']),'diary':'当日已处理'}
+            save_state(path,st)
             continue
         if st.get('pending_targets'):
             fills=execute_target_weights(st,st['pending_targets'],bars,trade_date)
@@ -93,18 +96,27 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
       'metrics':{**met,'today_pct':0,'week_pct':0,'win_rate_pct':0,'profit_factor':0,'trades':len(st['fills'])},
       'holdings':[{**x,'weight':round(x['market_value']/mtm['equity']*100,1),'score':next((c['score_d'] for c in candidates if c['symbol']==x['symbol']),0)} for x in mtm['holdings']],
       'decisions':[{'action':'目标','name':x.get('name',x['symbol']),'symbol':x['symbol'],'weight':f"{x['target_weight']*100:.1f}%",'reason':x.get('reason','组合目标仓位')} for x in st.get('pending_targets',[])],
-      'candidates':candidates[:10], 'equity_curve':st['equity_curve'], 'diary':d['diary']}
+      'candidates':candidates[:10], 'equity_curve':st['equity_curve'], 'diary':d['diary'],
+      'plain_explanation':'不押单一风格：趋势、公司质量、估值、动量和风险一起看，再由 AI 决定组合。'}
     (ROOT/'web/d/data.json').write_text(json.dumps(d_json,ensure_ascii=False,indent=2),encoding='utf-8')
 
     funds=[]
     risk_map={'A':'低','B':'高','C':'很高','D':'中','L':'中低'}
-    style_map={'A':'稳健','B':'趋势','C':'短线','D':'综合','L':'长线'}
+    style_map={'A':'保守','B':'追强','C':'短线','D':'综合','L':'长线'}
+    desc_map={
+        'A':'少折腾，先控制亏损和回撤，再考虑赚钱。',
+        'B':'专找最近明显走强的股票，顺势买入；转弱就换。',
+        'C':'偏热点、动量和活跃股，通常几天级别，换手最快。',
+        'D':'趋势、公司、估值、动量和风险都看，属于综合均衡型。',
+        'L':'更看重估值和公司质量，买入后倾向拿得更久。',
+    }
     for fid in ('A','B','C','D','L'):
         x=s[fid]; st2=x['state']; mtm2=x['mtm']; met2=x['metrics']
         funds.append({
             'id':fid,
             'name':st2['name'],
             'style':style_map[fid],
+            'description':desc_map[fid],
             'equity':mtm2['equity'],
             'return_pct':met2['return_pct'],
             'max_drawdown_pct':met2['max_drawdown_pct'],
