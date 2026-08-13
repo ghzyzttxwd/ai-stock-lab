@@ -43,6 +43,9 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
         stream=True,
         timeout=(15, 180),
     ) as r:
+        # Some OpenAI-compatible relays omit charset on text/event-stream.
+        # SSE is UTF-8; force it so Chinese diary/reasons do not become mojibake.
+        r.encoding = 'utf-8'
         if r.status_code >= 400:
             preview = r.text[:300].replace('\n', ' ')
             print(f'[AI] HTTP {r.status_code}: {preview}')
