@@ -3,7 +3,6 @@ from datetime import date, datetime, time as dt_time, timedelta
 from zoneinfo import ZoneInfo
 import math
 from .universe import is_main_board
-from .providers import BaoStockProvider
 
 
 def _f(v, default=0.0):
@@ -19,14 +18,23 @@ def _symbol(code: str) -> str:
     return ('sh.' if code.startswith(('600','601','603','605')) else 'sz.') + code
 
 
+def _tx_symbol(symbol: str) -> str:
+    s=symbol.lower().strip()
+    if s.startswith('sh.'):
+        return 'sh'+s[3:]
+    if s.startswith('sz.'):
+        return 'sz'+s[3:]
+    return s
+
+
 class AKShareMarket:
-    """V1 real-market loader with multiple upstreams.
+    """V1 real-market loader with multiple independent upstreams.
 
     Full-market snapshot: Eastmoney first, Sina fallback.
-    Historical bars and trade calendar: BaoStock, so a single Eastmoney outage
-    cannot kill the daily portfolio run.
+    Historical bars and trading-date detection: Tencent Securities via AKShare.
+    This avoids making BaoStock availability a hard dependency on GitHub runners.
     """
-    def __init__(self, history_limit: int = 140):
+    def __init__(self, history_limit: int = 120):
         import akshare as ak
         self.ak = ak
         self.history_limit = history_limit
@@ -34,27 +42,15 @@ class AKShareMarket:
     def latest_trade_date(self, today: str) -> str:
         requested = date.fromisoformat(today)
         now_cn = datetime.now(ZoneInfo('Asia/Shanghai'))
-        # A daily strategy must never use an unfinished trading day.
         if requested == now_cn.date() and now_cn.time() < dt_time(15, 20):
             raise RuntimeError('A股尚未收盘。正式日频虚拟盘请在北京时间15:20之后运行；盘中请运行“连接测试（行情 + AI）”。')
 
-        start = requested - timedelta(days=20)
-        import baostock as bs
-        lg = bs.login()
-        if lg.error_code != '0':
-            raise RuntimeError(f'BaoStock login failed: {lg.error_msg}')
-        try:
-            rs = bs.query_trade_dates(start_date=start.isoformat(), end_date=requested.isoformat())
-            trading=[]
-            while rs.error_code == '0' and rs.next():
-                row=dict(zip(rs.fields, rs.get_row_data()))
-                if str(row.get('is_trading_day','0')) == '1':
-                    trading.append(str(row.get('calendar_date',''))[:10])
-            if not trading:
-                raise RuntimeError('Cannot determine latest trading date from BaoStock')
-            return trading[-1]
-        finally:
-            bs.logout()
+        start=(requested-timedelta(days=20)).strftime('%Y%m%d')
+        end=requested.strftime('%Y%m%d')
+        df=self.ak.stock_zh_a_hist_tx(symbol='sz000001',start_date=start,end_date=end,adjust='',timeout=25)
+        if df is None or df.empty:
+            raise RuntimeError('Cannot determine latest trading date from Tencent')
+        return str(df.iloc[-1]['date'])[:10]
 
     def _snapshot_eastmoney(self) -> list[dict]:
         df = self.ak.stock_zh_a_spot_em()
@@ -123,45 +119,54 @@ class AKShareMarket:
         print(f'[market] snapshot source=sina rows={len(rows)}')
         return rows
 
-    def preselect(self, rows: list[dict], max_symbols: int = 140) -> list[dict]:
+    def preselect(self, rows: list[dict], max_symbols: int = 100) -> list[dict]:
         if not rows:
             return []
-        # Sina fallback has no valuation/60-day fields; in that case use liquid names
-        # and let BaoStock historical bars do the real ranking afterwards.
         if all(abs(x.get('r60_snapshot',0.0)) < 1e-12 for x in rows):
             return sorted(rows,key=lambda x:x['amount'],reverse=True)[:max_symbols]
 
-        by_amt=sorted(rows,key=lambda x:x['amount'],reverse=True)[:80]
+        by_amt=sorted(rows,key=lambda x:x['amount'],reverse=True)[:60]
         momentum=[x for x in rows if -0.05 <= x['r60_snapshot'] <= 0.70]
-        by_mom=sorted(momentum,key=lambda x:x['r60_snapshot'],reverse=True)[:55]
+        by_mom=sorted(momentum,key=lambda x:x['r60_snapshot'],reverse=True)[:45]
         sane=[x for x in rows if (0 < x['peTTM'] < 80) and (0 < x['pbMRQ'] < 12)]
-        by_val=sorted(sane,key=lambda x:(x['peTTM'] + 4*x['pbMRQ']))[:45]
+        by_val=sorted(sane,key=lambda x:(x['peTTM'] + 4*x['pbMRQ']))[:35]
         union={x['code']:x for x in by_amt+by_mom+by_val}
         vals=list(union.values())
         vals.sort(key=lambda x:(math.log10(max(x['amount'],1))*5 + x['r60_snapshot']*60 - max(0,x['turn']-18)), reverse=True)
         return vals[:max_symbols]
 
     def histories(self, selected: list[dict], trade_date: str) -> dict[str,list[dict]]:
+        d=date.fromisoformat(trade_date)
+        start=(d-timedelta(days=240)).strftime('%Y%m%d')
+        end=d.strftime('%Y%m%d')
         out={}
-        with BaoStockProvider() as provider:
-            for x in selected:
-                try:
-                    rows=provider.bars(x['code'],trade_date,lookback_days=self.history_limit)
-                    for r in rows:
-                        r['name']=x['name']
-                    if rows:
-                        out[x['code']]=rows
-                        last=rows[-1]
-                        # Enrich the snapshot object so valuation/turnover survive even
-                        # when the full-market snapshot came from Sina.
-                        x['peTTM']=_f(last.get('peTTM'),x.get('peTTM',0.0))
-                        x['pbMRQ']=_f(last.get('pbMRQ'),x.get('pbMRQ',0.0))
-                        x['turn']=_f(last.get('turn'),x.get('turn',0.0))
-                        x['tradestatus']=str(last.get('tradestatus','1'))
-                        x['isST']=str(last.get('isST','0'))
-                except Exception as e:
-                    print(f'[market] baostock history failed {x["code"]}: {e}')
+        for x in selected:
+            try:
+                df=self.ak.stock_zh_a_hist_tx(
+                    symbol=_tx_symbol(x['code']),
+                    start_date=start,
+                    end_date=end,
+                    adjust='qfq',
+                    timeout=25,
+                )
+                rows=[]
+                for _,r in df.tail(self.history_limit).iterrows():
+                    close=_f(r.get('close'))
+                    hands=_f(r.get('amount'))
+                    amount_yuan=max(0.0,hands*100.0*close)
+                    rows.append({
+                        'date':str(r.get('date'))[:10],
+                        'code':x['code'],'name':x['name'],
+                        'open':_f(r.get('open')),'high':_f(r.get('high')),
+                        'low':_f(r.get('low')),'close':close,
+                        'volume':hands*100.0,'amount':amount_yuan,
+                        'turn':0.0,'pctChg':0.0,'tradestatus':'1','isST':'0',
+                    })
+                if rows:
+                    out[x['code']]=rows
+            except Exception as e:
+                print(f'[market] tencent history failed {x["code"]}: {e}')
         if not out:
-            raise RuntimeError('BaoStock returned no historical data for the preselected universe')
-        print(f'[market] historical source=baostock symbols={len(out)}')
+            raise RuntimeError('Tencent returned no historical data for the preselected universe')
+        print(f'[market] historical source=tencent symbols={len(out)}')
         return out
