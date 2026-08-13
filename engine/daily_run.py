@@ -10,7 +10,14 @@ from .reporting import mark_to_market, metrics
 from .state import load_state, save_state
 
 ROOT=Path(__file__).resolve().parents[1]
-FUNDS={'D_MAIN':'AI 综合基金 D','A':'稳健基金 A','B':'趋势基金 B','D':'综合基金 D'}
+FUNDS={
+    'D_MAIN':'AI 综合基金 D',
+    'A':'稳健基金 A',
+    'B':'趋势基金 B',
+    'C':'短线基金 C',
+    'D':'综合基金 D',
+    'L':'长线基金 L',
+}
 
 
 def enrich_real_candidates(candidates, snapshot_rows):
@@ -90,9 +97,21 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
     (ROOT/'web/d/data.json').write_text(json.dumps(d_json,ensure_ascii=False,indent=2),encoding='utf-8')
 
     funds=[]
-    for fid in ('A','B','D'):
+    risk_map={'A':'低','B':'高','C':'很高','D':'中','L':'中低'}
+    style_map={'A':'稳健','B':'趋势','C':'短线','D':'综合','L':'长线'}
+    for fid in ('A','B','C','D','L'):
         x=s[fid]; st2=x['state']; mtm2=x['mtm']; met2=x['metrics']
-        funds.append({'id':fid,'name':st2['name'],'equity':mtm2['equity'],'return_pct':met2['return_pct'],'max_drawdown_pct':met2['max_drawdown_pct'],'risk':{'A':'低','B':'高','D':'中'}[fid],'curve':st2['equity_curve']})
+        funds.append({
+            'id':fid,
+            'name':st2['name'],
+            'style':style_map[fid],
+            'equity':mtm2['equity'],
+            'return_pct':met2['return_pct'],
+            'max_drawdown_pct':met2['max_drawdown_pct'],
+            'risk':risk_map[fid],
+            'trades':len(st2.get('fills',[])),
+            'curve':st2['equity_curve'],
+        })
     default_b=[{'name':'沪深300','return_pct':None},{'name':'中证500','return_pct':None},{'name':'中证1000','return_pct':None}]
     e_json={'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO', 'updated_at':trade_date,'funds':funds,'benchmarks':benchmarks or default_b}
     (ROOT/'web/e/data.json').write_text(json.dumps(e_json,ensure_ascii=False,indent=2),encoding='utf-8')
