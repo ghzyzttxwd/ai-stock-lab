@@ -1,7 +1,7 @@
 from __future__ import annotations
 from .indicators import score_history
 from .risk import clamp_d_targets
-from .strategies import strategy_a, strategy_b, strategy_d
+from .strategies import strategy_a, strategy_b, strategy_c, strategy_d, strategy_l
 from .ai_manager import decide_with_api
 
 
@@ -34,9 +34,13 @@ def market_temperature(candidates: list[dict]) -> float:
 
 def targets_for(fund_id: str, candidates: list[dict], market_score: float, state: dict, use_ai=True):
     if fund_id == 'A':
-        return strategy_a(candidates,market_score), '规则策略A'
+        return strategy_a(candidates,market_score), '稳健规则策略A'
     if fund_id == 'B':
-        return strategy_b(candidates,market_score), '规则策略B'
+        return strategy_b(candidates,market_score), '趋势规则策略B'
+    if fund_id == 'C':
+        return strategy_c(candidates,market_score), '短线规则策略C：动量/趋势/流动性优先'
+    if fund_id == 'L':
+        return strategy_l(candidates,market_score,state), '长线规则策略L：估值/风险/质量优先，降低换手'
     if fund_id == 'D':
         if use_ai:
             ai = decide_with_api(candidates, {'cash':state.get('cash'), 'positions':state.get('positions',{})}, market_score)
