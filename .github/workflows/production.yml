@@ -1,8 +1,9 @@
 name: Daily virtual-fund run
 on:
   workflow_dispatch:
-  # Daily schedule is intentionally disabled for first deployment.
-  # Enable only after a manual real-market run succeeds.
+  schedule:
+    # 18:20 Beijing time (10:20 UTC), Monday-Friday.
+    - cron: '20 10 * * 1-5'
 permissions:
   contents: write
   pages: write
