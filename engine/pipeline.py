@@ -52,10 +52,8 @@ def targets_for(fund_id: str, candidates: list[dict], market_score: float, state
                 if rejected:
                     notes.append(f'拒绝 {rejected} 个候选池外代码')
                 return clean, ai.get('diary','AI综合决策') + (('；'+'；'.join(notes)) if notes else '')
-            # Real AI fund must never silently turn into a rule fund.
-            # If the API is unavailable, keep the fund idle for the next session.
-            return [], 'AI调用失败：今日不下新的AI指令，保持现金/现有持仓'
-        # Demo mode may still use deterministic D so preview pages can be rendered without a paid API call.
+            clean, notes=clamp_d_targets(strategy_d(candidates,market_score))
+            return clean, 'AI调用失败，已启用D规则兜底' + (('；'+'；'.join(notes)) if notes else '')
         clean, notes=clamp_d_targets(strategy_d(candidates,market_score))
         return clean, 'D演示规则' + (('；'+'；'.join(notes)) if notes else '')
     raise ValueError(f'unknown fund {fund_id}')
