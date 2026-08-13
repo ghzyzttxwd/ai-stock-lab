@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/formal-ai-test.yml'
+      - 'engine/formal_ai_test.py'
 
 permissions:
   contents: read
@@ -23,7 +24,7 @@ jobs:
           cache: 'pip'
       - name: 安装依赖
         run: pip install -r requirements.txt
-      - name: 正式级 Sol 流式测试（只调用一次决策，不改账本）
+      - name: 正式级 Sol 流式测试（单次决策，最多一次5xx重试，不改账本）
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
