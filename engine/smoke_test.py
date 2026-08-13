@@ -2,25 +2,20 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 
-def test_baostock():
-    import baostock as bs
-    lg=bs.login()
-    if lg.error_code!='0':
-        raise RuntimeError(f'BaoStock login failed: {lg.error_msg}')
-    try:
-        end=date.today()
-        start=end-timedelta(days=20)
-        rs=bs.query_trade_dates(start_date=start.isoformat(), end_date=end.isoformat())
-        days=[]
-        while rs.error_code=='0' and rs.next():
-            row=dict(zip(rs.fields,rs.get_row_data()))
-            if row.get('is_trading_day')=='1':
-                days.append(row.get('calendar_date'))
-        if not days:
-            raise RuntimeError('BaoStock trade calendar returned no trading day')
-        print(f'[OK] BaoStock trade calendar latest={days[-1]}')
-    finally:
-        bs.logout()
+def test_tencent_history():
+    import akshare as ak
+    end=date.today()
+    start=end-timedelta(days=30)
+    df=ak.stock_zh_a_hist_tx(
+        symbol='sz000001',
+        start_date=start.strftime('%Y%m%d'),
+        end_date=end.strftime('%Y%m%d'),
+        adjust='',
+        timeout=25,
+    )
+    if df is None or df.empty:
+        raise RuntimeError('Tencent history returned no rows')
+    print(f'[OK] Tencent daily history rows={len(df)} latest={df.iloc[-1]["date"]}')
 
 
 def test_snapshot():
@@ -44,7 +39,7 @@ def test_ai():
 
 
 def main():
-    test_baostock()
+    test_tencent_history()
     test_snapshot()
     test_ai()
     print('[OK] ALL CONNECTION TESTS PASSED')
