@@ -46,7 +46,6 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
         sid='D' if fid=='D_MAIN' else fid
         path=ROOT/'state'/f'{fid}.json'
         st=load_state(path,fid,name)
-        # 名字只是展示层，已有账户也随新版名称更新，不改变资金和历史交易。
         st['name']=name
         if st.get('last_processed_date') == trade_date:
             print(f'[skip] {fid} already processed {trade_date}')
@@ -83,19 +82,53 @@ def run_real(requested_date: str):
     histories=market.histories(selected,trade_date)
     names={x['code']:x['name'] for x in snapshot}
     bars={x['code']:x for x in snapshot}
-    return trade_date,*run_all(trade_date,histories,names,bars,use_ai=True,snapshot_rows=snapshot)
+    candidates,mscore,snapshots=run_all(trade_date,histories,names,bars,use_ai=True,snapshot_rows=snapshot)
+    first_dates=[x['state']['equity_curve'][0]['date'] for x in snapshots.values() if x['state'].get('equity_curve')]
+    start_date=min(first_dates) if first_dates else trade_date
+    benchmarks=market.benchmarks(start_date,trade_date)
+    return trade_date,candidates,mscore,snapshots,benchmarks
+
+
+def _activity(state: dict, trade_date: str) -> dict:
+    today=[x for x in state.get('fills',[]) if x.get('trade_date')==trade_date]
+    buys=[x for x in today if x.get('side')=='BUY']
+    sells=[x for x in today if x.get('side')=='SELL']
+    return {
+        'buy_count':len(buys), 'sell_count':len(sells),
+        'buy_amount':round(sum(float(x.get('gross',0)) for x in buys),2),
+        'sell_amount':round(sum(float(x.get('gross',0)) for x in sells),2),
+        'pending_count':len(state.get('pending_targets',[])),
+    }
+
+
+def _benchmark_lookup(benchmarks, name='沪深300'):
+    return next((x for x in (benchmarks or []) if x.get('name')==name),None)
+
+
+def _score(met: dict, excess):
+    if met.get('trading_days',0) < 20:
+        return None
+    ex=float(excess or 0)
+    return round(float(met.get('return_pct',0)) + 1.2*ex - 0.45*abs(float(met.get('max_drawdown_pct',0))) - 0.05*float(met.get('volatility_pct',0)),2)
 
 
 def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
+    hs300=_benchmark_lookup(benchmarks)
     d=s['D_MAIN']; st=d['state']; mtm=d['mtm']; met=d['metrics']
     if not mtm.get('holdings'):
         mtm['holdings']=[]
+    excess=round(met['return_pct']-hs300['return_pct'],2) if hs300 and hs300.get('return_pct') is not None else None
     d_json={
-      'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO', 'updated_at':trade_date,'market_score':mscore,'market_label':'强势' if mscore>=80 else '偏强' if mscore>=60 else '震荡' if mscore>=40 else '偏弱' if mscore>=20 else '高风险',
+      'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO',
+      'updated_at':trade_date,'market_score':mscore,
+      'market_label':'强势' if mscore>=80 else '偏强' if mscore>=60 else '震荡' if mscore>=40 else '偏弱' if mscore>=20 else '高风险',
       'fund':{'name':st['name'],'initial':st['initial_cash'],'equity':mtm['equity'],'cash':st['cash'],'position_pct':round((mtm['equity']-st['cash'])/mtm['equity']*100,1) if mtm['equity'] else 0},
-      'metrics':{**met,'today_pct':0,'week_pct':0,'win_rate_pct':0,'profit_factor':0,'trades':len(st['fills'])},
+      'metrics':{**met,'week_pct':met.get('return_5d_pct'),'win_rate_pct':0,'profit_factor':0,'trades':len(st['fills']),'excess_hs300_pct':excess},
+      'activity':_activity(st,trade_date),
       'holdings':[{**x,'weight':round(x['market_value']/mtm['equity']*100,1),'score':next((c['score_d'] for c in candidates if c['symbol']==x['symbol']),0)} for x in mtm['holdings']],
-      'decisions':[{'action':'目标','name':x.get('name',x['symbol']),'symbol':x['symbol'],'weight':f"{x['target_weight']*100:.1f}%",'reason':x.get('reason','组合目标仓位')} for x in st.get('pending_targets',[])],
+      'decisions':[{'action':'待执行','name':x.get('name',x['symbol']),'symbol':x['symbol'],'weight':f"{x['target_weight']*100:.1f}%",'reason':x.get('reason','组合目标仓位'),'timing':'下一交易日开盘模拟执行'} for x in st.get('pending_targets',[])],
+      'recent_fills':st.get('fills',[])[-10:],
+      'benchmark':hs300,
       'candidates':candidates[:10], 'equity_curve':st['equity_curve'], 'diary':d['diary'],
       'plain_explanation':'不押单一风格：趋势、公司质量、估值、动量和风险一起看，再由 AI 决定组合。'}
     (ROOT/'web/d/data.json').write_text(json.dumps(d_json,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -112,20 +145,38 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
     }
     for fid in ('A','B','C','D','L'):
         x=s[fid]; st2=x['state']; mtm2=x['mtm']; met2=x['metrics']
+        bx=round(met2['return_pct']-hs300['return_pct'],2) if hs300 and hs300.get('return_pct') is not None else None
         funds.append({
-            'id':fid,
-            'name':st2['name'],
-            'style':style_map[fid],
-            'description':desc_map[fid],
-            'equity':mtm2['equity'],
-            'return_pct':met2['return_pct'],
-            'max_drawdown_pct':met2['max_drawdown_pct'],
-            'risk':risk_map[fid],
-            'trades':len(st2.get('fills',[])),
-            'curve':st2['equity_curve'],
+            'id':fid,'name':st2['name'],'style':style_map[fid],'description':desc_map[fid],
+            'equity':mtm2['equity'],'return_pct':met2['return_pct'],
+            'today_pct':met2.get('today_pct',0),'return_5d_pct':met2.get('return_5d_pct'),
+            'return_20d_pct':met2.get('return_20d_pct'),'return_60d_pct':met2.get('return_60d_pct'),
+            'max_drawdown_pct':met2['max_drawdown_pct'],'volatility_pct':met2.get('volatility_pct',0),
+            'trading_days':met2.get('trading_days',0),'losing_streak_days':met2.get('losing_streak_days',0),
+            'health':met2.get('health','观察期'),'health_reason':met2.get('health_reason',''),
+            'excess_hs300_pct':bx,'composite_score':_score(met2,bx),
+            'risk':risk_map[fid],'trades':len(st2.get('fills',[])),'curve':st2['equity_curve'],
+            'activity':_activity(st2,trade_date),
+            'holdings':mtm2.get('holdings',[]),
+            'pending_targets':st2.get('pending_targets',[]),
+            'recent_fills':st2.get('fills',[])[-8:],
+            'diary':x.get('diary',''),
         })
-    default_b=[{'name':'沪深300','return_pct':None},{'name':'中证500','return_pct':None},{'name':'中证1000','return_pct':None}]
-    e_json={'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO', 'updated_at':trade_date,'funds':funds,'benchmarks':benchmarks or default_b}
+    default_b=[{'name':'沪深300','return_pct':None,'curve':[]},{'name':'中证500','return_pct':None,'curve':[]},{'name':'中证1000','return_pct':None,'curve':[]}]
+    bs=benchmarks or default_b
+    available=[f for f in funds if f.get('return_5d_pct') is not None]
+    if available:
+        best=max(available,key=lambda x:x['return_5d_pct'])
+        worst=min(available,key=lambda x:x['return_5d_pct'])
+        weekly=f"近5个交易日最好：{best['name']} {best['return_5d_pct']:+.2f}%；最弱：{worst['name']} {worst['return_5d_pct']:+.2f}%。"
+    else:
+        weekly='运行不足6个交易日，周战报将在样本够后自动生成。'
+    e_json={
+        'mode':'REAL' if getattr(export_web,'_real_mode',False) else 'DEMO',
+        'updated_at':trade_date,'experiment_days':max((f['trading_days'] for f in funds),default=0),
+        'funds':funds,'benchmarks':bs,'weekly_report':weekly,
+        'evaluation_note':'至少看20/60个交易日；若连续几个月跑输并出现明显负收益，系统会直接标记为长期表现差。'
+    }
     (ROOT/'web/e/data.json').write_text(json.dumps(e_json,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
@@ -138,11 +189,11 @@ def main():
     args=ap.parse_args()
     if args.demo:
         export_web._real_mode=False
-        c,m,s=run_demo(args.date); td=args.date
+        c,m,s=run_demo(args.date); td=args.date; b=None
     else:
         export_web._real_mode=True
-        td,c,m,s=run_real(args.date)
-    export_web(td,c,m,s)
+        td,c,m,s,b=run_real(args.date)
+    export_web(td,c,m,s,b)
     print(f'updated D/E web snapshots for {td}, market_score={m}')
 
 if __name__=='__main__':
