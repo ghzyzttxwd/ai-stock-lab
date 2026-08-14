@@ -64,7 +64,7 @@ jobs:
           done = processed and cache_ok
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'done={str(done).lower()}\n')
-          print(f'[guard] Beijing date={today}; processed={processed}; recovery_cache_ok={cache_ok}; skip={done}')
+          print(f'[guard] Beijing date={today}; processed={processed}; recovery_cache_ok={cache_ok}; ledger_work_needed={not done}')
           PY
       - uses: actions/setup-python@v5
         if: steps.guard.outputs.done != 'true'
@@ -91,12 +91,15 @@ jobs:
           git diff --cached --quiet || git commit -m "data: daily virtual-fund run"
           git pull --rebase origin main
           git push
+      - name: Refresh latest committed web before deploy
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      # Pages deployment is intentionally still run on redundant retry slots.
+      # This repairs the case where the ledger was committed successfully but a prior Pages deploy failed.
       - uses: actions/configure-pages@v5
-        if: steps.guard.outputs.done != 'true'
       - uses: actions/upload-pages-artifact@v3
-        if: steps.guard.outputs.done != 'true'
         with:
           path: web
       - id: deployment
-        if: steps.guard.outputs.done != 'true'
         uses: actions/deploy-pages@v4
