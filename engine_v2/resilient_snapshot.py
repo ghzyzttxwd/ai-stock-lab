@@ -64,16 +64,46 @@ def _install_market_snapshot_recovery(trade_date: str, recovery_meta: dict) -> N
     AKShareMarket.snapshot = resilient_snapshot
 
 
+def _build_and_capture_sentiment(requested_date: str) -> tuple[dict, dict]:
+    """Build once and preserve the exact sentiment detail already used by the snapshot.
+
+    The base snapshot historically stored only aggregate sentiment counts. Downstream enrichment then
+    fetched the same Eastmoney pools again, creating a needless second network failure point and a
+    possible within-run data mismatch. Capture the first successful point-in-time payload instead.
+    """
+    import engine_v2.snapshot as snapshot_module
+
+    original = snapshot_module._sentiment_snapshot
+    captured: dict = {}
+
+    def capture(ak, trade_date: str):
+        result = original(ak, trade_date)
+        captured.clear()
+        captured.update(result)
+        captured['trade_date'] = trade_date
+        return result
+
+    snapshot_module._sentiment_snapshot = capture
+    try:
+        snap = build_snapshot(requested_date)
+    finally:
+        snapshot_module._sentiment_snapshot = original
+    return snap, captured
+
+
 def build_resilient_snapshot(requested_date: str) -> dict:
-    """Build the normal V2 snapshot, but preserve a strict decision-grade distinction on recovery."""
+    """Build the normal V2 snapshot, preserving strict decision-grade distinctions and one-shot inputs."""
     from engine.real_market import AKShareMarket
 
-    # Resolve the exact session before installing the recovery closure. This lightweight call already
-    # has its own Tencent stock/index fallback and does not touch any ledger.
     trade_date = AKShareMarket().latest_trade_date(requested_date)
     meta: dict = {}
     _install_market_snapshot_recovery(trade_date, meta)
-    snap = build_snapshot(requested_date)
+    snap, sentiment_detail = _build_and_capture_sentiment(requested_date)
+
+    if not sentiment_detail or sentiment_detail.get('trade_date') != snap.get('trade_date'):
+        raise RuntimeError('V2 snapshot failed to preserve same-session sentiment detail')
+    snap['market']['sentiment_detail'] = sentiment_detail
+    snap['source_notes']['sentiment_detail'] = 'persisted from the same one-shot point-in-time snapshot; downstream must not refetch'
 
     mode = str(meta.get('mode') or 'full')
     full = mode == 'full'
@@ -106,6 +136,11 @@ def main() -> None:
         'stock_universe_mode': snap['source_notes']['stock_universe_mode'],
         'stock_universe_grade': snap['safety']['stock_universe_grade'],
         'eligible_for_shadow_decision': snap['safety']['eligible_for_shadow_decision'],
+        'sentiment_detail': {
+            'limit_up': len(snap['market']['sentiment_detail'].get('limit_up', [])),
+            'broken_limit': len(snap['market']['sentiment_detail'].get('broken_limit', [])),
+            'limit_down': len(snap['market']['sentiment_detail'].get('limit_down', [])),
+        },
         'preselection_union': snap['preselection']['union_count'],
         'safety': snap['safety'],
     }, ensure_ascii=False, indent=2))
