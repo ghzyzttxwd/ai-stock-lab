@@ -32,26 +32,39 @@ jobs:
         run: |
           python - <<'PY'
           import json, os
-          from datetime import datetime
+          from datetime import datetime, date
           from pathlib import Path
           from zoneinfo import ZoneInfo
 
           today = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
           fund_ids = ('D_MAIN','A','B','C','D','L')
-          done = True
+          processed = True
           for fid in fund_ids:
               path = Path('state') / f'{fid}.json'
               try:
                   state = json.loads(path.read_text(encoding='utf-8'))
               except Exception:
-                  done = False
+                  processed = False
                   break
               if str(state.get('last_processed_date') or '')[:10] != today:
-                  done = False
+                  processed = False
                   break
+
+          cache_ok = False
+          cache_path = Path('state/market_universe.json')
+          try:
+              payload = json.loads(cache_path.read_text(encoding='utf-8'))
+              asof = str(payload.get('asof') or '')[:10]
+              symbols = payload.get('symbols') or []
+              age = (date.fromisoformat(today) - date.fromisoformat(asof)).days
+              cache_ok = 0 <= age <= 14 and len(symbols) >= 50
+          except Exception:
+              pass
+
+          done = processed and cache_ok
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'done={str(done).lower()}\n')
-          print(f'[guard] Beijing date={today}; already_processed={done}')
+          print(f'[guard] Beijing date={today}; processed={processed}; recovery_cache_ok={cache_ok}; skip={done}')
           PY
       - uses: actions/setup-python@v5
         if: steps.guard.outputs.done != 'true'
