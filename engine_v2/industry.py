@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from datetime import date, timedelta
 
+from .provider import bounded_call
+
 
 def _num(value, default=None):
     try:
@@ -106,11 +108,15 @@ def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
 def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
     td=date.fromisoformat(trade_date)
-    catalog=ak.index_realtime_sw(symbol='一级行业')
-    analysis=ak.index_analysis_daily_sw(
-        symbol='一级行业',
-        start_date=(td-timedelta(days=100)).strftime('%Y%m%d'),
-        end_date=td.strftime('%Y%m%d'),
+    catalog=bounded_call(45,lambda:ak.index_realtime_sw(symbol='一级行业'),'SW L1 catalog')
+    analysis=bounded_call(
+        90,
+        lambda:ak.index_analysis_daily_sw(
+            symbol='一级行业',
+            start_date=(td-timedelta(days=100)).strftime('%Y%m%d'),
+            end_date=td.strftime('%Y%m%d'),
+        ),
+        'SW L1 daily analysis',
     )
     industries=build_industry_scores(analysis,trade_date)
     stock_map={}
@@ -119,7 +125,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         idx=str(row['指数代码']).strip()
         name=str(row['指数名称']).strip()
         try:
-            df=ak.index_component_sw(symbol=idx)
+            df=bounded_call(25,lambda i=idx:ak.index_component_sw(symbol=i),f'SW component {idx}')
             for _,r in df.iterrows():
                 code=_stock_code(r.get('证券代码'))
                 if not _is_mainboard(code):
