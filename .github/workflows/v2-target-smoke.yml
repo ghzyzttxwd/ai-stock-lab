@@ -1,19 +1,18 @@
 name: V2 target diagnostics (shadow only)
 
 on:
-  workflow_dispatch:
   push:
     branches: [v2-shadow]
     paths:
-      - 'engine_v2/targets.py'
-      - 'engine_v2/strategies.py'
-      - 'engine_v2/sizing.py'
-      - 'engine_v2/enrichment_resilient.py'
-      - 'tests/test_v2_targets.py'
       - '.github/workflows/v2-target-smoke.yml'
+      - 'shadow_state/v2/.target-smoke-trigger'
 
 permissions:
   contents: read
+
+env:
+  V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
+  V2_HISTORY_WORKERS: '3'
 
 # Share the live-provider lock with v2-snapshot-smoke. These jobs both hit the same
 # public A-share endpoints and must never run concurrently; contention itself can
@@ -57,6 +56,14 @@ jobs:
 
       - name: Build safe normalized snapshot
         run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
+
+      - name: Restore bounded Tencent history cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/v2-history
+          key: v2-history-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('requirements.txt', 'engine_v2/history_cache.py') }}
+          restore-keys: |
+            v2-history-${{ runner.os }}-
 
       - name: Enrich candidates with Tencent histories
         run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
@@ -102,3 +109,4 @@ jobs:
             /tmp/v2-shadow-targets.json
           if-no-files-found: warn
           retention-days: 14
+
