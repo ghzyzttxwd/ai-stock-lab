@@ -58,7 +58,8 @@ class AKShareMarket:
     """Real-market loader with independent upstreams and conservative fallbacks.
 
     Full-market snapshot: Eastmoney first, Sina fallback, both with bounded retries.
-    Historical bars, trading-date detection and recovery bars: Tencent Securities via AKShare.
+    Historical bars and recovery bars: Tencent Securities via AKShare.
+    Trading-date detection: Tencent A-share daily first, Tencent index daily fallback.
     """
     def __init__(self, history_limit: int = 120):
         import akshare as ak
@@ -78,14 +79,32 @@ class AKShareMarket:
             try:
                 df=self.ak.stock_zh_a_hist_tx(symbol='sz000001',start_date=start,end_date=end,adjust='',timeout=20)
                 if df is None or df.empty:
-                    raise RuntimeError('empty Tencent calendar response')
-                return str(df.iloc[-1]['date'])[:10]
+                    raise RuntimeError('empty Tencent stock calendar response')
+                td=str(df.iloc[-1]['date'])[:10]
+                print(f'[market] trading-date source=tencent-stock date={td}')
+                return td
             except Exception as e:
                 last_error=e
-                print(f'[market] Tencent trading-date attempt {attempt}/2 failed: {e}')
+                print(f'[market] Tencent stock trading-date attempt {attempt}/2 failed: {e}')
                 if attempt == 1:
                     time.sleep(3)
-        raise RuntimeError(f'Cannot determine latest trading date from Tencent: {last_error}')
+
+        try:
+            df=_call_with_timeout(35,lambda:self.ak.stock_zh_index_daily_tx(symbol='sh000001'))
+            if df is None or df.empty:
+                raise RuntimeError('empty Tencent index calendar response')
+            dates=[str(x)[:10] for x in df['date'].tolist()]
+            valid=[x for x in dates if x and x <= requested.isoformat()]
+            if not valid:
+                raise RuntimeError(f'no index trading date on or before {requested.isoformat()}')
+            td=max(valid)
+            print(f'[market] trading-date source=tencent-index-fallback date={td}')
+            return td
+        except Exception as index_error:
+            raise RuntimeError(
+                f'Cannot determine latest trading date; Tencent stock path failed ({last_error}); '
+                f'Tencent index fallback failed ({index_error})'
+            ) from index_error
 
     def _snapshot_eastmoney(self) -> list[dict]:
         df = self.ak.stock_zh_a_spot_em()
