@@ -1,7 +1,7 @@
 name: Daily virtual-fund run
 on:
   workflow_dispatch:
-  # Safe recovery hook: changing only this marker can start a production catch-up run.
+  # Safe recovery hook: changing only this marker can start a production catch-up/read-only refresh run.
   push:
     branches: [main]
     paths:
@@ -61,10 +61,18 @@ jobs:
           except Exception:
               pass
 
-          done = processed and cache_ok
+          # Scheduled retry slots can skip market/Sol once the ledger and cache are healthy.
+          # An explicit production-trigger push intentionally rebuilds read-only web snapshots;
+          # run_all sees the same processed date and does not trade or call Sol again.
+          explicit_refresh = os.getenv('GITHUB_EVENT_NAME') == 'push'
+          done = processed and cache_ok and not explicit_refresh
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'done={str(done).lower()}\n')
-          print(f'[guard] Beijing date={today}; processed={processed}; recovery_cache_ok={cache_ok}; ledger_work_needed={not done}')
+          print(
+              f'[guard] Beijing date={today}; processed={processed}; '
+              f'recovery_cache_ok={cache_ok}; explicit_refresh={explicit_refresh}; '
+              f'ledger_work_needed={not done}'
+          )
           PY
       - uses: actions/setup-python@v5
         if: steps.guard.outputs.done != 'true'
