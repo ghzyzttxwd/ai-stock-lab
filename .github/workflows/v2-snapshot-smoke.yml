@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+env:
+  V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
+  V2_HISTORY_WORKERS: '3'
+
 concurrency:
   group: v2-snapshot-smoke
   cancel-in-progress: false
@@ -89,6 +93,14 @@ jobs:
           if s['safety'].get('ready_for_shadow_accounting'):
               raise SystemExit('snapshot cannot claim accounting readiness before Tencent history enrichment')
           PY
+
+      - name: Restore bounded Tencent history cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/v2-history
+          key: v2-history-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('requirements.txt', 'engine_v2/history_cache.py') }}
+          restore-keys: |
+            v2-history-${{ runner.os }}-
 
       - name: Enrich preselection with Tencent histories
         run: |
