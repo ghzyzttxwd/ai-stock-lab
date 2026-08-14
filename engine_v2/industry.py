@@ -41,6 +41,20 @@ def _is_mainboard(code: str | None) -> bool:
     return bool(code) and code.startswith(('600','601','603','605','000','001','002','003'))
 
 
+def _assign_membership(stock_map: dict, duplicates: dict, code: str, item: dict) -> None:
+    previous=stock_map.get(code)
+    if previous and previous.get('industry_code') != item.get('industry_code'):
+        duplicates.setdefault(code,{
+            'code':code,
+            'industry_codes':[previous.get('industry_code')],
+            'industry_names':[previous.get('industry_name')],
+        })
+        if item.get('industry_code') not in duplicates[code]['industry_codes']:
+            duplicates[code]['industry_codes'].append(item.get('industry_code'))
+            duplicates[code]['industry_names'].append(item.get('industry_name'))
+    stock_map[code]=item
+
+
 def _rank(values: dict[str,float | None]) -> dict[str,float | None]:
     valid=sorted((float(v),k) for k,v in values.items() if v is not None)
     out={k:None for k in values}
@@ -201,6 +215,8 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
 
     stock_map={}
     failures=[]
+    duplicate_assignments={}
+    component_rows_mainboard=0
     successful_declared=0
     for row in catalog:
         idx=row['industry_code']
@@ -212,21 +228,24 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
                 code=_stock_code(r.get('证券代码'))
                 if not _is_mainboard(code):
                     continue
+                component_rows_mainboard += 1
                 included=str(r.get('计入日期') or '')[:10]
                 if included and included!='NaT' and included>trade_date:
                     continue
-                stock_map[code]={
+                _assign_membership(stock_map,duplicate_assignments,code,{
                     'industry_code':idx,
                     'industry_name':name,
                     'included_date':included if included and included!='NaT' else None,
                     'industry_score':industries.get(idx,{}).get('industry_score'),
-                }
+                })
         except Exception as exc:
             failures.append({'industry_code':idx,'industry_name':name,'error':f'{type(exc).__name__}: {exc}'})
 
-    if len(stock_map)<2500 or len(failures)>2:
+    duplicate_limit=max(10,int(max(1,len(stock_map))*0.005))
+    if len(stock_map)<2500 or len(failures)>2 or len(duplicate_assignments)>duplicate_limit:
         raise RuntimeError(
-            f'Shenwan industry snapshot incomplete industries={len(industries)} stocks={len(stock_map)} failures={len(failures)}'
+            f'Shenwan industry snapshot incomplete industries={len(industries)} stocks={len(stock_map)} '
+            f'failures={len(failures)} cross_industry_duplicates={len(duplicate_assignments)}'
         )
     return {
         'trade_date':trade_date,
@@ -236,6 +255,8 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         'counts':{
             'industries':len(industries),
             'mainboard_stocks':len(stock_map),
+            'component_rows_mainboard':component_rows_mainboard,
+            'duplicate_cross_industry_stocks':len(duplicate_assignments),
             'component_failures':len(failures),
         },
         'source':{
@@ -243,6 +264,8 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
             'analysis':'sws-index-analysis-daily-bounded-retry-2',
             'components':'sws-index-component',
             'successful_declared_components':successful_declared,
+            'unique_vs_declared_ratio':round(len(stock_map)/successful_declared,4) if successful_declared else None,
+            'duplicate_sample':list(duplicate_assignments.values())[:10],
             'failure_sample':failures[:2],
         },
     }

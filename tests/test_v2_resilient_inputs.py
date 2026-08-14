@@ -1,6 +1,10 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
 
 from engine_v2.enrichment_resilient import _install_persisted_sentiment
+from engine_v2.resilient_snapshot import _load_recovery_universe, _save_recovery_universe
 
 
 class V2ResilientInputTests(unittest.TestCase):
@@ -32,6 +36,23 @@ class V2ResilientInputTests(unittest.TestCase):
                 'trade_date':'2026-08-14',
                 'market':{'sentiment_detail':{'trade_date':'2026-08-13'}},
             })
+
+    def test_recovery_universe_is_v2_owned_and_round_trips(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'shadow_state'/'v2'/'cache'/'market_universe.json'
+            snapshot={
+                'trade_date':'2026-08-14',
+                'preselection':{'rows':[
+                    {'code':f'sh.{600000+i:06d}','raw_code':f'{600000+i:06d}','name':f'S{i}','amount':1_000_000+i}
+                    for i in range(60)
+                ]},
+            }
+            _save_recovery_universe(snapshot,path)
+            payload=json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual(payload['cache_version'],'v2-market-universe-1')
+            rows,meta=_load_recovery_universe('2026-08-15',path)
+            self.assertEqual(len(rows),60)
+            self.assertEqual(meta['asof'],'2026-08-14')
 
 
 if __name__=='__main__':

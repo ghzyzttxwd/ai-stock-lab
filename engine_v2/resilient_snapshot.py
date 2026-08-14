@@ -2,20 +2,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import date
 from pathlib import Path
 
 from .snapshot import build_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
-CACHE_PATH = ROOT / 'state' / 'market_universe.json'
+V2_CACHE_PATH = ROOT / 'shadow_state' / 'v2' / 'cache' / 'market_universe.json'
 
 
-def _load_recovery_universe(trade_date: str, path: Path = CACHE_PATH) -> tuple[list[dict], dict]:
-    """Load a recent production recovery universe without treating it as a full market universe."""
+def _cache_path() -> Path:
+    return Path(os.getenv('V2_UNIVERSE_CACHE_PATH', str(V2_CACHE_PATH)))
+
+
+def _load_recovery_universe(trade_date: str, path: Path | None = None) -> tuple[list[dict], dict]:
+    """Load only the V2-owned recovery universe; V1 state is never consulted."""
+    path = path or _cache_path()
     if not path.exists():
         raise RuntimeError(f'V2 recovery cache missing: {path}')
     payload = json.loads(path.read_text(encoding='utf-8'))
+    if payload.get('cache_version') != 'v2-market-universe-1':
+        raise RuntimeError(f'unsupported V2 recovery cache version: {payload.get("cache_version")}')
     asof = str(payload.get('asof') or '')[:10]
     if not asof:
         raise RuntimeError('V2 recovery cache has no asof date')
@@ -26,6 +34,27 @@ def _load_recovery_universe(trade_date: str, path: Path = CACHE_PATH) -> tuple[l
     if len(rows) < 50:
         raise RuntimeError(f'V2 recovery cache too small: {len(rows)}')
     return rows, {'asof': asof, 'age_days': age, 'symbols': len(rows)}
+
+
+def _save_recovery_universe(snapshot: dict, path: Path | None = None) -> None:
+    path = path or _cache_path()
+    rows = []
+    keep = ('code', 'raw_code', 'name', 'peTTM', 'pbMRQ', 'r60_snapshot', 'amount', 'turn')
+    for item in (snapshot.get('preselection') or {}).get('rows') or []:
+        if item.get('code'):
+            rows.append({key: item.get(key) for key in keep})
+    if len(rows) < 50:
+        raise RuntimeError(f'refusing to persist undersized V2 recovery universe: {len(rows)}')
+    payload = {
+        'cache_version': 'v2-market-universe-1',
+        'asof': snapshot.get('trade_date'),
+        'source': 'V2 full decision-grade snapshot preselection',
+        'symbols': rows,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    tmp.replace(path)
 
 
 def _install_market_snapshot_recovery(trade_date: str, recovery_meta: dict) -> None:
@@ -107,6 +136,8 @@ def build_resilient_snapshot(requested_date: str) -> dict:
 
     mode = str(meta.get('mode') or 'full')
     full = mode == 'full'
+    if full:
+        _save_recovery_universe(snap)
     snap['source_notes']['stock_universe_mode'] = mode
     snap['source_notes']['stock_universe_grade'] = 'full' if full else 'degraded'
     if not full:
@@ -114,9 +145,11 @@ def build_resilient_snapshot(requested_date: str) -> dict:
     snap['safety']['stock_universe_grade'] = 'full' if full else 'degraded'
     snap['safety']['eligible_for_shadow_decision'] = full
     snap['safety']['decision_block_reason'] = None if full else (
-        'Full-market Eastmoney/Sina snapshot unavailable; cached production universe is allowed for '
+        'Full-market Eastmoney/Sina snapshot unavailable; cached V2 universe is allowed for '
         'pipeline continuity only and must not be treated as a complete cross-sectional decision universe.'
     )
+    snap['safety']['reads_v1_ledger'] = False
+    snap['safety']['writes_v1_ledger'] = False
     return snap
 
 

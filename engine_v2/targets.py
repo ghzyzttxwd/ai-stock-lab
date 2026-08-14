@@ -42,16 +42,42 @@ def _portfolio_stats(targets: list[dict]) -> dict:
     industry = defaultdict(float)
     for x in targets:
         industry[str(x.get('industry') or 'UNKNOWN')] += float(x.get('target_weight') or 0.0)
+    exposure = sum(float(x.get('target_weight') or 0.0) for x in targets)
+    industry_values = sorted(industry.values(), reverse=True)
+    normalized = [value / exposure for value in industry_values] if exposure > 0 else []
+    hhi = sum(value * value for value in normalized)
     return {
         'positions': len(targets),
-        'exposure': round(sum(float(x.get('target_weight') or 0.0) for x in targets), 6),
+        'exposure': round(exposure, 6),
         'max_position': round(max((float(x.get('target_weight') or 0.0) for x in targets), default=0.0), 6),
         'industry_weights': dict(sorted(
             ((k, round(v, 6)) for k, v in industry.items()),
             key=lambda kv: kv[1], reverse=True,
         )),
         'max_industry': round(max(industry.values(), default=0.0), 6),
+        'max_industry_share_of_invested': round(normalized[0], 6) if normalized else 0.0,
+        'top2_industry_share_of_invested': round(sum(normalized[:2]), 6) if normalized else 0.0,
+        'industry_hhi': round(hhi, 6),
+        'effective_industries': round(1.0 / hhi, 4) if hhi > 0 else 0.0,
     }
+
+
+def _concentration_flags(stats: dict[str, dict]) -> dict[str, list[str]]:
+    """Surface B/C concentration without silently optimizing it away."""
+    result: dict[str, list[str]] = {}
+    for label in ('B', 'C'):
+        item = stats[label]
+        flags = []
+        if item['effective_industries'] and item['effective_industries'] < 2.0:
+            flags.append('effective_industries_below_2')
+        if item['max_industry_share_of_invested'] >= 0.60:
+            flags.append('single_industry_at_least_60pct_of_invested')
+        if item['top2_industry_share_of_invested'] >= 0.85:
+            flags.append('top2_industries_at_least_85pct_of_invested')
+        if item['max_industry'] >= POLICY[label]['industry_cap'] * 0.95:
+            flags.append('hard_industry_cap_nearly_full')
+        result[label] = flags
+    return result
 
 
 def _jaccard(a: list[dict], b: list[dict]) -> float:
@@ -142,8 +168,9 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
     # review rather than silently tuning parameters to make the experiment look diverse.
     high_overlap = {k: v for k, v in overlap.items() if v >= 0.60}
     all_errors = {k: v for k, v in validation.items() if v}
+    stats = {k: _portfolio_stats(v) for k, v in targets.items()}
     return {
-        'target_version': 'v2-shadow-targets-0.1',
+        'target_version': 'v2-shadow-targets-0.2',
         'trade_date': enriched.get('trade_date'),
         'decision_for': 'next_trading_session_open',
         'regime': {
@@ -154,7 +181,8 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
         },
         'fund_drawdowns_used': {k: float(dds.get(k) or 0.0) for k in labels},
         'targets': targets,
-        'stats': {k: _portfolio_stats(v) for k, v in targets.items()},
+        'stats': stats,
+        'concentration_flags': _concentration_flags(stats),
         'overlap_jaccard': overlap,
         'high_overlap_pairs': high_overlap,
         'validation_errors': all_errors,

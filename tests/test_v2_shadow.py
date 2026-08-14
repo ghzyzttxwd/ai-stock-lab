@@ -14,6 +14,7 @@ from engine_v2.fundamentals import (
     score_quality,
     select_scoring_period,
 )
+from engine_v2.industry import _assign_membership
 from engine_v2.regime import MarketRegime, classify_market_regime
 from engine_v2.sizing import risk_budget_weights
 from engine_v2.snapshot import _normalize_market_row
@@ -54,6 +55,15 @@ def candidate(i: int, industry: str = "行业A", **kw):
 
 
 class V2ShadowTests(unittest.TestCase):
+    def test_industry_membership_reports_cross_industry_duplicates(self):
+        mapping={}
+        duplicates={}
+        _assign_membership(mapping,duplicates,'600000',{'industry_code':'801010','industry_name':'农林牧渔'})
+        _assign_membership(mapping,duplicates,'600000',{'industry_code':'801780','industry_name':'银行'})
+        self.assertEqual(len(mapping),1)
+        self.assertIn('600000',duplicates)
+        self.assertEqual(duplicates['600000']['industry_codes'],['801010','801780'])
+
     def test_regime_uses_broad_market_inputs(self):
         strong = classify_market_regime({
             "index_trend_score": 78,

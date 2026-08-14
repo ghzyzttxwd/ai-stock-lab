@@ -1,0 +1,208 @@
+name: V2 forward shadow ledgers (isolated)
+
+on:
+  push:
+    branches: [v2-shadow]
+    paths:
+      - 'engine_v2/shadow_ledger.py'
+      - 'engine_v2/shadow_run.py'
+      - 'engine_v2/history_cache.py'
+      - 'engine_v2/targets.py'
+      - 'engine_v2/strategies.py'
+      - 'engine_v2/sizing.py'
+      - 'engine_v2/enrichment.py'
+      - 'engine_v2/enrichment_resilient.py'
+      - 'tests/test_v2*.py'
+      - '.github/workflows/v2-shadow-ledger.yml'
+      - 'shadow_state/v2/.run-trigger'
+
+permissions:
+  contents: write
+
+# Every V2 live-data workflow shares one lock. Public market endpoints are less reliable
+# when three independent diagnostics hit them at once.
+concurrency:
+  group: v2-snapshot-smoke
+  cancel-in-progress: false
+
+jobs:
+  shadow-ledgers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout only the isolated V2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run all V2 tests before accounting
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+
+      - name: Resolve latest completed A-share session safely
+        id: td
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from engine_v2.data_validation import _safe_requested_date
+          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
+          PY
+          )
+          echo "date=$TD" >> "$GITHUB_OUTPUT"
+          echo "trade_date=$TD"
+
+      - name: Skip provider calls when the session is already audited
+        id: guard
+        run: |
+          python -m engine_v2.shadow_guard \
+            --state-root shadow_state/v2 \
+            --trade-date "${{ steps.td.outputs.date }}" \
+            --report /tmp/v2-shadow-run.json
+
+      - name: Restore bounded Tencent history cache
+        if: steps.guard.outputs.done != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .cache/v2-history
+          key: v2-history-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('requirements.txt', 'engine_v2/history_cache.py') }}
+          restore-keys: |
+            v2-history-${{ runner.os }}-
+
+      - name: Assert checkout is the isolated branch
+        shell: bash
+        run: |
+          test "$(git branch --show-current)" = "v2-shadow"
+
+      - name: Build one resilient decision snapshot
+        if: steps.guard.outputs.done != 'true'
+        shell: bash
+        run: |
+          start=$(date +%s)
+          python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
+          echo "snapshot_s=$(($(date +%s)-start))" >> /tmp/v2-timings.env
+
+      - name: Enrich once with cached Tencent histories
+        if: steps.guard.outputs.done != 'true'
+        shell: bash
+        env:
+          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
+          V2_HISTORY_WORKERS: '3'
+        run: |
+          start=$(date +%s)
+          python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
+          echo "enrichment_s=$(($(date +%s)-start))" >> /tmp/v2-timings.env
+
+      - name: Advance five isolated 1m shadow ledgers
+        if: steps.guard.outputs.done != 'true'
+        shell: bash
+        run: |
+          start=$(date +%s)
+          python -m engine_v2.shadow_run \
+            --snapshot /tmp/v2-normalized-snapshot.json \
+            --enriched /tmp/v2-enriched-candidates.json \
+            --state-root shadow_state/v2 \
+            --report /tmp/v2-shadow-run.json
+          echo "accounting_s=$(($(date +%s)-start))" >> /tmp/v2-timings.env
+
+      - name: Build derived V2 comparison summary
+        run: python -m engine_v2.shadow_reporting --state-root shadow_state/v2 --output shadow_state/v2/summary.json
+
+      - name: Assert isolation, auditability and no Sol
+        shell: bash
+        run: |
+          git diff --quiet -- state web
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
+          print('[V2 SHADOW] status=',report['status'])
+          print('[V2 SHADOW] trade_date=',report['trade_date'])
+          print('[V2 SHADOW] event_hash=',report['event_hash'])
+          print('[V2 SHADOW] fills=',json.dumps(report.get('fills',{}),ensure_ascii=False))
+          print('[V2 SHADOW] rejected=',json.dumps(report.get('rejected_orders',{}),ensure_ascii=False))
+          print('[V2 SHADOW] concentration=',json.dumps(report.get('concentration_flags',{}),ensure_ascii=False))
+          print('[V2 SHADOW] missing_execution_bars=',report.get('missing_critical_execution_bars',[]))
+          safety=report.get('safety') or {}
+          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 isolation invariant violated')
+          if report['status'] == 'processed':
+              for fund_id in ('A','B','C','D','L'):
+                  state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
+                  if state['initial_cash'] != 1_000_000:
+                      raise SystemExit(f'{fund_id} initial cash changed')
+                  if state['last_processed_date'] != report['trade_date']:
+                      raise SystemExit(f'{fund_id} date mismatch')
+                  if state['audit_head'] != report['event_hash']:
+                      raise SystemExit(f'{fund_id} audit head mismatch')
+                  if state['pending_decision'].get('calls_sol'):
+                      raise SystemExit(f'{fund_id} unexpectedly calls Sol')
+              audit=Path(report['audit_path'])
+              if not audit.exists():
+                  raise SystemExit('immutable audit event missing')
+          PY
+          changed=$(git status --short | awk '{print $2}' | grep -v '^shadow_state/v2/' || true)
+          if [ -n "$changed" ]; then
+            echo "Unexpected paths changed by V2 shadow run:"
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Report stage runtimes
+        if: always()
+        shell: bash
+        run: |
+          touch /tmp/v2-timings.env
+          cat /tmp/v2-timings.env
+          python - <<'PY'
+          from pathlib import Path
+          values={}
+          for line in Path('/tmp/v2-timings.env').read_text().splitlines():
+              if '=' in line:
+                  key,value=line.split('=',1)
+                  values[key]=int(value)
+          values['measured_total_s']=sum(values.values())
+          print('[V2 RUNTIME]',values)
+          with open('/tmp/v2-runtime.json','w',encoding='utf-8') as f:
+              import json
+              json.dump(values,f,ensure_ascii=False,indent=2)
+          path=Path('shadow_state/v2/diagnostics')/f'runtime-${{ steps.td.outputs.date }}.json'
+          if not path.exists() and values:
+              path.parent.mkdir(parents=True,exist_ok=True)
+              path.write_text(__import__('json').dumps(values,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+
+      - name: Persist only V2 shadow state
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add shadow_state/v2
+          git diff --cached --quiet || git commit -m "v2-data: advance isolated shadow ledgers"
+          git pull --rebase origin v2-shadow
+          git push origin HEAD:v2-shadow
+
+      - name: Upload reproducibility artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-shadow-ledger-${{ steps.td.outputs.date }}
+          path: |
+            /tmp/v2-normalized-snapshot.json
+            /tmp/v2-enriched-candidates.json
+            /tmp/v2-shadow-run.json
+            /tmp/v2-runtime.json
+            shadow_state/v2/audit/${{ steps.td.outputs.date }}.json
+          if-no-files-found: warn
+          retention-days: 30

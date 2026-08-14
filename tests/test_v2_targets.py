@@ -50,12 +50,17 @@ class V2TargetTests(unittest.TestCase):
         self.assertFalse(result['safety']['calls_sol'])
         self.assertFalse(result['safety']['executes_orders'])
         self.assertEqual(set(result['targets']), {'A','B','C','D','L'})
+        self.assertEqual(set(result['concentration_flags']), {'B','C'})
         for label, targets in result['targets'].items():
             self.assertGreater(len(targets), 0, label)
             for row in targets:
                 self.assertTrue(row['thesis'])
                 self.assertTrue(row['invalidation'])
                 self.assertGreater(row['target_weight'], 0)
+        for stats in result['stats'].values():
+            self.assertIn('industry_hhi', stats)
+            self.assertIn('effective_industries', stats)
+            self.assertLessEqual(stats['top2_industry_share_of_invested'], 1.0)
 
     def test_degraded_upstream_universe_blocks_target_generation(self):
         with self.assertRaisesRegex(RuntimeError, 'blocked by upstream safety'):

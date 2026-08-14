@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 from pathlib import Path
 from statistics import mean, pstdev
 
@@ -165,7 +166,21 @@ def enrich_snapshot(snapshot: dict) -> dict:
         raise RuntimeError('V2 snapshot contains no preselection rows')
 
     market = AKShareMarket(history_limit=120)
-    histories = market.histories(selected, trade_date)
+    cache_root = os.getenv('V2_HISTORY_CACHE_DIR')
+    if cache_root:
+        from .history_cache import load_histories_cached
+        histories, history_diagnostics = load_histories_cached(
+            market, selected, trade_date, Path(cache_root),
+        )
+    else:
+        histories = market.histories(selected, trade_date)
+        history_diagnostics = {
+            'cache_version': None, 'workers': 1, 'selected': len(selected),
+            'current_histories': len(histories), 'cache_hits': 0,
+            'incremental_fetches': 0, 'full_fetches': len(selected),
+            'failures': max(0, len(selected) - len(histories)), 'elapsed_s': None,
+            'mode': 'legacy_serial_no_persistent_cache',
+        }
     sentiment = _sentiment_snapshot(ak, trade_date)
     signals = _sentiment_signals(sentiment)
 
@@ -266,9 +281,11 @@ def enrich_snapshot(snapshot: dict) -> dict:
             'eligible_technical_features': len(candidates),
             'history_ratio': round(history_coverage, 4),
             'feature_ratio': round(feature_coverage, 4),
+            'history_cache': history_diagnostics,
         },
         'factor_notes': {
             'price_history': 'Tencent qfq daily bars ending exactly on trade_date',
+            'history_cache': 'persistent content cache with bounded incremental Tencent refresh when V2_HISTORY_CACHE_DIR is set',
             'valuation_score': 'cross-sectional inverse rank of disclosed common-period PB; missing stays missing',
             'risk_score': 'cross-sectional low-volatility and max-drawdown rank',
             'liquidity_score': 'cross-sectional 20-session turnover-amount rank',
