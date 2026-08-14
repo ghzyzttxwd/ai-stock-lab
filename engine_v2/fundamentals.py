@@ -4,6 +4,8 @@ import math
 from collections import defaultdict
 from datetime import date
 
+from .provider import bounded_call
+
 
 def normalize_code(value) -> str | None:
     if value is None:
@@ -90,7 +92,6 @@ def _percentile(values: dict[str, float | None]) -> dict[str, float | None]:
         return {k: None for k in values}
     n = len(valid)
     result = {k: None for k in values}
-    # Average-rank ties so repeated values do not receive arbitrary ordering.
     i = 0
     while i < n:
         j = i + 1
@@ -164,8 +165,16 @@ def load_point_in_time_fundamentals(trade_date: str, industry_by_code: dict[str,
 
     td = date.fromisoformat(trade_date)
     current_period, previous_period = _quarter_pair(td)
-    current_df = ak.stock_yjbb_em(date=current_period.strftime('%Y%m%d'))
-    previous_df = ak.stock_yjbb_em(date=previous_period.strftime('%Y%m%d'))
+    current_df = bounded_call(
+        75,
+        lambda: ak.stock_yjbb_em(date=current_period.strftime('%Y%m%d')),
+        f'financial report {current_period.isoformat()}',
+    )
+    previous_df = bounded_call(
+        75,
+        lambda: ak.stock_yjbb_em(date=previous_period.strftime('%Y%m%d')),
+        f'financial report {previous_period.isoformat()}',
+    )
     current_rows = _announced_mainboard_rows(current_df, trade_date)
     previous_rows = _announced_mainboard_rows(previous_df, trade_date)
     selected_label, selected_rows, current_coverage = select_scoring_period(
