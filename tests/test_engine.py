@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+import pandas as pd
 from engine.universe import is_main_board
 from engine.risk import clamp_d_targets
 from engine.broker import round_lot, fee_for, _locked_at_limit
@@ -111,5 +113,23 @@ class EngineTests(unittest.TestCase):
         }
         self.assertEqual(_decision_diary(state,'2026-08-14'),'今天真实决策日记')
         self.assertEqual(_decision_diary(state,'2026-08-15'),'当日已处理')
+
+    def test_trading_date_falls_back_to_tencent_index(self):
+        class FakeAk:
+            def stock_zh_a_hist_tx(self, **_kwargs):
+                raise RuntimeError('stock calendar unavailable')
+            def stock_zh_index_daily_tx(self, symbol):
+                self.symbol=symbol
+                return pd.DataFrame([
+                    {'date':'2026-08-13','close':100.0},
+                    {'date':'2026-08-14','close':101.0},
+                    {'date':'2026-08-17','close':102.0},
+                ])
+        market=AKShareMarket.__new__(AKShareMarket)
+        market.ak=FakeAk()
+        with patch('engine.real_market.time.sleep',return_value=None):
+            td=market.latest_trade_date('2026-08-16')
+        self.assertEqual(td,'2026-08-14')
+        self.assertEqual(market.ak.symbol,'sh000001')
 
 if __name__=='__main__': unittest.main()
