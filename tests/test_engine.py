@@ -2,7 +2,8 @@ import unittest
 from engine.universe import is_main_board
 from engine.risk import clamp_d_targets
 from engine.broker import round_lot, fee_for, _locked_at_limit
-from engine.daily_run import _previous_trade_date, _pending_is_fresh
+from engine.daily_run import _previous_trade_date, _pending_is_fresh, _merge_recovery_universe
+from engine.real_market import AKShareMarket
 
 class EngineTests(unittest.TestCase):
     def test_board_filter(self):
@@ -53,5 +54,31 @@ class EngineTests(unittest.TestCase):
         }
         self.assertTrue(_pending_is_fresh(state,'2026-08-13'))
         self.assertFalse(_pending_is_fresh(state,'2026-08-14'))
+
+    def test_recovery_universe_keeps_critical_symbols(self):
+        cached=[{'code':'sh.600000','name':'浦发银行','peTTM':6.0}]
+        critical={'sh.600000':'浦发银行','sz.000001':'平安银行'}
+        merged=_merge_recovery_universe(cached,critical)
+        by_code={x['code']:x for x in merged}
+        self.assertIn('sh.600000',by_code)
+        self.assertIn('sz.000001',by_code)
+        self.assertEqual(by_code['sz.000001']['name'],'平安银行')
+        self.assertEqual(by_code['sh.600000']['peTTM'],6.0)
+
+    def test_tencent_history_snapshot_uses_current_and_previous_bar(self):
+        market=AKShareMarket.__new__(AKShareMarket)
+        selected=[{'code':'sh.600000','name':'浦发银行','peTTM':6.0,'pbMRQ':0.7}]
+        histories={
+            'sh.600000':[
+                {'date':'2026-08-13','open':10.0,'high':10.2,'low':9.9,'close':10.1,'amount':100000000},
+                {'date':'2026-08-14','open':10.2,'high':10.6,'low':10.1,'close':10.5,'amount':120000000},
+            ]
+        }
+        rows=market.snapshot_from_histories(selected,histories,'2026-08-14')
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['open'],10.2)
+        self.assertEqual(rows[0]['close'],10.5)
+        self.assertEqual(rows[0]['preclose'],10.1)
+        self.assertEqual(rows[0]['source'],'tencent-cache')
 
 if __name__=='__main__': unittest.main()
