@@ -45,6 +45,34 @@ def _clean_text(value) -> str:
     return '' if text.lower() in {'nan', 'none', 'null'} else text
 
 
+def _normalize_market_row(row: dict) -> dict:
+    """Remove provider sentinel zeros before V2 uses a market row.
+
+    The production Sina fallback deliberately emits zeros for fields it does not provide. V2 must
+    never interpret those zeros as real PE/PB/60-day return/turnover observations.
+    """
+    item = dict(row)
+    source = str(item.get('source') or 'unknown').lower()
+    pe = _num(item.get('peTTM'))
+    pb = _num(item.get('pbMRQ'))
+    r60 = _num(item.get('r60_snapshot'))
+    turn = _num(item.get('turn'))
+    if source == 'sina':
+        pe = None
+        pb = None
+        r60 = None
+        turn = None
+    else:
+        pe = pe if pe is not None and pe > 0 else None
+        pb = pb if pb is not None and pb > 0 else None
+        turn = turn if turn is not None and turn > 0 else None
+    item['peTTM'] = pe
+    item['pbMRQ'] = pb
+    item['r60_snapshot'] = r60
+    item['turn'] = turn
+    return item
+
+
 def _activity_map(df) -> dict[str, object]:
     if df is None or df.empty or not {'item', 'value'}.issubset({str(x) for x in df.columns}):
         return {}
@@ -176,22 +204,42 @@ def _preselect_style_union(
     market_rows: list[dict], fundamentals: dict, industry: dict, sentiment: dict,
     max_union: int = 180,
 ) -> dict:
+    """Broad, source-invariant preselection only; final strategy scores require historical enrichment."""
     fund = fundamentals['stocks']
     swmap = industry['stock_map']
     rows = []
     by_code = {}
-    for row in market_rows:
+    source_counts = Counter()
+    pe_available = 0
+    r60_available = 0
+    report_pb_available = 0
+
+    for raw in market_rows:
+        row = _normalize_market_row(raw)
         code = _raw_code(row.get('code') or row.get('raw_code'))
         if not _is_mainboard(code):
             continue
-        item = {**row, 'raw_code': code}
+        source_counts[str(row.get('source') or 'unknown')] += 1
         f = fund.get(code, {})
         sw = swmap.get(code, {})
+        close = _num(row.get('close'))
+        bps = _num(f.get('book_value_per_share'))
+        report_pb = close / bps if close is not None and close > 0 and bps is not None and bps > 0 else None
+        if row.get('peTTM') is not None:
+            pe_available += 1
+        if row.get('r60_snapshot') is not None:
+            r60_available += 1
+        if report_pb is not None:
+            report_pb_available += 1
+
+        item = {**row, 'raw_code': code}
         item.update({
             'quality_score': f.get('quality_score'),
             'cashflow_score': f.get('cashflow_score'),
             'fundamental_ready': bool(f.get('fundamental_ready')),
             'financial_distress': bool(f.get('financial_distress')),
+            'book_value_per_share': bps,
+            'valuation_pb_disclosed': round(report_pb, 4) if report_pb is not None else None,
             'fundamental_period': fundamentals['selected_period'] if f else None,
             'industry': sw.get('industry_name'),
             'industry_code': sw.get('industry_code'),
@@ -210,31 +258,33 @@ def _preselect_style_union(
         eligible=lambda x: x.get('fundamental_ready') and not x.get('financial_distress'),
     )
     pools['B'] = top(
-        lambda x: ((x.get('industry_score') or 0) * 0.7 + (x.get('r60_snapshot') or 0) * 30, x.get('amount', 0)), 55,
+        lambda x: ((x.get('industry_score') or 0) * 0.8 + (_num(x.get('pctChg'), 0) or 0) * 2.0, x.get('amount', 0)), 55,
         eligible=lambda x: (x.get('industry_score') or 0) >= 45,
     )
     limit_codes = {x['code'] for x in sentiment['limit_up']} | {x['code'] for x in sentiment['broken_limit']}
     c_limit = [by_code[c] for c in limit_codes if c in by_code]
     c_extra = top(
-        lambda x: ((x.get('industry_score') or 0), (x.get('pctChg') or 0), x.get('amount', 0)), 25,
+        lambda x: ((x.get('industry_score') or 0), (_num(x.get('pctChg'), 0) or 0), x.get('amount', 0)), 25,
         eligible=lambda x: (x.get('industry_score') or 0) >= 55,
     )
     pools['C'] = (c_limit + c_extra)[:55]
     pools['D'] = top(
         lambda x: (
             (x.get('industry_score') or 50) + (x.get('quality_score') or 50)
-            + (x.get('r60_snapshot') or 0) * 100,
+            + (_num(x.get('pctChg'), 0) or 0),
             x.get('amount', 0),
         ), 55,
     )
     pools['L'] = top(
         lambda x: (
             (x.get('quality_score') or -1)
-            - max(0, (_num(x.get('peTTM'), 0) or 0) - 12) * 0.8
-            - max(0, (_num(x.get('pbMRQ'), 0) or 0) - 1.5) * 3,
+            - max(0.0, (x.get('valuation_pb_disclosed') or 99.0) - 1.0) * 4.0,
             x.get('amount', 0),
         ), 50,
-        eligible=lambda x: x.get('fundamental_ready') and not x.get('financial_distress'),
+        eligible=lambda x: (
+            x.get('fundamental_ready') and not x.get('financial_distress')
+            and x.get('valuation_pb_disclosed') is not None
+        ),
     )
     pools['LIQUID'] = top(lambda x: x.get('amount', 0), 35)
 
@@ -257,10 +307,22 @@ def _preselect_style_union(
     for code, item in chosen.items():
         output.append({**item, 'v2_preselect_for': sorted(membership[code])})
     output.sort(key=lambda x: (len(x['v2_preselect_for']), x.get('amount', 0)), reverse=True)
+    total = len(rows)
     return {
         'counts': {k: len(v) for k, v in pools.items()},
         'union_count': len(output),
         'rows': output,
+        'data_quality': {
+            'eligible_market_rows': total,
+            'source_counts': dict(source_counts),
+            'snapshot_pe_coverage': round(pe_available / total, 4) if total else 0.0,
+            'snapshot_r60_coverage': round(r60_available / total, 4) if total else 0.0,
+            'disclosed_pb_coverage': round(report_pb_available / total, 4) if total else 0.0,
+            'preselection_uses_snapshot_pe': False,
+            'preselection_uses_snapshot_r60': False,
+            'valuation_preselection': 'close / disclosed common-period book value per share',
+            'final_strategy_requires_tencent_history': True,
+        },
     }
 
 
@@ -310,7 +372,7 @@ def build_snapshot(requested_date: str) -> dict:
     source = str(market_rows[0].get('source') or 'unknown') if market_rows else 'unknown'
 
     return {
-        'snapshot_version': 'v2-shadow-data-0.3',
+        'snapshot_version': 'v2-shadow-data-0.4',
         'trade_date': trade_date,
         'requested_date': requested_date,
         'source_notes': {
@@ -354,6 +416,7 @@ def build_snapshot(requested_date: str) -> dict:
             'score_period_reason': fundamentals['score_period_reason'],
             'scored_stocks': len(fundamentals['stocks']),
             'fresh_report_events': len(fundamentals['fresh_report_events']),
+            'valuation_fallback_fields': fundamentals['valuation_fallback_fields'],
             'not_yet_used': fundamentals['not_yet_used'],
         },
         'preselection': preselect,
@@ -361,7 +424,9 @@ def build_snapshot(requested_date: str) -> dict:
             'writes_ledgers': False,
             'calls_sol': False,
             'historical_backtest_grade': False,
-            'note': 'forward point-in-time shadow input; no trading is performed by this module',
+            'ready_for_shadow_accounting': False,
+            'next_required_stage': 'fetch Tencent histories for preselection union and compute V2 stock-level indicators before any strategy targets',
+            'note': 'forward point-in-time input only; broad preselection is intentionally source-invariant and is not a trading decision',
         },
     }
 
@@ -382,7 +447,9 @@ def main():
         'industry_counts': snap['industry']['counts'],
         'fundamentals': snap['fundamentals'],
         'preselection_union': snap['preselection']['union_count'],
+        'preselection_quality': snap['preselection']['data_quality'],
         'stock_source': snap['source_notes']['stock_snapshot'],
+        'safety': snap['safety'],
     }, ensure_ascii=False, indent=2))
 
 
