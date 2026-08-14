@@ -12,6 +12,7 @@ from .state import load_state, save_state
 
 ROOT=Path(__file__).resolve().parents[1]
 STATE_ROOT=Path(os.getenv('FUND_STATE_DIR', str(ROOT/'state')))
+MARKET_CACHE_PATH=STATE_ROOT/'market_universe.json'
 FUNDS={
     'D_MAIN':'AI 综合判断基金',
     'A':'保守稳健基金',
@@ -20,6 +21,70 @@ FUNDS={
     'D':'综合判断基金',
     'L':'长线价值基金',
 }
+
+
+def _critical_market_symbols() -> dict[str,str]:
+    """Symbols that must not disappear from recovery mode: holdings + pending targets."""
+    out={}
+    for fid in FUNDS:
+        path=STATE_ROOT/f'{fid}.json'
+        if not path.exists():
+            continue
+        try:
+            st=json.loads(path.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        for sym,p in (st.get('positions') or {}).items():
+            out[sym]=p.get('name',sym)
+        for x in st.get('pending_targets') or []:
+            sym=x.get('symbol')
+            if sym:
+                out[sym]=x.get('name',out.get(sym,sym))
+    return out
+
+
+def _save_market_universe(trade_date: str, selected: list[dict]) -> None:
+    STATE_ROOT.mkdir(parents=True,exist_ok=True)
+    fields=('code','name','peTTM','pbMRQ','r60_snapshot','amount','turn')
+    symbols=[{k:x.get(k) for k in fields} for x in selected if x.get('code')]
+    payload={'asof':trade_date,'symbols':symbols}
+    tmp=MARKET_CACHE_PATH.with_suffix('.tmp')
+    tmp.write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding='utf-8')
+    tmp.replace(MARKET_CACHE_PATH)
+    print(f'[market] saved recovery universe symbols={len(symbols)} asof={trade_date}')
+
+
+def _load_market_universe(trade_date: str) -> list[dict]:
+    if not MARKET_CACHE_PATH.exists():
+        return []
+    try:
+        payload=json.loads(MARKET_CACHE_PATH.read_text(encoding='utf-8'))
+        asof=str(payload.get('asof') or '')[:10]
+        if not asof:
+            return []
+        age=(date.fromisoformat(trade_date)-date.fromisoformat(asof)).days
+        if age < 0 or age > 14:
+            print(f'[market] recovery universe rejected: asof={asof} age={age}d')
+            return []
+        rows=payload.get('symbols') or []
+        print(f'[market] loaded recovery universe symbols={len(rows)} asof={asof} age={age}d')
+        return rows
+    except Exception as e:
+        print(f'[market] recovery universe unreadable: {e}')
+        return []
+
+
+def _merge_recovery_universe(cached: list[dict], critical: dict[str,str]) -> list[dict]:
+    merged={x['code']:{**x} for x in cached if x.get('code')}
+    for sym,name in critical.items():
+        if sym not in merged:
+            merged[sym]={
+                'code':sym,'name':name,'peTTM':0.0,'pbMRQ':0.0,
+                'r60_snapshot':0.0,'amount':0.0,'turn':0.0,
+            }
+        elif not merged[sym].get('name'):
+            merged[sym]['name']=name
+    return list(merged.values())
 
 
 def enrich_real_candidates(candidates, snapshot_rows):
@@ -116,16 +181,50 @@ def run_real(requested_date: str):
     from .real_market import AKShareMarket
     market=AKShareMarket()
     trade_date=market.latest_trade_date(requested_date)
-    snapshot=market.snapshot()
-    selected=market.preselect(snapshot)
-    print(f'[market] trade_date={trade_date} mainboard_liquid={len(snapshot)} preselected={len(selected)}')
-    histories=market.histories(selected,trade_date)
-    names={x['code']:x['name'] for x in snapshot}
+    critical=_critical_market_symbols()
+    market_source='unknown'
+
+    try:
+        snapshot=market.snapshot()
+        selected=market.preselect(snapshot)
+        if len(selected) < 50:
+            raise RuntimeError(f'full-market preselection suspiciously small: {len(selected)}')
+        _save_market_universe(trade_date,selected)
+        histories=market.histories(selected,trade_date)
+        market_source=str(snapshot[0].get('source') or 'full-market')
+        print(f'[market] trade_date={trade_date} mainboard_liquid={len(snapshot)} preselected={len(selected)} mode=primary')
+    except Exception as primary_error:
+        print(f'[market] primary market path failed; trying cached-universe Tencent recovery: {primary_error}')
+        cached=_load_market_universe(trade_date)
+        selected=_merge_recovery_universe(cached,critical)
+        if len(selected) < 20:
+            raise RuntimeError(
+                f'No safe recovery universe available ({len(selected)} symbols). '
+                'Refusing to mutate ledger; next scheduled retry may recover.'
+            ) from primary_error
+        histories=market.histories(selected,trade_date)
+        snapshot=market.snapshot_from_histories(selected,histories,trade_date)
+        required=max(10,int(len(histories)*0.70))
+        if len(snapshot) < required:
+            raise RuntimeError(
+                f'Tencent recovery snapshot coverage too low: {len(snapshot)}/{len(histories)}, require >= {required}. '
+                'Refusing to mutate ledger.'
+            ) from primary_error
+        if critical:
+            exec_bars=market.execution_bars(critical,trade_date)
+            smap={x['code']:x for x in snapshot}
+            smap.update(exec_bars)
+            snapshot=list(smap.values())
+        market_source='tencent-cache'
+        print(f'[market] trade_date={trade_date} recovery_symbols={len(selected)} current_rows={len(snapshot)} mode=recovery')
+
+    names={x['code']:x.get('name',x['code']) for x in selected}
     bars={x['code']:x for x in snapshot}
     candidates,mscore,snapshots=run_all(trade_date,histories,names,bars,use_ai=True,snapshot_rows=snapshot)
     first_dates=[x['state']['equity_curve'][0]['date'] for x in snapshots.values() if x['state'].get('equity_curve')]
     start_date=min(first_dates) if first_dates else trade_date
     benchmarks=market.benchmarks(start_date,trade_date)
+    export_web._market_source=market_source
     return trade_date,candidates,mscore,snapshots,benchmarks
 
 
@@ -160,7 +259,7 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
     excess=round(met['return_pct']-hs300['return_pct'],2) if hs300 and hs300.get('return_pct') is not None else None
     d_json={
       'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO',
-      'updated_at':trade_date,'market_score':mscore,
+      'updated_at':trade_date,'market_score':mscore,'market_source':getattr(export_web,'_market_source','demo'),
       'market_label':'强势' if mscore>=80 else '偏强' if mscore>=60 else '震荡' if mscore>=40 else '偏弱' if mscore>=20 else '高风险',
       'fund':{'name':st['name'],'initial':st['initial_cash'],'equity':mtm['equity'],'cash':st['cash'],'position_pct':round((mtm['equity']-st['cash'])/mtm['equity']*100,1) if mtm['equity'] else 0},
       'metrics':{**met,'week_pct':met.get('return_5d_pct'),'win_rate_pct':0,'profit_factor':0,'trades':len(st['fills']),'excess_hs300_pct':excess},
@@ -213,7 +312,8 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
         weekly='运行不足6个交易日，周战报将在样本够后自动生成。'
     e_json={
         'mode':'REAL' if getattr(export_web,'_real_mode',False) else 'DEMO',
-        'updated_at':trade_date,'experiment_days':max((f['trading_days'] for f in funds),default=0),
+        'updated_at':trade_date,'market_source':getattr(export_web,'_market_source','demo'),
+        'experiment_days':max((f['trading_days'] for f in funds),default=0),
         'funds':funds,'benchmarks':bs,'weekly_report':weekly,
         'evaluation_note':'至少看20/60个交易日；若连续几个月跑输并出现明显负收益，系统会直接标记为长期表现差。'
     }
@@ -229,12 +329,13 @@ def main():
     args=ap.parse_args()
     if args.demo:
         export_web._real_mode=False
+        export_web._market_source='demo'
         c,m,s=run_demo(args.date); td=args.date; b=None
     else:
         export_web._real_mode=True
         td,c,m,s,b=run_real(args.date)
     export_web(td,c,m,s,b)
-    print(f'updated D/E web snapshots for {td}, market_score={m}')
+    print(f'updated D/E web snapshots for {td}, market_score={m}, market_source={getattr(export_web,"_market_source","unknown")}')
 
 if __name__=='__main__':
     main()
