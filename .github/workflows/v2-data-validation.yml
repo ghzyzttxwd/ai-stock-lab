@@ -39,20 +39,31 @@ jobs:
       - name: Validate live V2 data sources without touching ledgers
         run: python -m engine_v2.data_validation --output /tmp/v2-data-validation.json
 
+      - name: Validate industry strength and stock mapping separately
+        run: |
+          TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
+          python -m engine_v2.industry_validation --date "$TD" --output /tmp/v2-industry-validation.json
+
       - name: Show readiness summary
         run: |
           python - <<'PY'
           import json
           p=json.load(open('/tmp/v2-data-validation.json',encoding='utf-8'))
+          i=json.load(open('/tmp/v2-industry-validation.json',encoding='utf-8'))
           print('[V2 DATA] trade_date=',p['trade_date'])
           print('[V2 DATA] readiness=',json.dumps(p['readiness'],ensure_ascii=False))
           for x in p['probes']:
               print(f"[V2 DATA] {x['name']}: {x['status']} scope={x['scope']} rows={x['rows']} asof={x['asof']} error={x['error']}")
+          print('[V2 INDUSTRY] ready=',i['ready'])
+          print('[V2 INDUSTRY] strength=',json.dumps(i['strength'],ensure_ascii=False))
+          print('[V2 INDUSTRY] membership=',json.dumps(i['membership'],ensure_ascii=False))
           PY
 
-      - name: Upload validation report
+      - name: Upload validation reports
         uses: actions/upload-artifact@v4
         with:
           name: v2-data-validation
-          path: /tmp/v2-data-validation.json
+          path: |
+            /tmp/v2-data-validation.json
+            /tmp/v2-industry-validation.json
           retention-days: 14
