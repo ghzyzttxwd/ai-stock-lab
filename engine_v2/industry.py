@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from datetime import date, timedelta
 
 from .provider import bounded_call
@@ -60,6 +61,20 @@ def _period_return(values: list[float], sessions: int) -> float | None:
     if len(values)<=sessions or values[-1-sessions]<=0:
         return None
     return values[-1]/values[-1-sessions]-1
+
+
+def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 45, delay_seconds: float = 3.0):
+    """Bounded retry for transient provider responses; never loop indefinitely."""
+    last=None
+    for attempt in range(1, attempts+1):
+        try:
+            return bounded_call(timeout_seconds,fn,f'{label} attempt {attempt}/{attempts}')
+        except Exception as exc:
+            last=exc
+            print(f'[V2 INDUSTRY] {label} attempt {attempt}/{attempts} failed: {type(exc).__name__}: {exc}')
+            if attempt < attempts:
+                time.sleep(delay_seconds)
+    raise RuntimeError(f'{label} failed after {attempts} attempts: {type(last).__name__}: {last}') from last
 
 
 def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
@@ -166,14 +181,16 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
     td=date.fromisoformat(trade_date)
     catalog,catalog_meta=_load_l1_catalog(ak)
-    analysis=bounded_call(
-        90,
+    analysis=_bounded_retry(
+        'SW L1 daily analysis',
         lambda:ak.index_analysis_daily_sw(
             symbol='一级行业',
             start_date=(td-timedelta(days=100)).strftime('%Y%m%d'),
             end_date=td.strftime('%Y%m%d'),
         ),
-        'SW L1 daily analysis',
+        attempts=2,
+        timeout_seconds=45,
+        delay_seconds=3.0,
     )
     industries=build_industry_scores(analysis,trade_date)
     latest_asof=max((x.get('asof') or '' for x in industries.values()),default='')
@@ -207,8 +224,6 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         except Exception as exc:
             failures.append({'industry_code':idx,'industry_name':name,'error':f'{type(exc).__name__}: {exc}'})
 
-    # A single flaky component endpoint must not kill the entire snapshot, but the map still needs
-    # broad main-board coverage. More than two failed L1 groups is considered decision-unsafe.
     if len(stock_map)<2500 or len(failures)>2:
         raise RuntimeError(
             f'Shenwan industry snapshot incomplete industries={len(industries)} stocks={len(stock_map)} failures={len(failures)}'
@@ -225,7 +240,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         },
         'source':{
             'catalog':catalog_meta,
-            'analysis':'sws-index-analysis-daily',
+            'analysis':'sws-index-analysis-daily-bounded-retry-2',
             'components':'sws-index-component',
             'successful_declared_components':successful_declared,
             'failure_sample':failures[:2],
