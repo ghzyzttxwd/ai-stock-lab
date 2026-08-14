@@ -11,7 +11,7 @@ from engine.daily_run import (
     _readonly_portfolio_snapshot,
     _decision_diary,
 )
-from engine.real_market import AKShareMarket
+from engine.real_market import AKShareMarket, _tx_amount_mode, _tx_amount_and_volume
 
 class EngineTests(unittest.TestCase):
     def test_board_filter(self):
@@ -131,5 +131,16 @@ class EngineTests(unittest.TestCase):
             td=market.latest_trade_date('2026-08-16')
         self.assertEqual(td,'2026-08-14')
         self.assertEqual(market.ak.symbol,'sh000001')
+
+    def test_tencent_amount_normalization_handles_yuan_or_hands(self):
+        self.assertEqual(_tx_amount_mode(500_000_000,10.0,520_000_000),'yuan')
+        amount,volume=_tx_amount_and_volume(500_000_000,10.0,'yuan')
+        self.assertEqual(amount,500_000_000)
+        self.assertEqual(volume,50_000_000)
+
+        self.assertEqual(_tx_amount_mode(500_000,10.0,520_000_000),'hands')
+        amount,volume=_tx_amount_and_volume(500_000,10.0,'hands')
+        self.assertEqual(amount,500_000_000)
+        self.assertEqual(volume,50_000_000)
 
 if __name__=='__main__': unittest.main()
