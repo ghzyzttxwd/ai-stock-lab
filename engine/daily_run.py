@@ -218,6 +218,14 @@ def run_real(requested_date: str):
         market_source='tencent-cache'
         print(f'[market] trade_date={trade_date} recovery_symbols={len(selected)} current_rows={len(snapshot)} mode=recovery')
 
+    if market_source != 'tencent-cache' and critical:
+        smap={x['code']:x for x in snapshot}
+        missing={sym:name for sym,name in critical.items() if sym not in smap}
+        if missing:
+            print(f'[market] supplementing {len(missing)} critical holdings/pending symbols outside liquid snapshot')
+            smap.update(market.execution_bars(missing,trade_date))
+            snapshot=list(smap.values())
+
     names={x['code']:x.get('name',x['code']) for x in selected}
     bars={x['code']:x for x in snapshot}
     candidates,mscore,snapshots=run_all(trade_date,histories,names,bars,use_ai=True,snapshot_rows=snapshot)
