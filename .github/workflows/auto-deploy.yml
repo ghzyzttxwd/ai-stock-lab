@@ -40,6 +40,11 @@ jobs:
       - name: 运行自动测试
         run: python -m unittest discover -s tests -v
 
+      - name: 发布前同步最新基金数据
+        run: |
+          git fetch origin main
+          git checkout origin/main -- web/d/data.json web/e/data.json
+
       - name: 准备 GitHub Pages
         uses: actions/configure-pages@v5
 
