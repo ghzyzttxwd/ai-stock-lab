@@ -62,6 +62,8 @@ def _announced_mainboard_rows(df, asof: str) -> dict[str, dict]:
             'code': code,
             'name': str(row.get('股票简称') or '').strip(),
             'announcement_date': announced,
+            'eps_period': _num(row.get('每股收益')),
+            'book_value_per_share': _num(row.get('每股净资产')),
             'roe': _num(row.get('净资产收益率')),
             'revenue_yoy': _num(row.get('营业总收入-同比增长')),
             'profit_yoy': _num(row.get('净利润-同比增长')),
@@ -72,13 +74,7 @@ def _announced_mainboard_rows(df, asof: str) -> dict[str, dict]:
 
 
 def select_scoring_period(current_rows: dict[str, dict], previous_rows: dict[str, dict], min_current_coverage: float = 0.80) -> tuple[str, dict[str, dict], float]:
-    """Use one common reporting period for cross-sectional quality ranking.
-
-    Mixing early half-year reporters with first-quarter rows creates horizon mismatch in ROE/cash-flow.
-    The newer period becomes the scoring baseline only after it reaches broad coverage; otherwise the
-    previous broadly complete period remains the quality baseline. Fresh newer reports can still be
-    carried separately as event information later.
-    """
+    """Use one common reporting period for cross-sectional quality ranking."""
     previous_count = len(previous_rows)
     coverage = len(current_rows) / previous_count if previous_count else 0.0
     if previous_count and coverage >= min_current_coverage:
@@ -203,5 +199,9 @@ def load_point_in_time_fundamentals(trade_date: str, industry_by_code: dict[str,
         'stocks': scored,
         'fresh_report_events': fresh_reports,
         'quality_fields': ['roe', 'revenue_yoy', 'profit_yoy', 'gross_margin', 'operating_cashflow_per_share'],
-        'not_yet_used': ['debt_ratio/balance_sheet_score: requires disclosure-timed source validation'],
+        'valuation_fallback_fields': ['book_value_per_share from same disclosed scoring period'],
+        'not_yet_used': [
+            'debt_ratio/balance_sheet_score: requires disclosure-timed source validation',
+            'quarterly EPS is not treated as TTM PE; no fake PE is derived from it',
+        ],
     }
