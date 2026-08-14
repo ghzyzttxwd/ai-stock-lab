@@ -2,7 +2,12 @@ import unittest
 from engine.universe import is_main_board
 from engine.risk import clamp_d_targets
 from engine.broker import round_lot, fee_for, _locked_at_limit
-from engine.daily_run import _previous_trade_date, _pending_is_fresh, _merge_recovery_universe
+from engine.daily_run import (
+    _previous_trade_date,
+    _pending_is_fresh,
+    _merge_recovery_universe,
+    _readonly_portfolio_snapshot,
+)
 from engine.real_market import AKShareMarket
 
 class EngineTests(unittest.TestCase):
@@ -80,5 +85,20 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(rows[0]['close'],10.5)
         self.assertEqual(rows[0]['preclose'],10.1)
         self.assertEqual(rows[0]['source'],'tencent-cache')
+
+    def test_duplicate_snapshot_keeps_holdings_without_mutating_curve(self):
+        state={
+            'cash':500000.0,
+            'positions':{
+                'sh.600000':{'name':'浦发银行','qty':10000,'avg_cost':10.0,'last_price':10.0}
+            },
+            'equity_curve':[{'date':'2026-08-14','equity':600000.0}],
+        }
+        before=list(state['equity_curve'])
+        mtm=_readonly_portfolio_snapshot(state,{'sh.600000':{'close':10.5}})
+        self.assertEqual(len(mtm['holdings']),1)
+        self.assertEqual(mtm['holdings'][0]['market_value'],105000.0)
+        self.assertEqual(mtm['equity'],605000.0)
+        self.assertEqual(state['equity_curve'],before)
 
 if __name__=='__main__': unittest.main()
