@@ -9,6 +9,11 @@ from engine_v2.data_validation import (
     _quarter_end_on_or_before,
     _safe_requested_date,
 )
+from engine_v2.fundamentals import (
+    _announced_mainboard_rows,
+    score_quality,
+    select_scoring_period,
+)
 from engine_v2.regime import MarketRegime, classify_market_regime
 from engine_v2.sizing import risk_budget_weights
 from engine_v2.strategies import (
@@ -33,7 +38,8 @@ def candidate(i: int, industry: str = "行业A", **kw):
         "risk": 72,
         "quality_score": 72,
         "cashflow_score": 70,
-        "balance_sheet_score": 68,
+        "fundamental_ready": True,
+        "financial_distress": False,
         "valuation_score": 65,
         "industry_score": 70,
         "leader_score": 68,
@@ -93,14 +99,18 @@ class V2ShadowTests(unittest.TestCase):
         r = MarketRegime("risk_off", 25, 80, ("市场宽度偏弱",))
         self.assertEqual(strategy_c_v2([candidate(i) for i in range(8)], r), [])
 
-    def test_a_and_l_reject_bad_financial_quality(self):
+    def test_a_and_l_reject_bad_or_unverified_financial_quality(self):
         r = MarketRegime("neutral", 50, 50, ())
         bad = candidate(1, quality_score=30, cashflow_score=25)
+        missing = candidate(3, fundamental_ready=False, quality_score=None, cashflow_score=None)
         good = candidate(2)
-        self.assertTrue(strategy_a_v2([bad, good], r))
-        self.assertTrue(strategy_l_v2([bad, good], r))
-        self.assertNotIn(bad["symbol"], {x["symbol"] for x in strategy_a_v2([bad, good], r)})
-        self.assertNotIn(bad["symbol"], {x["symbol"] for x in strategy_l_v2([bad, good], r)})
+        self.assertTrue(strategy_a_v2([bad, missing, good], r))
+        self.assertTrue(strategy_l_v2([bad, missing, good], r))
+        for fn in (strategy_a_v2, strategy_l_v2):
+            symbols={x["symbol"] for x in fn([bad, missing, good], r)}
+            self.assertNotIn(bad["symbol"], symbols)
+            self.assertNotIn(missing["symbol"], symbols)
+            self.assertIn(good["symbol"], symbols)
 
     def test_all_v2_targets_record_thesis_and_invalidation(self):
         r = MarketRegime("risk_on", 72, 70, ())
@@ -145,6 +155,41 @@ class V2ShadowTests(unittest.TestCase):
         rows, latest = _financial_available_rows(df, "2026-08-14")
         self.assertEqual(rows, 1)
         self.assertEqual(latest, "2026-08-10")
+
+    def test_fundamental_loader_filters_non_mainboard_and_future_reports(self):
+        df = pd.DataFrame([
+            {"股票代码":"600001","股票简称":"主板A","最新公告日期":"2026-08-10","净资产收益率":8,"营业总收入-同比增长":10,"净利润-同比增长":12,"每股经营现金流量":0.5,"销售毛利率":25},
+            {"股票代码":"688001","股票简称":"科创","最新公告日期":"2026-08-10","净资产收益率":8},
+            {"股票代码":"000002","股票简称":"主板B","最新公告日期":"2026-08-20","净资产收益率":8},
+        ])
+        rows=_announced_mainboard_rows(df,"2026-08-14")
+        self.assertEqual(set(rows),{"600001"})
+
+    def test_quality_scoring_keeps_one_common_period_until_new_period_is_broad(self):
+        previous={f"600{i:03d}":{} for i in range(100)}
+        early_current={f"600{i:03d}":{} for i in range(20)}
+        label, selected, coverage=select_scoring_period(early_current,previous,min_current_coverage=0.8)
+        self.assertEqual(label,"previous")
+        self.assertIs(selected,previous)
+        self.assertAlmostEqual(coverage,0.2)
+        broad_current={f"600{i:03d}":{} for i in range(85)}
+        label, selected, coverage=select_scoring_period(broad_current,previous,min_current_coverage=0.8)
+        self.assertEqual(label,"current")
+        self.assertIs(selected,broad_current)
+        self.assertAlmostEqual(coverage,0.85)
+
+    def test_quality_score_requires_cashflow_and_multiple_real_fields(self):
+        rows={
+            "600001":{"roe":12,"revenue_yoy":15,"profit_yoy":18,"gross_margin":30,"operating_cashflow_per_share":0.5},
+            "600002":{"roe":-5,"revenue_yoy":-10,"profit_yoy":-40,"gross_margin":15,"operating_cashflow_per_share":-0.2},
+            "600003":{"roe":None,"revenue_yoy":None,"profit_yoy":10,"gross_margin":None,"operating_cashflow_per_share":0.1},
+        }
+        scored=score_quality(rows)
+        self.assertTrue(scored["600001"]["fundamental_ready"])
+        self.assertTrue(scored["600002"]["fundamental_ready"])
+        self.assertTrue(scored["600002"]["financial_distress"])
+        self.assertFalse(scored["600003"]["fundamental_ready"])
+        self.assertIsNone(scored["600003"]["quality_score"])
 
 
 if __name__ == "__main__":
