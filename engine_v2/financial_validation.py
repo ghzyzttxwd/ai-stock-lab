@@ -33,6 +33,21 @@ def normalize_code(value):
     return digits[-6:].zfill(6)
 
 
+def is_mainboard_code(code: str | None) -> bool:
+    if not code:
+        return False
+    return code.startswith(('600','601','603','605','000','001','002','003'))
+
+
+def _clean_text(value) -> str | None:
+    if value is None:
+        return None
+    text=str(value).strip()
+    if not text or text.lower() in {'nan','none','null','--','-'}:
+        return None
+    return text
+
+
 def _rows(df, asof: str):
     out=[]
     if df is None or df.empty: return out
@@ -45,8 +60,8 @@ def _rows(df, asof: str):
         out.append({
             'code':code,
             'raw_code':str(r.get('股票代码')),
-            'name':str(r.get('股票简称','')).strip(),
-            'industry':str(r.get('所处行业','')).strip(),
+            'name':_clean_text(r.get('股票简称')),
+            'industry':_clean_text(r.get('所处行业')),
             'announced':announced,
         })
     return out
@@ -62,59 +77,72 @@ def _prefix(code):
     return code[:3]
 
 
+def _overlap_block(current: dict, previous: dict) -> dict:
+    cur_codes=set(current); prev_codes=set(previous)
+    intersection=cur_codes & prev_codes
+    missing=sorted(cur_codes-prev_codes)
+    return {
+        'current_count':len(cur_codes),
+        'previous_count':len(prev_codes),
+        'intersection':len(intersection),
+        'current_not_previous':len(missing),
+        'current_overlap_ratio':round(len(intersection)/len(cur_codes),4) if cur_codes else 0.0,
+        'current_not_previous_samples':[current[x] for x in missing[:30]],
+    }
+
+
 def validate_financial_overlap(trade_date: str) -> dict:
     import akshare as ak
     td=date.fromisoformat(trade_date)
     periods=[date(td.year,6,30),date(td.year,3,31)] if td >= date(td.year,6,30) else [date(td.year,3,31),date(td.year-1,12,31)]
     data={}
-    raw={}
+    stores={}
     for p in periods:
         started=time.monotonic()
         df=_timeout(90,lambda q=p:ak.stock_yjbb_em(date=q.strftime('%Y%m%d')))
-        raw[p.isoformat()]=df
         rr=_rows(df,trade_date)
-        by_code={x['code']:x for x in rr}
-        by_name={x['name']:x for x in rr if x['name'] and x['name'].lower() not in {'nan','none'}}
+        all_by_code={x['code']:x for x in rr}
+        main=[x for x in rr if is_mainboard_code(x['code'])]
+        main_by_code={x['code']:x for x in main}
+        stores[p.isoformat()]={'all':all_by_code,'main':main_by_code}
         data[p.isoformat()]={
-            'raw_rows':len(df),'announced_rows':len(rr),'unique_codes':len(by_code),'unique_names':len(by_name),
+            'raw_rows':len(df),
+            'announced_rows':len(rr),
+            'unique_codes':len(all_by_code),
+            'mainboard_announced_rows':len(main_by_code),
+            'mainboard_with_industry':sum(1 for x in main_by_code.values() if x['industry']),
             'prefix_counts':dict(Counter(_prefix(x['code']) for x in rr)),
-            'code_sample':sorted(by_code)[:10],
-            '_by_code':by_code,'_by_name':by_name,
+            'mainboard_code_sample':sorted(main_by_code)[:10],
             'latency_s':round(time.monotonic()-started,2),
         }
-    cur=data[periods[0].isoformat()]; prev=data[periods[1].isoformat()]
-    cur_codes=set(cur['_by_code']); prev_codes=set(prev['_by_code'])
-    cur_names=set(cur['_by_name']); prev_names=set(prev['_by_name'])
-    missing_codes=sorted(cur_codes-prev_codes)
-    missing_names=sorted(cur_names-prev_names)
-    code_missing_but_name_present=[]
-    for code in missing_codes:
-        item=cur['_by_code'][code]
-        old=prev['_by_name'].get(item['name'])
-        if old:
-            code_missing_but_name_present.append({'current':item,'previous_same_name':old})
-    suspicious=[cur['_by_code'][x] for x in missing_codes[:30]]
-    for v in data.values():
-        v.pop('_by_code',None); v.pop('_by_name',None)
+
+    cur=stores[periods[0].isoformat()]
+    prev=stores[periods[1].isoformat()]
+    all_overlap=_overlap_block(cur['all'],prev['all'])
+    main_overlap=_overlap_block(cur['main'],prev['main'])
+
+    # A newly reported mainboard issuer should almost always have existed in the previous quarter.
+    # A small allowance remains for IPOs/relistings/corporate events. The point is to reject the
+    # massive off-universe pollution seen in the unfiltered report endpoint, not require 100% identity.
+    main_ready=(
+        main_overlap['current_count'] >= 100
+        and main_overlap['current_overlap_ratio'] >= 0.95
+        and data[periods[1].isoformat()]['mainboard_announced_rows'] >= 2500
+    )
+
     result={
         'trade_date':trade_date,
         'periods':[p.isoformat() for p in periods],
         'reports':data,
-        'overlap':{
-            'code_intersection':len(cur_codes & prev_codes),
-            'current_not_previous_code':len(missing_codes),
-            'name_intersection':len(cur_names & prev_names),
-            'current_not_previous_name':len(missing_names),
-            'code_missing_but_same_name_present':len(code_missing_but_name_present),
-            'same_name_code_mismatch_samples':code_missing_but_name_present[:20],
-            'current_not_previous_samples':suspicious,
-        },
+        'all_market_overlap':all_overlap,
+        'mainboard_overlap':main_overlap,
+        'ready_for_quality_merge':main_ready,
+        'quality_merge_rule':(
+            'Only Shanghai/Shenzhen main-board codes are eligible. Build a previous-quarter baseline, '
+            'then overlay current-quarter rows only when their announcement date is <= decision date. '
+            'Industry classification is not taken from this report table; V2 uses Shenwan L1.'
+        ),
     }
-    # Do not declare quality factors usable until current-period issuer overlap makes sense.
-    expected=min(len(cur_codes),1000)
-    ratio=len(cur_codes & prev_codes)/len(cur_codes) if cur_codes else 0.0
-    result['overlap']['current_code_overlap_ratio']=round(ratio,4)
-    result['ready_for_quality_merge']=ratio>=0.90 and len(cur_codes)>=100
     return result
 
 
