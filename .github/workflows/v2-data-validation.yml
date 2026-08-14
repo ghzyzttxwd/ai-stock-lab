@@ -49,6 +49,11 @@ jobs:
           TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
           python -m engine_v2.sw_industry_validation --date "$TD" --output /tmp/v2-sw-industry-validation.json
 
+      - name: Diagnose financial report issuer overlap before quality merge
+        run: |
+          TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
+          python -m engine_v2.financial_validation --date "$TD" --output /tmp/v2-financial-validation.json
+
       - name: Show readiness summary
         run: |
           python - <<'PY'
@@ -56,17 +61,16 @@ jobs:
           p=json.load(open('/tmp/v2-data-validation.json',encoding='utf-8'))
           i=json.load(open('/tmp/v2-industry-validation.json',encoding='utf-8'))
           sw=json.load(open('/tmp/v2-sw-industry-validation.json',encoding='utf-8'))
+          f=json.load(open('/tmp/v2-financial-validation.json',encoding='utf-8'))
           print('[V2 DATA] trade_date=',p['trade_date'])
           print('[V2 DATA] readiness=',json.dumps(p['readiness'],ensure_ascii=False))
-          for x in p['probes']:
-              print(f"[V2 DATA] {x['name']}: {x['status']} scope={x['scope']} rows={x['rows']} asof={x['asof']} error={x['error']}")
-          print('[V2 MIXED INDUSTRY] ready=',i['ready'])
-          print('[V2 MIXED INDUSTRY] taxonomy=',json.dumps(i.get('taxonomy'),ensure_ascii=False))
+          print('[V2 MIXED INDUSTRY] ready=',i['ready'],'taxonomy=',json.dumps(i.get('taxonomy'),ensure_ascii=False))
           print('[V2 SW INDUSTRY] ready=',sw['ready'])
-          print('[V2 SW INDUSTRY] catalog=',json.dumps(sw['index_catalog'],ensure_ascii=False))
           print('[V2 SW INDUSTRY] analysis=',json.dumps(sw['daily_analysis'],ensure_ascii=False))
-          print('[V2 SW INDUSTRY] history=',json.dumps(sw['history_sample'],ensure_ascii=False))
           print('[V2 SW INDUSTRY] constituents=',json.dumps(sw['constituents'],ensure_ascii=False))
+          print('[V2 FINANCIAL] ready=',f['ready_for_quality_merge'])
+          print('[V2 FINANCIAL] reports=',json.dumps(f['reports'],ensure_ascii=False))
+          print('[V2 FINANCIAL] overlap=',json.dumps(f['overlap'],ensure_ascii=False))
           PY
 
       - name: Upload validation reports
@@ -77,4 +81,5 @@ jobs:
             /tmp/v2-data-validation.json
             /tmp/v2-industry-validation.json
             /tmp/v2-sw-industry-validation.json
+            /tmp/v2-financial-validation.json
           retention-days: 14
