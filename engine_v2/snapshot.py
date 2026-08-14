@@ -4,11 +4,11 @@ import argparse
 import json
 import math
 from collections import Counter, defaultdict
-from datetime import date
 from pathlib import Path
 
 from .fundamentals import load_point_in_time_fundamentals
 from .industry import load_sw_l1_snapshot
+from .provider import bounded_call
 from .regime import classify_market_regime
 
 
@@ -81,7 +81,7 @@ def _index_features(ak, trade_date: str) -> dict:
     specs = ('sh000300', 'sh000905', 'sh000852')
     per = []
     for symbol in specs:
-        df = ak.stock_zh_index_daily_tx(symbol=symbol)
+        df = bounded_call(45, lambda s=symbol: ak.stock_zh_index_daily_tx(symbol=s), f'index history {symbol}')
         if df is None or df.empty:
             raise RuntimeError(f'empty index history {symbol}')
         work = df.copy()
@@ -119,9 +119,9 @@ def _index_features(ak, trade_date: str) -> dict:
 
 def _sentiment_snapshot(ak, trade_date: str) -> dict:
     d8 = trade_date.replace('-', '')
-    up = ak.stock_zt_pool_em(date=d8)
-    broken = ak.stock_zt_pool_zbgc_em(date=d8)
-    down = ak.stock_zt_pool_dtgc_em(date=d8)
+    up = bounded_call(35, lambda: ak.stock_zt_pool_em(date=d8), 'limit-up pool')
+    broken = bounded_call(35, lambda: ak.stock_zt_pool_zbgc_em(date=d8), 'broken-limit pool')
+    down = bounded_call(35, lambda: ak.stock_zt_pool_dtgc_em(date=d8), 'limit-down pool')
 
     main_up = []
     for _, r in up.iterrows():
@@ -271,7 +271,7 @@ def build_snapshot(requested_date: str) -> dict:
     market = AKShareMarket()
     trade_date = market.latest_trade_date(requested_date)
 
-    activity = ak.stock_market_activity_legu()
+    activity = bounded_call(40, ak.stock_market_activity_legu, 'market activity')
     items = _activity_map(activity)
     reported_date = str(items.get('统计日期') or '')[:10]
     if reported_date != trade_date:
@@ -285,7 +285,8 @@ def build_snapshot(requested_date: str) -> dict:
     if up is None or down is None or active < 1000:
         raise RuntimeError(f'market activity breadth unusable: items={list(items)[:20]}')
 
-    highlow = _latest_highlow(ak.stock_a_high_low_statistics(symbol='all'), trade_date)
+    highlow_df = bounded_call(40, lambda: ak.stock_a_high_low_statistics(symbol='all'), 'high-low breadth')
+    highlow = _latest_highlow(highlow_df, trade_date)
     if highlow['date'] != trade_date:
         raise RuntimeError(f'high/low breadth stale: {highlow["date"]} != {trade_date}')
     sentiment = _sentiment_snapshot(ak, trade_date)
@@ -309,7 +310,7 @@ def build_snapshot(requested_date: str) -> dict:
     source = str(market_rows[0].get('source') or 'unknown') if market_rows else 'unknown'
 
     return {
-        'snapshot_version': 'v2-shadow-data-0.2',
+        'snapshot_version': 'v2-shadow-data-0.3',
         'trade_date': trade_date,
         'requested_date': requested_date,
         'source_notes': {
