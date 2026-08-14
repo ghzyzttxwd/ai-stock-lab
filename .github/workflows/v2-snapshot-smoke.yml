@@ -1,13 +1,11 @@
 name: V2 normalized snapshot smoke (shadow only)
 
 on:
-  workflow_dispatch:
   push:
     branches: [v2-shadow]
     paths:
-      - 'engine_v2/**'
-      - 'tests/test_v2*.py'
       - '.github/workflows/v2-snapshot-smoke.yml'
+      - 'shadow_state/v2/.snapshot-smoke-trigger'
 
 permissions:
   contents: read
@@ -147,3 +145,4 @@ jobs:
             /tmp/v2-enriched-candidates.json
           if-no-files-found: warn
           retention-days: 14
+
