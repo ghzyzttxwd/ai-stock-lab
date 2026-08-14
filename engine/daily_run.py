@@ -105,6 +105,16 @@ def _readonly_portfolio_snapshot(state: dict, bars: dict[str,dict]) -> dict:
     return {'equity':round(equity,2),'holdings':holdings}
 
 
+def _decision_diary(state: dict, trade_date: str) -> str:
+    """Preserve the real diary when a same-day run is only refreshing data/pages."""
+    for decision in reversed(state.get('decisions') or []):
+        if str(decision.get('date') or '')[:10] == trade_date:
+            diary=str(decision.get('diary') or '').strip()
+            if diary:
+                return diary
+    return '当日已处理'
+
+
 def enrich_real_candidates(candidates, snapshot_rows):
     smap={x['code']:x for x in snapshot_rows}
     for c in candidates:
@@ -166,7 +176,12 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
         if st.get('last_processed_date') == trade_date:
             print(f'[skip] {fid} already processed {trade_date}')
             mtm=_readonly_portfolio_snapshot(st,bars)
-            snapshots[fid]={'state':st,'mtm':mtm,'metrics':metrics(st['equity_curve'],st['initial_cash']),'diary':'当日已处理'}
+            snapshots[fid]={
+                'state':st,
+                'mtm':mtm,
+                'metrics':metrics(st['equity_curve'],st['initial_cash']),
+                'diary':_decision_diary(st,trade_date),
+            }
             continue
         if st.get('pending_targets'):
             if _pending_is_fresh(st,previous_trade_date):
