@@ -1,0 +1,101 @@
+name: V2 target diagnostics (shadow only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v2-shadow]
+    paths:
+      - 'engine_v2/targets.py'
+      - 'engine_v2/strategies.py'
+      - 'engine_v2/sizing.py'
+      - 'engine_v2/enrichment_resilient.py'
+      - 'tests/test_v2_targets.py'
+      - '.github/workflows/v2-target-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-target-diagnostics
+  cancel-in-progress: true
+
+jobs:
+  targets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout V2 shadow branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run all V2 tests
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+
+      - name: Resolve latest completed session
+        id: td
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from engine_v2.data_validation import _safe_requested_date
+          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
+          PY
+          )
+          echo "date=$TD" >> "$GITHUB_OUTPUT"
+          echo "trade_date=$TD"
+
+      - name: Build safe normalized snapshot
+        run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
+
+      - name: Enrich candidates with Tencent histories
+        run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
+
+      - name: Generate five read-only V2 targets
+        run: python -m engine_v2.targets --enriched /tmp/v2-enriched-candidates.json --output /tmp/v2-shadow-targets.json
+
+      - name: Assert target diagnostics
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/v2-shadow-targets.json',encoding='utf-8'))
+          print('[V2 TARGETS] trade_date=',p['trade_date'])
+          print('[V2 TARGETS] regime=',json.dumps(p['regime'],ensure_ascii=False))
+          print('[V2 TARGETS] stats=',json.dumps(p['stats'],ensure_ascii=False))
+          print('[V2 TARGETS] overlap=',json.dumps(p['overlap_jaccard'],ensure_ascii=False))
+          print('[V2 TARGETS] high_overlap=',json.dumps(p['high_overlap_pairs'],ensure_ascii=False))
+          print('[V2 TARGETS] errors=',json.dumps(p['validation_errors'],ensure_ascii=False))
+          print('[V2 TARGETS] safety=',json.dumps(p['safety'],ensure_ascii=False))
+          if p['validation_errors']:
+              raise SystemExit('V2 target policy validation failed')
+          if not p['safety']['targets_valid']:
+              raise SystemExit('V2 target validator did not approve targets')
+          if p['safety']['writes_ledgers'] or p['safety']['calls_sol'] or p['safety']['executes_orders']:
+              raise SystemExit('V2 target stage violated read-only safety')
+          if p['safety']['ready_for_shadow_accounting']:
+              raise SystemExit('target generation cannot claim shadow-accounting readiness')
+          for label, stats in p['stats'].items():
+              if label != 'C' and stats['positions'] == 0:
+                  raise SystemExit(f'{label} unexpectedly has no targets')
+              if stats['exposure'] > 1.000001:
+                  raise SystemExit(f'{label} exposure > 100%')
+          PY
+
+      - name: Upload target diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-shadow-targets
+          path: |
+            /tmp/v2-normalized-snapshot.json
+            /tmp/v2-enriched-candidates.json
+            /tmp/v2-shadow-targets.json
+          if-no-files-found: warn
+          retention-days: 14
