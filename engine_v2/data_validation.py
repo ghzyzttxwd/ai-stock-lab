@@ -84,7 +84,6 @@ def _quarter_end_on_or_before(day: date) -> date:
 
 
 def _safe_requested_date(now_cn: datetime) -> date:
-    # Before the close, validate the latest completed session rather than today's partial data.
     if now_cn.weekday() < 5 and now_cn.time() >= dt_time(15, 20):
         return now_cn.date()
     return now_cn.date() - timedelta(days=1)
@@ -135,7 +134,6 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
     d8 = latest.replace("-", "")
     probes: list[Probe] = []
 
-    # 1) Short-term sentiment / limit-board structure. Recent-history only by provider design.
     p, limit_up = _probe_df(
         "limit_up_pool", "forward_and_recent_only",
         lambda: ak.stock_zt_pool_em(date=d8),
@@ -183,7 +181,6 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
         p.details = {"expected_trade_date": latest, "note": "current-only feed did not report the latest completed session"}
     probes.append(p)
 
-    # 2) Market breadth. This source exposes roughly two years of dated history.
     p, highlow = _probe_df(
         "high_low_breadth", "historical_point_in_time",
         lambda: ak.stock_a_high_low_statistics(symbol="all"),
@@ -205,10 +202,9 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
                 p.status = "DEGRADED"
     probes.append(p)
 
-    # 3) Industry regime. The live membership/ranking endpoints are useful for the forward shadow,
-    # but current membership must not be projected backward in a serious historical backtest.
+    # Industry layer: probe Eastmoney, independent Tonghuashun flow, and CNInfo dated taxonomy changes.
     p, industries = _probe_df(
-        "industry_board_live", "forward_only",
+        "industry_board_eastmoney", "forward_only",
         ak.stock_board_industry_name_em,
         {"板块名称", "板块代码", "涨跌幅", "上涨家数", "下跌家数"},
         min_rows=50,
@@ -216,13 +212,41 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
     p.asof = latest if p.status != "FAIL" else None
     probes.append(p)
 
-    p, industry_flow = _probe_df(
-        "industry_fund_flow_live", "forward_only",
+    p, industry_flow_em = _probe_df(
+        "industry_fund_flow_eastmoney", "forward_only",
         lambda: ak.stock_sector_fund_flow_rank(indicator="今日", sector_type="行业资金流"),
         {"名称", "今日涨跌幅", "今日主力净流入-净额"},
         min_rows=50,
     )
     p.asof = latest if p.status != "FAIL" else None
+    probes.append(p)
+
+    p, industry_flow_ths = _probe_df(
+        "industry_fund_flow_ths", "forward_only",
+        lambda: ak.stock_fund_flow_industry(symbol="即时"),
+        {"行业", "行业指数", "行业-涨跌幅", "净额", "公司家数"},
+        min_rows=50,
+        timeout=60,
+    )
+    p.asof = latest if p.status != "FAIL" else None
+    probes.append(p)
+
+    p, industry_change = _probe_df(
+        "industry_membership_history_cninfo", "historical_point_in_time",
+        lambda: ak.stock_industry_change_cninfo(
+            symbol="002594",
+            start_date="20100101",
+            end_date=d8,
+        ),
+        {"行业中类", "行业大类", "分类标准", "证券代码", "变更日期"},
+        min_rows=1,
+        timeout=60,
+    )
+    if industry_change is not None and not industry_change.empty:
+        change_dates = [_date_text(x) for x in industry_change["变更日期"].tolist()]
+        change_dates = [x for x in change_dates if x and x <= latest]
+        p.asof = max(change_dates) if change_dates else None
+    p.details = {"sample": "002594", "purpose": "prove dated industry membership history is available"}
     probes.append(p)
 
     if industries is not None and not industries.empty and {"板块名称"}.issubset(_cols(industries)):
@@ -243,7 +267,6 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
         p.details = {"sample_industry": sample_industry, "warning": "historical prices are usable; current taxonomy/membership must not be back-projected"}
         probes.append(p)
 
-    # 4) Fundamentals. Use report tables carrying announcement dates for point-in-time filtering.
     period = _quarter_end_on_or_before(td)
     p, report = _probe_df(
         "financial_report_with_announcement_date", "historical_point_in_time_after_announcement",
@@ -263,8 +286,6 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
         p.status = "DEGRADED"
     probes.append(p)
 
-    # Richer ratios exist, but this endpoint labels accounting periods rather than disclosure timestamps.
-    # It is therefore not permitted as a standalone historical point-in-time factor.
     p, rich = _probe_df(
         "rich_financial_ratios", "research_only_without_disclosure_join",
         lambda: ak.stock_financial_analysis_indicator(symbol="600519", start_year=str(max(2010, td.year - 2))),
@@ -278,7 +299,6 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
     }
     probes.append(p)
 
-    # Independent disclosure metadata can be used to audit report availability timestamps.
     p, disclosure = _probe_df(
         "cninfo_disclosure_metadata", "historical_point_in_time",
         lambda: ak.stock_zh_a_disclosure_report_cninfo(
@@ -303,11 +323,13 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
     by_name = {p.name: p for p in probes}
     sentiment_ok = all(by_name[x].status in {"PASS", "DEGRADED"} for x in ("limit_up_pool", "broken_limit_pool", "limit_down_pool"))
     breadth_ok = by_name["high_low_breadth"].status in {"PASS", "DEGRADED"}
-    industry_ok = by_name["industry_board_live"].status == "PASS" and by_name["industry_fund_flow_live"].status in {"PASS", "DEGRADED"}
+    eastmoney_industry_ok = by_name["industry_board_eastmoney"].status == "PASS" and by_name["industry_fund_flow_eastmoney"].status in {"PASS", "DEGRADED"}
+    fallback_industry_ok = by_name["industry_fund_flow_ths"].status in {"PASS", "DEGRADED"} and by_name["industry_membership_history_cninfo"].status in {"PASS", "DEGRADED"}
+    industry_ok = eastmoney_industry_ok or fallback_industry_ok
     fundamentals_ok = by_name["financial_report_with_announcement_date"].status in {"PASS", "DEGRADED"}
 
     return {
-        "validator_version": "v2-data-0.1",
+        "validator_version": "v2-data-0.2",
         "generated_at": now_cn.isoformat(),
         "trade_date": latest,
         "report_period": period.isoformat(),
@@ -316,12 +338,14 @@ def validate_data_sources(trade_date: str | None = None) -> dict:
             "sentiment_forward": sentiment_ok,
             "breadth_forward": breadth_ok,
             "industry_forward": industry_ok,
+            "industry_primary_eastmoney": eastmoney_industry_ok,
+            "industry_fallback_ths_cninfo": fallback_industry_ok,
             "fundamentals_forward": fundamentals_ok,
             "forward_shadow_ready": sentiment_ok and breadth_ok and industry_ok and fundamentals_ok,
             "historical_backtest_production_grade": False,
             "historical_blockers": [
                 "涨停/炸板/跌停接口只提供近期数据，需从影子盘启用日起自行归档",
-                "行业实时成份/资金流属于当前快照，不能把今天行业成份倒灌到过去",
+                "东方财富行业实时成份属于当前快照；历史回测需使用巨潮带变更日期的行业归属",
                 "rich_financial_ratios 必须与公告时间连接后才能用于历史时点因子",
                 "历史股票池还需解决上市/退市/ST/停牌的逐日 point-in-time 状态",
             ],
