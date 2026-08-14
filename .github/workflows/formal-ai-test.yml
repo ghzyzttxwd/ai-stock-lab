@@ -32,7 +32,12 @@ jobs:
           cache: 'pip'
       - name: 安装依赖
         run: pip install -r requirements.txt
+      - name: 检查今天是否为A股交易日
+        id: marketday
+        if: github.event_name == 'schedule'
+        run: python -m engine.schedule_guard preflight
       - name: 正式级 Sol 流式测试（单次决策，最多一次5xx重试，不改账本）
+        if: github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
