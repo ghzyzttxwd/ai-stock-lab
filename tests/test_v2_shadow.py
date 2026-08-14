@@ -1,5 +1,14 @@
 import unittest
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
+import pandas as pd
+
+from engine_v2.data_validation import (
+    _financial_available_rows,
+    _quarter_end_on_or_before,
+    _safe_requested_date,
+)
 from engine_v2.regime import MarketRegime, classify_market_regime
 from engine_v2.sizing import risk_budget_weights
 from engine_v2.strategies import (
@@ -115,6 +124,27 @@ class V2ShadowTests(unittest.TestCase):
         normal = sum(x["target_weight"] for x in strategy_b_v2(xs, r, fund_drawdown=0.0))
         stressed = sum(x["target_weight"] for x in strategy_b_v2(xs, r, fund_drawdown=-0.13))
         self.assertLess(stressed, normal)
+
+    def test_validator_uses_latest_completed_quarter(self):
+        self.assertEqual(_quarter_end_on_or_before(date(2026, 8, 14)), date(2026, 6, 30))
+        self.assertEqual(_quarter_end_on_or_before(date(2026, 2, 1)), date(2025, 12, 31))
+
+    def test_validator_never_uses_partial_trading_day(self):
+        before_close = datetime(2026, 8, 14, 14, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+        after_close = datetime(2026, 8, 14, 16, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        saturday = datetime(2026, 8, 15, 1, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+        self.assertEqual(_safe_requested_date(before_close), date(2026, 8, 13))
+        self.assertEqual(_safe_requested_date(after_close), date(2026, 8, 14))
+        self.assertEqual(_safe_requested_date(saturday), date(2026, 8, 14))
+
+    def test_financial_rows_are_filtered_by_announcement_date(self):
+        df = pd.DataFrame([
+            {"最新公告日期": "2026-08-10", "股票代码": "600001"},
+            {"最新公告日期": "2026-08-20", "股票代码": "600002"},
+        ])
+        rows, latest = _financial_available_rows(df, "2026-08-14")
+        self.assertEqual(rows, 1)
+        self.assertEqual(latest, "2026-08-10")
 
 
 if __name__ == "__main__":
