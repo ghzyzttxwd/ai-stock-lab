@@ -5,6 +5,7 @@ import json
 import math
 import signal
 import time
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -24,16 +25,7 @@ def _timeout(seconds, fn):
         signal.signal(signal.SIGALRM, old)
 
 
-def _quarter_ends_before(day: date) -> tuple[date, date]:
-    ends = [date(day.year - 1, 12, 31), date(day.year, 3, 31), date(day.year, 6, 30), date(day.year, 9, 30), date(day.year, 12, 31)]
-    valid = [x for x in ends if x <= day]
-    current = max(valid)
-    previous = max(x for x in ends if x < current)
-    return current, previous
-
-
 def _normalize_code(value) -> str | None:
-    """Normalize numeric/string stock codes without allowing pandas' 1.0 vs '000001' split."""
     if value is None:
         return None
     if isinstance(value, float):
@@ -42,70 +34,172 @@ def _normalize_code(value) -> str | None:
         if value.is_integer():
             value = int(value)
     text = str(value).strip()
-    if text.endswith('.0'):
-        head = text[:-2]
-        if head.isdigit():
-            text = head
+    if text.endswith('.0') and text[:-2].isdigit():
+        text = text[:-2]
     digits = ''.join(ch for ch in text if ch.isdigit())
     if not digits:
         return None
-    if len(digits) > 6:
-        digits = digits[-6:]
-    return digits.zfill(6)
+    return digits[-6:].zfill(6)
 
 
-def _announced_industry_map(df, asof: str) -> dict[str, str]:
-    if df is None or df.empty:
-        return {}
-    need = {'股票代码', '所处行业', '最新公告日期'}
-    if not need.issubset({str(x) for x in df.columns}):
-        return {}
-    work = df.copy()
-    work['_announce'] = work['最新公告日期'].astype(str).str[:10]
-    work = work[(work['_announce'] >= '2000-01-01') & (work['_announce'] <= asof)]
-    out = {}
-    for _, row in work.iterrows():
-        code = _normalize_code(row.get('股票代码'))
-        industry = str(row.get('所处行业', '')).strip()
-        if code and industry and industry.lower() != 'nan':
-            out[code] = industry
-    return out
+def _sw_index_code(value) -> str:
+    text = str(value).strip()
+    return text.split('.')[0]
 
 
 def validate_industry_layer(trade_date: str) -> dict:
     import akshare as ak
 
-    td = date.fromisoformat(trade_date)
-    current_q, previous_q = _quarter_ends_before(td)
     result = {
         'trade_date': trade_date,
-        'strength': {},
-        'membership': {},
-        'taxonomy': {},
+        'primary_taxonomy': '申万一级行业',
+        'sw_strength': {},
+        'sw_membership': {},
+        'sw_history': {},
+        'ths_fallback': {},
         'ready': False,
     }
 
-    summary = None
-    flow = None
+    # Primary: one coherent SW taxonomy for both industry strength and stock membership.
+    realtime = None
     started = time.monotonic()
     try:
-        summary = _timeout(60, ak.stock_board_industry_summary_ths)
-        required = {'板块', '涨跌幅', '总成交额', '净流入', '上涨家数', '下跌家数'}
-        missing = sorted(required - {str(x) for x in summary.columns})
+        realtime = _timeout(60, lambda: ak.index_realtime_sw(symbol='一级行业'))
+        required = {'指数代码', '指数名称', '昨收盘', '最新价', '成交额', '成交量'}
+        missing = sorted(required - {str(x) for x in realtime.columns})
         if missing:
             raise RuntimeError(f'missing columns: {missing}')
-        result['strength']['ths_summary'] = {
-            'status': 'PASS' if len(summary) >= 50 else 'DEGRADED',
-            'rows': len(summary),
+        realtime = realtime.copy()
+        realtime['_code'] = realtime['指数代码'].map(_sw_index_code)
+        realtime['_ret'] = (realtime['最新价'].astype(float) / realtime['昨收盘'].astype(float) - 1.0) * 100.0
+        result['sw_strength']['realtime_level1'] = {
+            'status': 'PASS' if len(realtime) >= 25 else 'DEGRADED',
+            'rows': len(realtime),
             'latency_s': round(time.monotonic() - started, 2),
+            'top5': [
+                {'code': str(r['_code']), 'name': str(r['指数名称']), 'return_pct': round(float(r['_ret']), 2)}
+                for _, r in realtime.sort_values('_ret', ascending=False).head(5).iterrows()
+            ],
         }
     except Exception as e:
-        result['strength']['ths_summary'] = {
+        result['sw_strength']['realtime_level1'] = {
             'status': 'FAIL', 'rows': 0,
             'latency_s': round(time.monotonic() - started, 2),
             'error': f'{type(e).__name__}: {e}',
         }
 
+    info = None
+    started = time.monotonic()
+    try:
+        info = _timeout(60, ak.sw_index_first_info)
+        required = {'行业代码', '行业名称', '成份个数'}
+        missing = sorted(required - {str(x) for x in info.columns})
+        if missing:
+            raise RuntimeError(f'missing columns: {missing}')
+        info = info.copy()
+        info['_code'] = info['行业代码'].map(_sw_index_code)
+        result['sw_membership']['level1_directory'] = {
+            'status': 'PASS' if len(info) >= 25 else 'DEGRADED',
+            'rows': len(info),
+            'declared_components': int(info['成份个数'].fillna(0).astype(float).sum()),
+            'latency_s': round(time.monotonic() - started, 2),
+        }
+    except Exception as e:
+        result['sw_membership']['level1_directory'] = {
+            'status': 'FAIL', 'rows': 0, 'declared_components': 0,
+            'latency_s': round(time.monotonic() - started, 2),
+            'error': f'{type(e).__name__}: {e}',
+        }
+
+    membership: dict[str, str] = {}
+    duplicate_assignments: Counter[str] = Counter()
+    component_failures: list[dict] = []
+    per_industry: list[dict] = []
+    if info is not None and not info.empty:
+        for _, row in info.iterrows():
+            idx_code = str(row['_code'])
+            idx_name = str(row['行业名称']).strip()
+            started = time.monotonic()
+            try:
+                df = _timeout(35, lambda c=idx_code: ak.index_component_sw(symbol=c))
+                required = {'证券代码', '证券名称', '计入日期'}
+                missing = sorted(required - {str(x) for x in df.columns})
+                if missing:
+                    raise RuntimeError(f'missing columns: {missing}')
+                count = 0
+                for value in df['证券代码'].tolist():
+                    code = _normalize_code(value)
+                    if not code:
+                        continue
+                    count += 1
+                    if code in membership and membership[code] != idx_name:
+                        duplicate_assignments[code] += 1
+                    membership[code] = idx_name
+                per_industry.append({'code': idx_code, 'name': idx_name, 'rows': count, 'latency_s': round(time.monotonic() - started, 2)})
+            except Exception as e:
+                component_failures.append({'code': idx_code, 'name': idx_name, 'error': f'{type(e).__name__}: {e}'})
+
+    declared = int(result['sw_membership'].get('level1_directory', {}).get('declared_components', 0) or 0)
+    unique_count = len(membership)
+    coverage_vs_declared = unique_count / declared if declared > 0 else 0.0
+    mapping_status = (
+        'PASS' if unique_count >= 4000 and len(component_failures) <= 2 and coverage_vs_declared >= 0.82
+        else 'DEGRADED' if unique_count >= 2500 and len(component_failures) <= 6
+        else 'FAIL'
+    )
+    result['sw_membership']['components'] = {
+        'status': mapping_status,
+        'unique_stocks': unique_count,
+        'declared_components': declared,
+        'coverage_vs_declared': round(coverage_vs_declared, 4),
+        'duplicate_cross_industry_assignments': len(duplicate_assignments),
+        'failed_industries': component_failures,
+        'slowest_industries': sorted(per_industry, key=lambda x: x['latency_s'], reverse=True)[:5],
+        'sample': [{'code': k, 'industry': membership[k]} for k in sorted(membership)[:8]],
+        'scope': 'current_forward_mapping',
+    }
+
+    # Verify that the SW live index directory and component directory use the same taxonomy.
+    rt_codes = set(realtime['_code'].astype(str)) if realtime is not None and not realtime.empty else set()
+    info_codes = set(info['_code'].astype(str)) if info is not None and not info.empty else set()
+    code_overlap = rt_codes & info_codes
+    taxonomy_ratio = len(code_overlap) / len(info_codes) if info_codes else 0.0
+    result['sw_membership']['taxonomy_consistency'] = {
+        'status': 'PASS' if taxonomy_ratio >= 0.95 else 'DEGRADED' if taxonomy_ratio >= 0.8 else 'FAIL',
+        'realtime_codes': len(rt_codes),
+        'directory_codes': len(info_codes),
+        'overlap_codes': len(code_overlap),
+        'ratio': round(taxonomy_ratio, 4),
+        'missing_from_realtime': sorted(info_codes - rt_codes)[:10],
+    }
+
+    # Historical point-in-time classification: do not project today's membership backward.
+    started = time.monotonic()
+    try:
+        hist = _timeout(90, ak.stock_industry_clf_hist_sw)
+        required = {'symbol', 'start_date', 'industry_code', 'update_time'}
+        missing = sorted(required - {str(x) for x in hist.columns})
+        if missing:
+            raise RuntimeError(f'missing columns: {missing}')
+        symbols = {_normalize_code(x) for x in hist['symbol'].tolist()}
+        symbols.discard(None)
+        result['sw_history'] = {
+            'status': 'PASS' if len(hist) >= 9000 and len(symbols) >= 3500 else 'DEGRADED',
+            'rows': len(hist),
+            'unique_stocks': len(symbols),
+            'min_start_date': str(hist['start_date'].astype(str).min())[:10] if len(hist) else None,
+            'max_start_date': str(hist['start_date'].astype(str).max())[:10] if len(hist) else None,
+            'latency_s': round(time.monotonic() - started, 2),
+            'scope': 'historical_point_in_time_membership',
+        }
+    except Exception as e:
+        result['sw_history'] = {
+            'status': 'FAIL', 'rows': 0, 'unique_stocks': 0,
+            'latency_s': round(time.monotonic() - started, 2),
+            'error': f'{type(e).__name__}: {e}',
+        }
+
+    # Independent THS industry flow remains a fallback / cross-check, not the stock-industry mapping source.
     started = time.monotonic()
     try:
         flow = _timeout(60, lambda: ak.stock_fund_flow_industry(symbol='即时'))
@@ -113,80 +207,27 @@ def validate_industry_layer(trade_date: str) -> dict:
         missing = sorted(required - {str(x) for x in flow.columns})
         if missing:
             raise RuntimeError(f'missing columns: {missing}')
-        result['strength']['ths_flow'] = {
+        result['ths_fallback'] = {
             'status': 'PASS' if len(flow) >= 50 else 'DEGRADED',
             'rows': len(flow),
             'latency_s': round(time.monotonic() - started, 2),
+            'role': 'independent_strength_crosscheck_only',
         }
     except Exception as e:
-        result['strength']['ths_flow'] = {
+        result['ths_fallback'] = {
             'status': 'FAIL', 'rows': 0,
             'latency_s': round(time.monotonic() - started, 2),
+            'role': 'independent_strength_crosscheck_only',
             'error': f'{type(e).__name__}: {e}',
         }
 
-    maps = []
-    for label, period in [('current_report', current_q), ('previous_report', previous_q)]:
-        started = time.monotonic()
-        try:
-            df = _timeout(75, lambda p=period: ak.stock_yjbb_em(date=p.strftime('%Y%m%d')))
-            mapping = _announced_industry_map(df, trade_date)
-            maps.append(mapping)
-            result['membership'][label] = {
-                'status': 'PASS' if len(mapping) >= 500 else 'DEGRADED',
-                'period': period.isoformat(),
-                'raw_rows': len(df),
-                'announced_mapped_rows': len(mapping),
-                'sample_codes': sorted(mapping)[:5],
-                'latency_s': round(time.monotonic() - started, 2),
-            }
-        except Exception as e:
-            maps.append({})
-            result['membership'][label] = {
-                'status': 'FAIL', 'period': period.isoformat(), 'raw_rows': 0,
-                'announced_mapped_rows': 0,
-                'latency_s': round(time.monotonic() - started, 2),
-                'error': f'{type(e).__name__}: {e}',
-            }
-
-    current_map = maps[0] if maps else {}
-    previous_map = maps[1] if len(maps) > 1 else {}
-    overlap = set(current_map) & set(previous_map)
-    merged = dict(previous_map)
-    merged.update(current_map)
-    result['membership']['merged'] = {
-        'mapped_stocks': len(merged),
-        'current_previous_overlap': len(overlap),
-        'current_not_in_previous': len(set(current_map) - set(previous_map)),
-        'status': 'PASS' if len(merged) >= 2500 else 'DEGRADED' if len(merged) >= 1000 else 'FAIL',
-        'scope': 'forward_asof_announcements_only',
-        'warning': 'industry labels come from disclosed report tables; historical membership backtest remains separate',
-    }
-
-    ths_labels = set()
-    if summary is not None and not summary.empty and '板块' in summary.columns:
-        ths_labels.update(str(x).strip() for x in summary['板块'].tolist() if str(x).strip())
-    if flow is not None and not flow.empty and '行业' in flow.columns:
-        ths_labels.update(str(x).strip() for x in flow['行业'].tolist() if str(x).strip())
-    direct_match = sum(1 for industry in merged.values() if industry in ths_labels)
-    ratio = direct_match / len(merged) if merged else 0.0
-    unmatched_top = {}
-    for industry in merged.values():
-        if industry not in ths_labels:
-            unmatched_top[industry] = unmatched_top.get(industry, 0) + 1
-    result['taxonomy'] = {
-        'ths_unique_labels': len(ths_labels),
-        'report_unique_labels': len(set(merged.values())),
-        'direct_match_stocks': direct_match,
-        'direct_match_ratio': round(ratio, 4),
-        'largest_unmatched_labels': sorted(unmatched_top.items(), key=lambda x: x[1], reverse=True)[:12],
-        'status': 'PASS' if ratio >= 0.65 else 'DEGRADED' if ratio >= 0.35 else 'FAIL',
-    }
-
-    strength_ok = any(x.get('status') == 'PASS' for x in result['strength'].values())
-    membership_ok = result['membership']['merged']['status'] == 'PASS'
-    taxonomy_ok = result['taxonomy']['status'] == 'PASS'
-    result['ready'] = strength_ok and membership_ok and taxonomy_ok
+    strength_ok = result['sw_strength'].get('realtime_level1', {}).get('status') == 'PASS'
+    directory_ok = result['sw_membership'].get('level1_directory', {}).get('status') == 'PASS'
+    components_ok = result['sw_membership'].get('components', {}).get('status') == 'PASS'
+    taxonomy_ok = result['sw_membership'].get('taxonomy_consistency', {}).get('status') == 'PASS'
+    history_ok = result['sw_history'].get('status') in {'PASS', 'DEGRADED'}
+    result['ready'] = strength_ok and directory_ok and components_ok and taxonomy_ok
+    result['historical_membership_ready'] = history_ok
     return result
 
 
