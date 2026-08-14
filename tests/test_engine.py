@@ -1,4 +1,7 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 import pandas as pd
 from engine.universe import is_main_board
@@ -12,6 +15,7 @@ from engine.daily_run import (
     _decision_diary,
 )
 from engine.real_market import AKShareMarket, _tx_amount_mode, _tx_amount_and_volume
+from engine.schedule_guard import FUND_IDS, scheduled_decision
 
 class EngineTests(unittest.TestCase):
     def test_board_filter(self):
@@ -142,5 +146,22 @@ class EngineTests(unittest.TestCase):
         amount,volume=_tx_amount_and_volume(500_000,10.0,'hands')
         self.assertEqual(amount,500_000_000)
         self.assertEqual(volume,50_000_000)
+
+    def test_exchange_holiday_skips_scheduled_market_and_ai_work(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            for fid in FUND_IDS:
+                (root/f'{fid}.json').write_text(
+                    json.dumps({'last_processed_date':'2026-09-30'}),encoding='utf-8'
+                )
+            decision=scheduled_decision('2026-10-01','2026-09-30',root)
+            self.assertFalse(decision['is_trading_day'])
+            self.assertTrue(decision['processed_latest'])
+            self.assertFalse(decision['production_run'])
+            self.assertFalse(decision['preflight_run'])
+
+            trading_day=scheduled_decision('2026-10-08','2026-10-08',root)
+            self.assertTrue(trading_day['production_run'])
+            self.assertTrue(trading_day['preflight_run'])
 
 if __name__=='__main__': unittest.main()
