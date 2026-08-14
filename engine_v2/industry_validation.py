@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import signal
 import time
 from datetime import date
@@ -31,6 +32,28 @@ def _quarter_ends_before(day: date) -> tuple[date, date]:
     return current, previous
 
 
+def _normalize_code(value) -> str | None:
+    """Normalize numeric/string stock codes without allowing pandas' 1.0 vs '000001' split."""
+    if value is None:
+        return None
+    if isinstance(value, float):
+        if math.isnan(value):
+            return None
+        if value.is_integer():
+            value = int(value)
+    text = str(value).strip()
+    if text.endswith('.0'):
+        head = text[:-2]
+        if head.isdigit():
+            text = head
+    digits = ''.join(ch for ch in text if ch.isdigit())
+    if not digits:
+        return None
+    if len(digits) > 6:
+        digits = digits[-6:]
+    return digits.zfill(6)
+
+
 def _announced_industry_map(df, asof: str) -> dict[str, str]:
     if df is None or df.empty:
         return {}
@@ -42,9 +65,9 @@ def _announced_industry_map(df, asof: str) -> dict[str, str]:
     work = work[(work['_announce'] >= '2000-01-01') & (work['_announce'] <= asof)]
     out = {}
     for _, row in work.iterrows():
-        code = str(row.get('股票代码', '')).zfill(6)
+        code = _normalize_code(row.get('股票代码'))
         industry = str(row.get('所处行业', '')).strip()
-        if len(code) == 6 and industry and industry.lower() != 'nan':
+        if code and industry and industry.lower() != 'nan':
             out[code] = industry
     return out
 
@@ -58,10 +81,12 @@ def validate_industry_layer(trade_date: str) -> dict:
         'trade_date': trade_date,
         'strength': {},
         'membership': {},
+        'taxonomy': {},
         'ready': False,
     }
 
-    # Same taxonomy/provider pair: summary gives breadth/price action, fund-flow gives money flow.
+    summary = None
+    flow = None
     started = time.monotonic()
     try:
         summary = _timeout(60, ak.stock_board_industry_summary_ths)
@@ -100,8 +125,6 @@ def validate_industry_layer(trade_date: str) -> dict:
             'error': f'{type(e).__name__}: {e}',
         }
 
-    # Membership baseline: use only report rows that were publicly announced by the decision date.
-    # Current quarter wins; previous quarter fills stocks that have not yet reported the current quarter.
     maps = []
     for label, period in [('current_report', current_q), ('previous_report', previous_q)]:
         started = time.monotonic()
@@ -114,6 +137,7 @@ def validate_industry_layer(trade_date: str) -> dict:
                 'period': period.isoformat(),
                 'raw_rows': len(df),
                 'announced_mapped_rows': len(mapping),
+                'sample_codes': sorted(mapping)[:5],
                 'latency_s': round(time.monotonic() - started, 2),
             }
         except Exception as e:
@@ -125,19 +149,44 @@ def validate_industry_layer(trade_date: str) -> dict:
                 'error': f'{type(e).__name__}: {e}',
             }
 
-    merged = dict(maps[1] if len(maps) > 1 else {})
-    if maps:
-        merged.update(maps[0])
+    current_map = maps[0] if maps else {}
+    previous_map = maps[1] if len(maps) > 1 else {}
+    overlap = set(current_map) & set(previous_map)
+    merged = dict(previous_map)
+    merged.update(current_map)
     result['membership']['merged'] = {
         'mapped_stocks': len(merged),
+        'current_previous_overlap': len(overlap),
+        'current_not_in_previous': len(set(current_map) - set(previous_map)),
         'status': 'PASS' if len(merged) >= 2500 else 'DEGRADED' if len(merged) >= 1000 else 'FAIL',
         'scope': 'forward_asof_announcements_only',
         'warning': 'industry labels come from disclosed report tables; historical membership backtest remains separate',
     }
 
+    ths_labels = set()
+    if summary is not None and not summary.empty and '板块' in summary.columns:
+        ths_labels.update(str(x).strip() for x in summary['板块'].tolist() if str(x).strip())
+    if flow is not None and not flow.empty and '行业' in flow.columns:
+        ths_labels.update(str(x).strip() for x in flow['行业'].tolist() if str(x).strip())
+    direct_match = sum(1 for industry in merged.values() if industry in ths_labels)
+    ratio = direct_match / len(merged) if merged else 0.0
+    unmatched_top = {}
+    for industry in merged.values():
+        if industry not in ths_labels:
+            unmatched_top[industry] = unmatched_top.get(industry, 0) + 1
+    result['taxonomy'] = {
+        'ths_unique_labels': len(ths_labels),
+        'report_unique_labels': len(set(merged.values())),
+        'direct_match_stocks': direct_match,
+        'direct_match_ratio': round(ratio, 4),
+        'largest_unmatched_labels': sorted(unmatched_top.items(), key=lambda x: x[1], reverse=True)[:12],
+        'status': 'PASS' if ratio >= 0.65 else 'DEGRADED' if ratio >= 0.35 else 'FAIL',
+    }
+
     strength_ok = any(x.get('status') == 'PASS' for x in result['strength'].values())
     membership_ok = result['membership']['merged']['status'] == 'PASS'
-    result['ready'] = strength_ok and membership_ok
+    taxonomy_ok = result['taxonomy']['status'] == 'PASS'
+    result['ready'] = strength_ok and membership_ok and taxonomy_ok
     return result
 
 
