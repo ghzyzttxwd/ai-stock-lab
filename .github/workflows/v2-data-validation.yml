@@ -39,47 +39,62 @@ jobs:
       - name: Validate live V2 data sources without touching ledgers
         run: python -m engine_v2.data_validation --output /tmp/v2-data-validation.json
 
-      - name: Validate mixed industry sources and expose taxonomy mismatch
-        run: |
-          TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
-          python -m engine_v2.industry_validation --date "$TD" --output /tmp/v2-industry-validation.json
-
       - name: Validate unified Shenwan L1 industry chain
         run: |
           TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
           python -m engine_v2.sw_industry_validation --date "$TD" --output /tmp/v2-sw-industry-validation.json
 
-      - name: Diagnose financial report issuer overlap before quality merge
+      - name: Validate mainboard financial point-in-time consistency
         run: |
           TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
           python -m engine_v2.financial_validation --date "$TD" --output /tmp/v2-financial-validation.json
+
+      - name: Build normalized V2 shadow snapshot without trading
+        run: |
+          TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
+          python -m engine_v2.snapshot --date "$TD" --output /tmp/v2-normalized-snapshot.json
 
       - name: Show readiness summary
         run: |
           python - <<'PY'
           import json
           p=json.load(open('/tmp/v2-data-validation.json',encoding='utf-8'))
-          i=json.load(open('/tmp/v2-industry-validation.json',encoding='utf-8'))
           sw=json.load(open('/tmp/v2-sw-industry-validation.json',encoding='utf-8'))
           f=json.load(open('/tmp/v2-financial-validation.json',encoding='utf-8'))
+          s=json.load(open('/tmp/v2-normalized-snapshot.json',encoding='utf-8'))
           print('[V2 DATA] trade_date=',p['trade_date'])
           print('[V2 DATA] readiness=',json.dumps(p['readiness'],ensure_ascii=False))
-          print('[V2 MIXED INDUSTRY] ready=',i['ready'],'taxonomy=',json.dumps(i.get('taxonomy'),ensure_ascii=False))
           print('[V2 SW INDUSTRY] ready=',sw['ready'])
           print('[V2 SW INDUSTRY] analysis=',json.dumps(sw['daily_analysis'],ensure_ascii=False))
           print('[V2 SW INDUSTRY] constituents=',json.dumps(sw['constituents'],ensure_ascii=False))
           print('[V2 FINANCIAL] ready=',f['ready_for_quality_merge'])
-          print('[V2 FINANCIAL] reports=',json.dumps(f['reports'],ensure_ascii=False))
-          print('[V2 FINANCIAL] overlap=',json.dumps(f['overlap'],ensure_ascii=False))
+          print('[V2 FINANCIAL] mainboard_overlap=',json.dumps(f['mainboard_overlap'],ensure_ascii=False))
+          print('[V2 FINANCIAL] all_market_overlap=',json.dumps(f['all_market_overlap'],ensure_ascii=False))
+          print('[V2 SNAPSHOT] regime=',json.dumps(s['market']['regime'],ensure_ascii=False))
+          print('[V2 SNAPSHOT] fundamentals=',json.dumps(s['fundamentals'],ensure_ascii=False))
+          print('[V2 SNAPSHOT] industry=',json.dumps(s['industry']['counts'],ensure_ascii=False))
+          print('[V2 SNAPSHOT] preselection_union=',s['preselection']['union_count'])
+          print('[V2 SNAPSHOT] stock_source=',s['source_notes']['stock_snapshot'])
+          print('[V2 SNAPSHOT] safety=',json.dumps(s['safety'],ensure_ascii=False))
+          if not sw['ready']:
+              raise SystemExit('Shenwan industry layer is not ready')
+          if not f['ready_for_quality_merge']:
+              raise SystemExit('mainboard financial point-in-time layer is not ready')
+          if s['safety']['writes_ledgers'] or s['safety']['calls_sol']:
+              raise SystemExit('shadow snapshot safety invariant violated')
+          if not (80 <= s['preselection']['union_count'] <= 180):
+              raise SystemExit('shadow preselection size is suspicious')
           PY
 
       - name: Upload validation reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: v2-data-validation
           path: |
             /tmp/v2-data-validation.json
-            /tmp/v2-industry-validation.json
             /tmp/v2-sw-industry-validation.json
             /tmp/v2-financial-validation.json
+            /tmp/v2-normalized-snapshot.json
+          if-no-files-found: warn
           retention-days: 14
