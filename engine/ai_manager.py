@@ -10,12 +10,16 @@ SYSTEM = '''你是A股虚拟基金的组合经理。你没有真实证券账户�
 允许targets为空。target_weight必须在0到0.15之间。'''
 
 
+class TransientAIError(RuntimeError):
+    """A relay/stream condition worth retrying once."""
+
+
 def _headers(key: str) -> dict:
     return {
         'Authorization': f'Bearer {key}',
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream, application/json',
-        'User-Agent': 'ai-stock-lab/0.5',
+        'User-Agent': 'ai-stock-lab/0.6',
     }
 
 
@@ -55,6 +59,9 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
         plain_lines: list[str] = []
         saw_sse = False
         first_event = None
+        event_count = 0
+        reasoning_chars = 0
+        finish_reasons: list[str] = []
         for raw in r.iter_lines(decode_unicode=True):
             if raw is None:
                 continue
@@ -69,35 +76,49 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
                 data = line[5:].strip()
                 if data == '[DONE]':
                     break
+                event_count += 1
                 try:
                     obj = json.loads(data)
                 except json.JSONDecodeError:
                     continue
+                if obj.get('error'):
+                    raise RuntimeError(f"AI stream error: {str(obj.get('error'))[:240]}")
                 choices = obj.get('choices') or []
                 if not choices:
                     continue
                 choice = choices[0]
+                finish = choice.get('finish_reason')
+                if finish:
+                    finish_reasons.append(str(finish))
                 delta = choice.get('delta') or {}
                 content = delta.get('content')
                 if content:
                     sse_parts.append(str(content))
                 elif choice.get('message', {}).get('content'):
                     sse_parts.append(str(choice['message']['content']))
+                else:
+                    # Some Sol-compatible relays stream reasoning separately before final content.
+                    reasoning = delta.get('reasoning_content') or delta.get('reasoning')
+                    if reasoning:
+                        reasoning_chars += len(str(reasoning))
             else:
                 plain_lines.append(line)
 
         elapsed = time.monotonic() - started
         if saw_sse:
             text = ''.join(sse_parts).strip()
-            print(f'[AI] stream completed in {elapsed:.2f}s chars={len(text)}')
+            print(
+                f'[AI] stream completed in {elapsed:.2f}s chars={len(text)} '
+                f'events={event_count} reasoning_chars={reasoning_chars} finish={finish_reasons[-1:]}'
+            )
             if not text:
-                raise RuntimeError('AI stream completed but returned no content')
+                raise TransientAIError('AI stream completed but returned no final content')
             return text
 
         # Some relays ignore stream=true and return one normal JSON response.
         raw_text = '\n'.join(plain_lines).strip()
         if not raw_text:
-            raise RuntimeError('AI response was empty')
+            raise TransientAIError('AI response was empty')
         obj = json.loads(raw_text)
         content = obj['choices'][0]['message']['content']
         print(f'[AI] non-SSE response completed in {elapsed:.2f}s')
@@ -131,10 +152,9 @@ def decide_with_api(candidates: list[dict], current: dict, market_score: float) 
         }, ensure_ascii=False)},
     ]
     # Keep the formal request close to the most widely supported Chat Completions shape.
-    # No response_format/temperature requirement: the system prompt already requires strict JSON.
     payload = {'model': model, 'messages': messages}
 
-    # At most two network attempts. This avoids runaway API spend while covering transient 502/503/504.
+    # At most two network attempts. Covers transient gateway errors and empty SSE streams without runaway spend.
     for attempt in (1, 2):
         try:
             content = _stream_chat(base, key, payload)
@@ -151,11 +171,14 @@ def decide_with_api(candidates: list[dict], current: dict, market_score: float) 
                 continue
             print(f'[AI] fallback because API HTTP failed: {code}')
             return None
-        except (requests.RequestException, json.JSONDecodeError, ValueError, RuntimeError) as e:
-            if attempt == 1 and isinstance(e, requests.RequestException):
-                print(f'[AI] transient network error; retry once after 5s: {e}')
+        except (requests.RequestException, TransientAIError, json.JSONDecodeError) as e:
+            if attempt == 1:
+                print(f'[AI] transient/invalid response; retry once after 5s: {e}')
                 time.sleep(5)
                 continue
+            print(f'[AI] fallback because API call failed after retry: {e}')
+            return None
+        except (ValueError, RuntimeError) as e:
             print(f'[AI] fallback because API call failed: {e}')
             return None
     return None
