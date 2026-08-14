@@ -1,0 +1,58 @@
+name: V2 data validation (shadow only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v2-shadow]
+    paths:
+      - 'engine_v2/**'
+      - 'tests/test_v2_shadow.py'
+      - '.github/workflows/v2-data-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-data-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout V2 shadow branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run V2 pure-function tests
+        run: python -m unittest tests.test_v2_shadow -v
+
+      - name: Validate live V2 data sources without touching ledgers
+        run: python -m engine_v2.data_validation --output /tmp/v2-data-validation.json
+
+      - name: Show readiness summary
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/v2-data-validation.json',encoding='utf-8'))
+          print('[V2 DATA] trade_date=',p['trade_date'])
+          print('[V2 DATA] readiness=',json.dumps(p['readiness'],ensure_ascii=False))
+          for x in p['probes']:
+              print(f"[V2 DATA] {x['name']}: {x['status']} scope={x['scope']} rows={x['rows']} asof={x['asof']} error={x['error']}")
+          PY
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-data-validation
+          path: /tmp/v2-data-validation.json
+          retention-days: 14
