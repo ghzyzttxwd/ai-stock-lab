@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pandas as pd
 from engine.universe import is_main_board
 from engine.risk import clamp_d_targets
-from engine.broker import round_lot, fee_for, _locked_at_limit
+from engine.broker import round_lot, fee_for, _locked_at_limit, _execution_target_map
 from engine.daily_run import (
     _previous_trade_date,
     _pending_is_fresh,
@@ -38,6 +38,31 @@ class EngineTests(unittest.TestCase):
         self.assertLessEqual(max(x['target_weight'] for x in clean),.15)
         self.assertLessEqual(sum(x['target_weight'] for x in clean),.90+1e-9)
         self.assertTrue(notes)
+
+    def test_d_new_position_cap_uses_current_holdings(self):
+        state={'positions':{'sh.600001':{'qty':1000}}}
+        targets=[
+            {'symbol':'sh.600001','name':'已有仓','target_weight':0.15},
+            {'symbol':'sh.600002','name':'新仓','target_weight':0.12},
+        ]
+        clean,notes=clamp_d_targets(targets,state)
+        by_symbol={x['symbol']:x for x in clean}
+        self.assertEqual(by_symbol['sh.600001']['target_weight'],0.15)
+        self.assertEqual(by_symbol['sh.600002']['target_weight'],0.10)
+        self.assertTrue(any('新开仓' in x for x in notes))
+
+    def test_d_execution_rechecks_old_pending_new_position_cap(self):
+        state={'fund_id':'D_MAIN','positions':{}}
+        target_map=_execution_target_map(state,[
+            {'symbol':'sz.000831','name':'中国稀土','target_weight':0.11}
+        ])
+        self.assertEqual(target_map['sz.000831']['target_weight'],0.10)
+
+        other_state={'fund_id':'B','positions':{}}
+        other_map=_execution_target_map(other_state,[
+            {'symbol':'sz.000831','name':'中国稀土','target_weight':0.11}
+        ])
+        self.assertEqual(other_map['sz.000831']['target_weight'],0.11)
 
     def test_limit_lock(self):
         self.assertTrue(_locked_at_limit('BUY', {'open':11.0,'preclose':10.0}))
