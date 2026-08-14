@@ -81,17 +81,21 @@ jobs:
           cache: 'pip'
       - run: pip install -r requirements.txt
         if: steps.guard.outputs.done != 'true'
+      - name: Check exchange session for scheduled run
+        id: marketday
+        if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
+        run: python -m engine.schedule_guard production
       - name: Run real-market virtual portfolios
-        if: steps.guard.outputs.done != 'true'
+        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: python -m engine.daily_run --real
       - run: python -m unittest discover -s tests -v
-        if: steps.guard.outputs.done != 'true'
+        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
       - name: Persist portfolio ledger and public snapshots
-        if: steps.guard.outputs.done != 'true'
+        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         run: |
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
@@ -103,7 +107,7 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      # Pages deployment is intentionally still run on redundant retry slots.
+      # Pages deployment is intentionally still run on redundant retry slots and holidays.
       # This repairs the case where the ledger was committed successfully but a prior Pages deploy failed.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
