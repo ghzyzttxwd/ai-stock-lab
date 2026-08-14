@@ -50,7 +50,7 @@ jobs:
           echo "requested_date=$TD"
 
       - name: Build normalized V2 shadow snapshot once
-        run: python -m engine_v2.snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
+        run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
 
       - name: Assert snapshot invariants
         run: |
@@ -67,6 +67,7 @@ jobs:
           print('[V2 SNAPSHOT] preselection_union=',s['preselection']['union_count'])
           print('[V2 SNAPSHOT] data_quality=',json.dumps(q,ensure_ascii=False))
           print('[V2 SNAPSHOT] source=',s['source_notes']['stock_snapshot'])
+          print('[V2 SNAPSHOT] universe_mode=',s['source_notes'].get('stock_universe_mode'))
           print('[V2 SNAPSHOT] safety=',json.dumps(s['safety'],ensure_ascii=False))
           if s['market']['activity']['reported_date'] != s['trade_date']:
               raise SystemExit('market activity is not point-in-time current')
@@ -114,8 +115,10 @@ jobs:
           print('[V2 ENRICH] limit_status=',json.dumps(limits,ensure_ascii=False))
           if cov['history_ratio'] < 0.85 or cov['feature_ratio'] < 0.80 or len(c) < 100:
               raise SystemExit('Tencent history/feature coverage too low')
-          if not safety['ready_for_strategy_targets']:
-              raise SystemExit('enrichment did not earn strategy-target readiness')
+          if safety.get('stock_universe_grade') == 'full' and not safety['ready_for_strategy_targets']:
+              raise SystemExit('full-universe enrichment did not earn strategy-target readiness')
+          if safety.get('stock_universe_grade') != 'full' and safety['ready_for_strategy_targets']:
+              raise SystemExit('degraded stock universe must not earn strategy-target readiness')
           if safety['writes_ledgers'] or safety['calls_sol'] or safety['ready_for_shadow_accounting']:
               raise SystemExit('enrichment safety invariant violated')
           required=('trend','momentum','risk','liquidity','breakout_quality','crowding_score','vol20','r20','r60','amount20')
