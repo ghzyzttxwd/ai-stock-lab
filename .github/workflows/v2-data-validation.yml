@@ -39,10 +39,15 @@ jobs:
       - name: Validate live V2 data sources without touching ledgers
         run: python -m engine_v2.data_validation --output /tmp/v2-data-validation.json
 
-      - name: Validate industry strength and stock mapping separately
+      - name: Validate mixed industry sources and expose taxonomy mismatch
         run: |
           TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
           python -m engine_v2.industry_validation --date "$TD" --output /tmp/v2-industry-validation.json
+
+      - name: Validate unified Shenwan L1 industry chain
+        run: |
+          TD=$(python -c "import json; print(json.load(open('/tmp/v2-data-validation.json'))['trade_date'])")
+          python -m engine_v2.sw_industry_validation --date "$TD" --output /tmp/v2-sw-industry-validation.json
 
       - name: Show readiness summary
         run: |
@@ -50,13 +55,18 @@ jobs:
           import json
           p=json.load(open('/tmp/v2-data-validation.json',encoding='utf-8'))
           i=json.load(open('/tmp/v2-industry-validation.json',encoding='utf-8'))
+          sw=json.load(open('/tmp/v2-sw-industry-validation.json',encoding='utf-8'))
           print('[V2 DATA] trade_date=',p['trade_date'])
           print('[V2 DATA] readiness=',json.dumps(p['readiness'],ensure_ascii=False))
           for x in p['probes']:
               print(f"[V2 DATA] {x['name']}: {x['status']} scope={x['scope']} rows={x['rows']} asof={x['asof']} error={x['error']}")
-          print('[V2 INDUSTRY] ready=',i['ready'])
-          print('[V2 INDUSTRY] strength=',json.dumps(i['strength'],ensure_ascii=False))
-          print('[V2 INDUSTRY] membership=',json.dumps(i['membership'],ensure_ascii=False))
+          print('[V2 MIXED INDUSTRY] ready=',i['ready'])
+          print('[V2 MIXED INDUSTRY] taxonomy=',json.dumps(i.get('taxonomy'),ensure_ascii=False))
+          print('[V2 SW INDUSTRY] ready=',sw['ready'])
+          print('[V2 SW INDUSTRY] catalog=',json.dumps(sw['index_catalog'],ensure_ascii=False))
+          print('[V2 SW INDUSTRY] analysis=',json.dumps(sw['daily_analysis'],ensure_ascii=False))
+          print('[V2 SW INDUSTRY] history=',json.dumps(sw['history_sample'],ensure_ascii=False))
+          print('[V2 SW INDUSTRY] constituents=',json.dumps(sw['constituents'],ensure_ascii=False))
           PY
 
       - name: Upload validation reports
@@ -66,4 +76,5 @@ jobs:
           path: |
             /tmp/v2-data-validation.json
             /tmp/v2-industry-validation.json
+            /tmp/v2-sw-industry-validation.json
           retention-days: 14
