@@ -25,19 +25,51 @@ jobs:
       name: github-pages
     steps:
       - uses: actions/checkout@v4
+      - name: Skip redundant retry if today already succeeded
+        id: guard
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          today = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+          fund_ids = ('D_MAIN','A','B','C','D','L')
+          done = True
+          for fid in fund_ids:
+              path = Path('state') / f'{fid}.json'
+              try:
+                  state = json.loads(path.read_text(encoding='utf-8'))
+              except Exception:
+                  done = False
+                  break
+              if str(state.get('last_processed_date') or '')[:10] != today:
+                  done = False
+                  break
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'done={str(done).lower()}\n')
+          print(f'[guard] Beijing date={today}; already_processed={done}')
+          PY
       - uses: actions/setup-python@v5
+        if: steps.guard.outputs.done != 'true'
         with:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
+        if: steps.guard.outputs.done != 'true'
       - name: Run real-market virtual portfolios
+        if: steps.guard.outputs.done != 'true'
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: python -m engine.daily_run --real
       - run: python -m unittest discover -s tests -v
+        if: steps.guard.outputs.done != 'true'
       - name: Persist portfolio ledger and public snapshots
+        if: steps.guard.outputs.done != 'true'
         run: |
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
@@ -46,8 +78,11 @@ jobs:
           git pull --rebase origin main
           git push
       - uses: actions/configure-pages@v5
+        if: steps.guard.outputs.done != 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.guard.outputs.done != 'true'
         with:
           path: web
       - id: deployment
+        if: steps.guard.outputs.done != 'true'
         uses: actions/deploy-pages@v4
