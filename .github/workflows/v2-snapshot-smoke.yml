@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
@@ -50,6 +51,69 @@ jobs:
           )
           echo "date=$TD" >> "$GITHUB_OUTPUT"
           echo "requested_date=$TD"
+
+      - name: Restore exact-session decision snapshot cache
+        id: decision-cache
+        uses: actions/cache@v4
+        with:
+          path: shadow_state/v2/cache/normalized_snapshot.json
+          key: v2-decision-snapshot-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('engine_v2/resilient_snapshot.py') }}
+          restore-keys: |
+            v2-decision-snapshot-${{ runner.os }}-${{ steps.td.outputs.date }}-
+
+      - name: Find latest successful snapshot artifact
+        if: steps.decision-cache.outputs.cache-hit != 'true'
+        id: prior
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from urllib.request import Request, urlopen
+          url=(
+              f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}"
+              "/actions/workflows/v2-snapshot-smoke.yml/runs"
+              "?branch=v2-shadow&status=success&per_page=1"
+          )
+          req=Request(url,headers={
+              'Authorization':f"Bearer {os.environ['GH_TOKEN']}",
+              'Accept':'application/vnd.github+json',
+              'X-GitHub-Api-Version':'2022-11-28',
+          })
+          runs=json.load(urlopen(req,timeout=30)).get('workflow_runs') or []
+          run_id=str(runs[0]['id']) if runs else ''
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as handle:
+              handle.write(f'run-id={run_id}\n')
+          print('latest_successful_snapshot_run=',run_id or 'none')
+          PY
+
+      - name: Download latest successful snapshot artifact
+        if: steps.decision-cache.outputs.cache-hit != 'true' && steps.prior.outputs.run-id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: v2-normalized-snapshot
+          path: /tmp/v2-prior-snapshot
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.prior.outputs.run-id }}
+
+      - name: Bootstrap validated exact-session cache
+        if: steps.decision-cache.outputs.cache-hit != 'true' && steps.prior.outputs.run-id != ''
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from engine_v2.resilient_snapshot import _save_decision_snapshot
+          path=Path('/tmp/v2-prior-snapshot/v2-normalized-snapshot.json')
+          if not path.exists():
+              raise SystemExit(f'prior successful artifact missing normalized snapshot: {path}')
+          snapshot=json.loads(path.read_text(encoding='utf-8'))
+          requested='${{ steps.td.outputs.date }}'
+          if str(snapshot.get('trade_date') or '')[:10] != requested:
+              print(f'prior artifact date does not match; skip cache bootstrap: {snapshot.get("trade_date")} != {requested}')
+          else:
+              _save_decision_snapshot(snapshot)
+              print(f'validated exact-session cache bootstrapped for {requested}')
+          PY
 
       - name: Build normalized V2 shadow snapshot once
         run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
