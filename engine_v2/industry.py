@@ -29,6 +29,13 @@ def _stock_code(value) -> str | None:
     return digits[-6:].zfill(6)
 
 
+def _industry_code(value) -> str:
+    text=str(value or '').strip()
+    if text.endswith('.SI'):
+        text=text[:-3]
+    return text
+
+
 def _is_mainboard(code: str | None) -> bool:
     return bool(code) and code.startswith(('600','601','603','605','000','001','002','003'))
 
@@ -70,8 +77,9 @@ def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
         if len(closes)<21:
             continue
         latest=g.iloc[-1]
-        metrics[str(code)]={
-            'industry_code':str(code),
+        normalized_code=_industry_code(code)
+        metrics[normalized_code]={
+            'industry_code':normalized_code,
             'industry_name':str(latest['指数名称']).strip(),
             'asof':str(latest['_date']),
             'r20':_period_return(closes,20),
@@ -105,10 +113,59 @@ def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
     return metrics
 
 
+def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
+    """Load the SW L1 directory without depending on the realtime SWS endpoint.
+
+    The directory only supplies stable industry codes/names; live prices are not required here.
+    Prefer the independent Legulegu-backed AKShare interface and keep SWS realtime as fallback.
+    """
+    errors=[]
+    try:
+        info=bounded_call(30,ak.sw_index_first_info,'SW L1 directory Legulegu')
+        need={'行业代码','行业名称'}
+        missing=sorted(need-{str(x) for x in info.columns})
+        if missing:
+            raise RuntimeError(f'missing columns: {missing}')
+        rows=[]
+        for _,r in info.iterrows():
+            code=_industry_code(r.get('行业代码'))
+            name=str(r.get('行业名称') or '').strip()
+            if code and name:
+                rows.append({
+                    'industry_code':code,
+                    'industry_name':name,
+                    'declared_components':int(_num(r.get('成份个数'),0) or 0),
+                })
+        if len(rows)<25:
+            raise RuntimeError(f'too few SW L1 industries: {len(rows)}')
+        return rows,{'source':'legulegu-sw-index-first-info','errors':errors}
+    except Exception as exc:
+        errors.append(f'legulegu={type(exc).__name__}: {exc}')
+
+    try:
+        realtime=bounded_call(35,lambda:ak.index_realtime_sw(symbol='一级行业'),'SW L1 directory SWS fallback')
+        need={'指数代码','指数名称'}
+        missing=sorted(need-{str(x) for x in realtime.columns})
+        if missing:
+            raise RuntimeError(f'missing columns: {missing}')
+        rows=[]
+        for _,r in realtime.iterrows():
+            code=_industry_code(r.get('指数代码'))
+            name=str(r.get('指数名称') or '').strip()
+            if code and name:
+                rows.append({'industry_code':code,'industry_name':name,'declared_components':0})
+        if len(rows)<25:
+            raise RuntimeError(f'too few SW L1 industries: {len(rows)}')
+        return rows,{'source':'sws-realtime-fallback','errors':errors}
+    except Exception as exc:
+        errors.append(f'sws={type(exc).__name__}: {exc}')
+        raise RuntimeError('SW L1 directory unavailable; '+' | '.join(errors)) from exc
+
+
 def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
     td=date.fromisoformat(trade_date)
-    catalog=bounded_call(45,lambda:ak.index_realtime_sw(symbol='一级行业'),'SW L1 catalog')
+    catalog,catalog_meta=_load_l1_catalog(ak)
     analysis=bounded_call(
         90,
         lambda:ak.index_analysis_daily_sw(
@@ -119,13 +176,21 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         'SW L1 daily analysis',
     )
     industries=build_industry_scores(analysis,trade_date)
+    latest_asof=max((x.get('asof') or '' for x in industries.values()),default='')
+    if len(industries)<25 or latest_asof!=trade_date:
+        raise RuntimeError(
+            f'Shenwan industry analysis incomplete industries={len(industries)} latest={latest_asof} trade_date={trade_date}'
+        )
+
     stock_map={}
     failures=[]
-    for _,row in catalog.iterrows():
-        idx=str(row['指数代码']).strip()
-        name=str(row['指数名称']).strip()
+    successful_declared=0
+    for row in catalog:
+        idx=row['industry_code']
+        name=row['industry_name']
         try:
             df=bounded_call(25,lambda i=idx:ak.index_component_sw(symbol=i),f'SW component {idx}')
+            successful_declared += int(row.get('declared_components') or 0)
             for _,r in df.iterrows():
                 code=_stock_code(r.get('证券代码'))
                 if not _is_mainboard(code):
@@ -141,7 +206,10 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
                 }
         except Exception as exc:
             failures.append({'industry_code':idx,'industry_name':name,'error':f'{type(exc).__name__}: {exc}'})
-    if len(industries)<25 or len(stock_map)<2500 or failures:
+
+    # A single flaky component endpoint must not kill the entire snapshot, but the map still needs
+    # broad main-board coverage. More than two failed L1 groups is considered decision-unsafe.
+    if len(stock_map)<2500 or len(failures)>2:
         raise RuntimeError(
             f'Shenwan industry snapshot incomplete industries={len(industries)} stocks={len(stock_map)} failures={len(failures)}'
         )
@@ -150,5 +218,16 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         'taxonomy':'Shenwan L1',
         'industries':industries,
         'stock_map':stock_map,
-        'counts':{'industries':len(industries),'mainboard_stocks':len(stock_map)},
+        'counts':{
+            'industries':len(industries),
+            'mainboard_stocks':len(stock_map),
+            'component_failures':len(failures),
+        },
+        'source':{
+            'catalog':catalog_meta,
+            'analysis':'sws-index-analysis-daily',
+            'components':'sws-index-component',
+            'successful_declared_components':successful_declared,
+            'failure_sample':failures[:2],
+        },
     }
