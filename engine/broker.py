@@ -27,6 +27,24 @@ def _locked_at_limit(side: str, bar: dict) -> bool:
     return (side == 'BUY' and change >= 0.097) or (side == 'SELL' and change <= -0.097)
 
 
+def _execution_target_map(state: dict, targets: list[dict]) -> dict[str,dict]:
+    """Final deterministic safety clamp before any simulated order is sized."""
+    positions=state.get('positions') or {}
+    d_fund=state.get('fund_id') in ('D_MAIN','D')
+    out={}
+    for x in targets:
+        sym=x['symbol']
+        item={**x}
+        weight=max(0.0,float(item.get('target_weight',0.0)))
+        if d_fund:
+            weight=min(weight,CONFIG.max_single_weight_d)
+            if sym not in positions:
+                weight=min(weight,CONFIG.max_new_position_weight_d)
+        item['target_weight']=weight
+        out[sym]=item
+    return out
+
+
 def execute_target_weights(state: dict, targets: list[dict], bars: dict[str, dict], trade_date: str) -> list[dict]:
     fills = []
     positions = state.setdefault('positions', {})
@@ -37,7 +55,7 @@ def execute_target_weights(state: dict, targets: list[dict], bars: dict[str, dic
         px = float((bar or {}).get('open') or p.get('last_price', p['avg_cost']))
         total_equity += p['qty'] * px
 
-    target_map = {x['symbol']: x for x in targets}
+    target_map = _execution_target_map(state,targets)
     symbols = set(positions) | set(target_map)
     diffs = []
     for sym in symbols:
@@ -99,7 +117,7 @@ def execute_target_weights(state: dict, targets: list[dict], bars: dict[str, dic
             positions[sym] = {'name': name, 'qty': qty, 'avg_cost': round((gross + fees) / qty, 4),
                               'acquired_date': trade_date, 'last_price': px}
         fills.append({'symbol': sym, 'name': name, 'side': 'BUY', 'trade_date': trade_date,
-                      'price': px, 'qty': qty, 'gross': gross, 'fees': fees, 'note': '目标仓位再平衡'})
+                      'price': px, 'qty': qty,'gross': gross, 'fees': fees, 'note': '目标仓位再平衡'})
 
     state['cash'] = round(cash, 2)
     return fills
