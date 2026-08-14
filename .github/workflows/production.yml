@@ -1,9 +1,16 @@
 name: Daily virtual-fund run
 on:
   workflow_dispatch:
+  # Safe recovery hook: changing only this marker can start a production catch-up run.
+  push:
+    branches: [main]
+    paths:
+      - 'state/.production-trigger'
   schedule:
-    # 18:20 Beijing time (10:20 UTC), Monday-Friday.
-    - cron: '20 10 * * 1-5'
+    # Beijing time, Monday-Friday. GitHub cron may be delayed, so use redundant catch-up slots.
+    - cron: '20 10 * * 1-5'  # 18:20 primary
+    - cron: '50 10 * * 1-5'  # 18:50 retry
+    - cron: '20 11 * * 1-5'  # 19:20 final retry
 permissions:
   contents: write
   pages: write
