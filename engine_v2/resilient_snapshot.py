@@ -1,19 +1,83 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 from datetime import date
 from pathlib import Path
 
 from .snapshot import build_snapshot
+from .shadow_ledger import sha256_json
 
 ROOT = Path(__file__).resolve().parents[1]
 V2_CACHE_PATH = ROOT / 'shadow_state' / 'v2' / 'cache' / 'market_universe.json'
+V2_DECISION_SNAPSHOT_CACHE_PATH = ROOT / 'shadow_state' / 'v2' / 'cache' / 'normalized_snapshot.json'
 
 
 def _cache_path() -> Path:
     return Path(os.getenv('V2_UNIVERSE_CACHE_PATH', str(V2_CACHE_PATH)))
+
+
+def _decision_snapshot_cache_path() -> Path:
+    return Path(os.getenv('V2_DECISION_SNAPSHOT_CACHE_PATH', str(V2_DECISION_SNAPSHOT_CACHE_PATH)))
+
+
+def _save_decision_snapshot(snapshot: dict, path: Path | None = None) -> None:
+    """Persist only a full, decision-grade V2 snapshot for exact-session recovery."""
+    path = path or _decision_snapshot_cache_path()
+    safety = dict(snapshot.get('safety') or {})
+    if (
+        safety.get('stock_universe_grade') != 'full'
+        or not safety.get('eligible_for_shadow_decision')
+        or safety.get('calls_sol')
+        or safety.get('writes_ledgers')
+    ):
+        raise RuntimeError('refusing to cache a non-decision-grade V2 snapshot')
+    trade_date = str(snapshot.get('trade_date') or '')[:10]
+    detail_date = str(((snapshot.get('market') or {}).get('sentiment_detail') or {}).get('trade_date') or '')[:10]
+    if not trade_date or detail_date != trade_date:
+        raise RuntimeError('refusing to cache V2 snapshot without same-session sentiment detail')
+    payload = {
+        'cache_version': 'v2-normalized-snapshot-1',
+        'trade_date': trade_date,
+        'snapshot_sha256': sha256_json(snapshot),
+        'snapshot': snapshot,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    tmp.replace(path)
+
+
+def _load_decision_snapshot(trade_date: str, path: Path | None = None) -> tuple[dict, dict]:
+    """Load an exact-date, hashed, formerly decision-grade V2 snapshot; never use stale data."""
+    path = path or _decision_snapshot_cache_path()
+    if not path.exists():
+        raise RuntimeError(f'V2 decision snapshot cache missing: {path}')
+    payload = json.loads(path.read_text(encoding='utf-8'))
+    if payload.get('cache_version') != 'v2-normalized-snapshot-1':
+        raise RuntimeError(f'unsupported V2 decision snapshot cache version: {payload.get("cache_version")}')
+    cached_date = str(payload.get('trade_date') or '')[:10]
+    if cached_date != trade_date:
+        raise RuntimeError(f'V2 decision snapshot cache date mismatch: cached={cached_date} requested={trade_date}')
+    snapshot = dict(payload.get('snapshot') or {})
+    if str(snapshot.get('trade_date') or '')[:10] != trade_date:
+        raise RuntimeError('V2 decision snapshot payload date mismatch')
+    actual_hash = sha256_json(snapshot)
+    if actual_hash != payload.get('snapshot_sha256'):
+        raise RuntimeError('V2 decision snapshot cache hash mismatch')
+    safety = dict(snapshot.get('safety') or {})
+    detail_date = str(((snapshot.get('market') or {}).get('sentiment_detail') or {}).get('trade_date') or '')[:10]
+    if (
+        safety.get('stock_universe_grade') != 'full'
+        or not safety.get('eligible_for_shadow_decision')
+        or safety.get('calls_sol')
+        or safety.get('writes_ledgers')
+        or detail_date != trade_date
+    ):
+        raise RuntimeError('V2 decision snapshot cache failed safety validation')
+    return copy.deepcopy(snapshot), {'path': str(path), 'trade_date': cached_date, 'snapshot_sha256': actual_hash}
 
 
 def _load_recovery_universe(trade_date: str, path: Path | None = None) -> tuple[list[dict], dict]:
@@ -127,7 +191,39 @@ def build_resilient_snapshot(requested_date: str) -> dict:
     trade_date = AKShareMarket().latest_trade_date(requested_date)
     meta: dict = {}
     _install_market_snapshot_recovery(trade_date, meta)
-    snap, sentiment_detail = _build_and_capture_sentiment(requested_date)
+    try:
+        snap, sentiment_detail = _build_and_capture_sentiment(requested_date)
+    except Exception as first_error:
+        try:
+            cached, cache_meta = _load_decision_snapshot(trade_date)
+        except Exception as cache_error:
+            print(
+                f'[V2 SNAPSHOT] first live build failed and exact-session cache is unavailable; '
+                f'retrying once: live={type(first_error).__name__}: {first_error}; '
+                f'cache={type(cache_error).__name__}: {cache_error}'
+            )
+            try:
+                snap, sentiment_detail = _build_and_capture_sentiment(requested_date)
+            except Exception as second_error:
+                raise RuntimeError(
+                    f'V2 snapshot failed twice with no valid exact-session cache: '
+                    f'first={type(first_error).__name__}: {first_error}; '
+                    f'second={type(second_error).__name__}: {second_error}'
+                ) from second_error
+        else:
+            cached.setdefault('source_notes', {})['snapshot_recovery_mode'] = 'exact-session-v2-cache'
+            cached['source_notes']['snapshot_cache'] = {
+                **cache_meta,
+                'live_error': f'{type(first_error).__name__}: {first_error}',
+            }
+            cached.setdefault('safety', {})['snapshot_cache_reused'] = True
+            cached['safety']['reads_v1_ledger'] = False
+            cached['safety']['writes_v1_ledger'] = False
+            print(
+                f'[V2 SNAPSHOT] live build failed; reusing hashed exact-session V2 cache '
+                f'date={trade_date} sha256={cache_meta["snapshot_sha256"]}'
+            )
+            return cached
 
     if not sentiment_detail or sentiment_detail.get('trade_date') != snap.get('trade_date'):
         raise RuntimeError('V2 snapshot failed to preserve same-session sentiment detail')
@@ -150,6 +246,10 @@ def build_resilient_snapshot(requested_date: str) -> dict:
     )
     snap['safety']['reads_v1_ledger'] = False
     snap['safety']['writes_v1_ledger'] = False
+    snap['safety']['snapshot_cache_reused'] = False
+    snap['source_notes']['snapshot_recovery_mode'] = 'live'
+    if full:
+        _save_decision_snapshot(snap)
     return snap
 
 
@@ -181,3 +281,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+

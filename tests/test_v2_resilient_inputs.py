@@ -4,7 +4,12 @@ import tempfile
 from pathlib import Path
 
 from engine_v2.enrichment_resilient import _install_persisted_sentiment
-from engine_v2.resilient_snapshot import _load_recovery_universe, _save_recovery_universe
+from engine_v2.resilient_snapshot import (
+    _load_decision_snapshot,
+    _load_recovery_universe,
+    _save_decision_snapshot,
+    _save_recovery_universe,
+)
 
 
 class V2ResilientInputTests(unittest.TestCase):
@@ -54,6 +59,49 @@ class V2ResilientInputTests(unittest.TestCase):
             self.assertEqual(len(rows),60)
             self.assertEqual(meta['asof'],'2026-08-14')
 
+    def test_decision_snapshot_cache_requires_exact_date_and_hash(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'shadow_state'/'v2'/'cache'/'normalized_snapshot.json'
+            snapshot={
+                'trade_date':'2026-08-14',
+                'market':{'sentiment_detail':{'trade_date':'2026-08-14'}},
+                'source_notes':{},
+                'safety':{
+                    'stock_universe_grade':'full',
+                    'eligible_for_shadow_decision':True,
+                    'calls_sol':False,
+                    'writes_ledgers':False,
+                },
+            }
+            _save_decision_snapshot(snapshot,path)
+            restored,meta=_load_decision_snapshot('2026-08-14',path)
+            self.assertEqual(restored,snapshot)
+            self.assertEqual(meta['trade_date'],'2026-08-14')
+            with self.assertRaisesRegex(RuntimeError,'date mismatch'):
+                _load_decision_snapshot('2026-08-15',path)
+            payload=json.loads(path.read_text(encoding='utf-8'))
+            payload['snapshot']['trade_date']='2026-08-13'
+            path.write_text(json.dumps(payload,ensure_ascii=False),encoding='utf-8')
+            with self.assertRaisesRegex(RuntimeError,'payload date mismatch'):
+                _load_decision_snapshot('2026-08-14',path)
+
+    def test_decision_snapshot_cache_rejects_degraded_inputs(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'normalized_snapshot.json'
+            snapshot={
+                'trade_date':'2026-08-14',
+                'market':{'sentiment_detail':{'trade_date':'2026-08-14'}},
+                'safety':{
+                    'stock_universe_grade':'degraded',
+                    'eligible_for_shadow_decision':False,
+                    'calls_sol':False,
+                    'writes_ledgers':False,
+                },
+            }
+            with self.assertRaisesRegex(RuntimeError,'non-decision-grade'):
+                _save_decision_snapshot(snapshot,path)
+
 
 if __name__=='__main__':
     unittest.main()
+
