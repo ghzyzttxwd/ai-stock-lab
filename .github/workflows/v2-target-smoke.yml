@@ -15,9 +15,12 @@ on:
 permissions:
   contents: read
 
+# Share the live-provider lock with v2-snapshot-smoke. These jobs both hit the same
+# public A-share endpoints and must never run concurrently; contention itself can
+# create false degraded-universe failures.
 concurrency:
-  group: v2-target-diagnostics
-  cancel-in-progress: true
+  group: v2-snapshot-smoke
+  cancel-in-progress: false
 
 jobs:
   targets:
