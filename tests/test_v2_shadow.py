@@ -16,6 +16,7 @@ from engine_v2.fundamentals import (
 )
 from engine_v2.regime import MarketRegime, classify_market_regime
 from engine_v2.sizing import risk_budget_weights
+from engine_v2.snapshot import _normalize_market_row
 from engine_v2.strategies import (
     strategy_a_v2,
     strategy_b_v2,
@@ -156,14 +157,34 @@ class V2ShadowTests(unittest.TestCase):
         self.assertEqual(rows, 1)
         self.assertEqual(latest, "2026-08-10")
 
-    def test_fundamental_loader_filters_non_mainboard_and_future_reports(self):
+    def test_fundamental_loader_filters_non_mainboard_future_reports_and_keeps_book_value(self):
         df = pd.DataFrame([
-            {"股票代码":"600001","股票简称":"主板A","最新公告日期":"2026-08-10","净资产收益率":8,"营业总收入-同比增长":10,"净利润-同比增长":12,"每股经营现金流量":0.5,"销售毛利率":25},
+            {"股票代码":"600001","股票简称":"主板A","最新公告日期":"2026-08-10","每股收益":0.25,"每股净资产":5.5,"净资产收益率":8,"营业总收入-同比增长":10,"净利润-同比增长":12,"每股经营现金流量":0.5,"销售毛利率":25},
             {"股票代码":"688001","股票简称":"科创","最新公告日期":"2026-08-10","净资产收益率":8},
             {"股票代码":"000002","股票简称":"主板B","最新公告日期":"2026-08-20","净资产收益率":8},
         ])
         rows=_announced_mainboard_rows(df,"2026-08-14")
         self.assertEqual(set(rows),{"600001"})
+        self.assertEqual(rows["600001"]["book_value_per_share"],5.5)
+        self.assertEqual(rows["600001"]["eps_period"],0.25)
+
+    def test_sina_missing_feature_sentinels_never_become_real_zero_factors(self):
+        row=_normalize_market_row({
+            "source":"sina","peTTM":0.0,"pbMRQ":0.0,"r60_snapshot":0.0,"turn":0.0,"close":10.0,
+        })
+        self.assertIsNone(row["peTTM"])
+        self.assertIsNone(row["pbMRQ"])
+        self.assertIsNone(row["r60_snapshot"])
+        self.assertIsNone(row["turn"])
+
+    def test_real_eastmoney_market_fields_are_preserved(self):
+        row=_normalize_market_row({
+            "source":"eastmoney","peTTM":12.0,"pbMRQ":1.4,"r60_snapshot":0.12,"turn":2.3,
+        })
+        self.assertEqual(row["peTTM"],12.0)
+        self.assertEqual(row["pbMRQ"],1.4)
+        self.assertEqual(row["r60_snapshot"],0.12)
+        self.assertEqual(row["turn"],2.3)
 
     def test_quality_scoring_keeps_one_common_period_until_new_period_is_broad(self):
         previous={f"600{i:03d}":{} for i in range(100)}
