@@ -87,6 +87,24 @@ def _merge_recovery_universe(cached: list[dict], critical: dict[str,str]) -> lis
     return list(merged.values())
 
 
+def _readonly_portfolio_snapshot(state: dict, bars: dict[str,dict]) -> dict:
+    """Value an already-processed portfolio without mutating state or appending equity."""
+    equity=float(state.get('cash',0))
+    holdings=[]
+    for sym,p in (state.get('positions') or {}).items():
+        bar=bars.get(sym,{})
+        px=float(bar.get('close') or p.get('last_price') or p.get('avg_cost') or 0)
+        value=float(p.get('qty',0))*px
+        avg=float(p.get('avg_cost') or 0)
+        pnl=(px/avg-1)*100 if avg else 0.0
+        holdings.append({
+            'symbol':sym,'name':p.get('name',sym),'qty':p.get('qty',0),'avg_cost':avg,
+            'last_price':px,'market_value':round(value,2),'pnl_pct':round(pnl,2),
+        })
+        equity+=value
+    return {'equity':round(equity,2),'holdings':holdings}
+
+
 def enrich_real_candidates(candidates, snapshot_rows):
     smap={x['code']:x for x in snapshot_rows}
     for c in candidates:
@@ -147,9 +165,8 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
         st['name']=name
         if st.get('last_processed_date') == trade_date:
             print(f'[skip] {fid} already processed {trade_date}')
-            mtm={'equity':st['equity_curve'][-1]['equity'] if st['equity_curve'] else st['cash'],'holdings':[]}
+            mtm=_readonly_portfolio_snapshot(st,bars)
             snapshots[fid]={'state':st,'mtm':mtm,'metrics':metrics(st['equity_curve'],st['initial_cash']),'diary':'当日已处理'}
-            save_state(path,st)
             continue
         if st.get('pending_targets'):
             if _pending_is_fresh(st,previous_trade_date):
