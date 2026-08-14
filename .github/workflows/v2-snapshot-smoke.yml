@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: v2-data-validation
+  group: v2-snapshot-smoke
   cancel-in-progress: true
 
 jobs:
@@ -57,6 +57,7 @@ jobs:
           python - <<'PY'
           import json
           s=json.load(open('/tmp/v2-normalized-snapshot.json',encoding='utf-8'))
+          q=s['preselection']['data_quality']
           print('[V2 SNAPSHOT] trade_date=',s['trade_date'])
           print('[V2 SNAPSHOT] regime=',json.dumps(s['market']['regime'],ensure_ascii=False))
           print('[V2 SNAPSHOT] activity=',json.dumps(s['market']['activity'],ensure_ascii=False))
@@ -64,6 +65,7 @@ jobs:
           print('[V2 SNAPSHOT] fundamentals=',json.dumps(s['fundamentals'],ensure_ascii=False))
           print('[V2 SNAPSHOT] preselection_counts=',json.dumps(s['preselection']['counts'],ensure_ascii=False))
           print('[V2 SNAPSHOT] preselection_union=',s['preselection']['union_count'])
+          print('[V2 SNAPSHOT] data_quality=',json.dumps(q,ensure_ascii=False))
           print('[V2 SNAPSHOT] source=',s['source_notes']['stock_snapshot'])
           print('[V2 SNAPSHOT] safety=',json.dumps(s['safety'],ensure_ascii=False))
           if s['market']['activity']['reported_date'] != s['trade_date']:
@@ -76,8 +78,17 @@ jobs:
               raise SystemExit('fundamental baseline coverage too low')
           if not (80 <= s['preselection']['union_count'] <= 180):
               raise SystemExit('preselection union outside expected range')
+          if q['preselection_uses_snapshot_pe'] or q['preselection_uses_snapshot_r60']:
+              raise SystemExit('broad preselection must not depend on provider-specific PE/R60 fields')
+          if q['disclosed_pb_coverage'] < 0.60:
+              raise SystemExit('disclosed PB fallback coverage too low')
+          if s['source_notes']['stock_snapshot'].lower() == 'sina':
+              if q['snapshot_pe_coverage'] != 0.0 or q['snapshot_r60_coverage'] != 0.0:
+                  raise SystemExit('Sina missing PE/R60 sentinels were misinterpreted as real data')
           if s['safety']['writes_ledgers'] or s['safety']['calls_sol']:
               raise SystemExit('shadow safety invariant violated')
+          if s['safety'].get('ready_for_shadow_accounting'):
+              raise SystemExit('snapshot cannot claim accounting readiness before Tencent history enrichment')
           PY
 
       - name: Upload normalized snapshot
