@@ -7,6 +7,7 @@ from engine.daily_run import (
     _pending_is_fresh,
     _merge_recovery_universe,
     _readonly_portfolio_snapshot,
+    _decision_diary,
 )
 from engine.real_market import AKShareMarket
 
@@ -100,5 +101,15 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(mtm['holdings'][0]['market_value'],105000.0)
         self.assertEqual(mtm['equity'],605000.0)
         self.assertEqual(state['equity_curve'],before)
+
+    def test_duplicate_refresh_preserves_real_diary(self):
+        state={
+            'decisions':[
+                {'date':'2026-08-13','diary':'昨天'},
+                {'date':'2026-08-14','diary':'今天真实决策日记'},
+            ]
+        }
+        self.assertEqual(_decision_diary(state,'2026-08-14'),'今天真实决策日记')
+        self.assertEqual(_decision_diary(state,'2026-08-15'),'当日已处理')
 
 if __name__=='__main__': unittest.main()
