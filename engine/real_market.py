@@ -184,6 +184,7 @@ class AKShareMarket:
         start=(d-timedelta(days=240)).strftime('%Y%m%d')
         end=d.strftime('%Y%m%d')
         out={}
+        stale_count=0
         for x in selected:
             try:
                 df=self.ak.stock_zh_a_hist_tx(
@@ -206,16 +207,18 @@ class AKShareMarket:
                         'volume':hands*100.0,'amount':amount_yuan,
                         'turn':0.0,'pctChg':0.0,'tradestatus':'1','isST':'0',
                     })
-                if rows:
+                if rows and rows[-1]['date'] == trade_date:
                     out[x['code']]=rows
+                elif rows:
+                    stale_count+=1
             except Exception as e:
                 print(f'[market] tencent history failed {x["code"]}: {e}')
         if not selected:
             raise RuntimeError('No symbols supplied for Tencent histories')
         required=max(1,math.ceil(len(selected)*0.75))
         if len(out) < required:
-            raise RuntimeError(f'Tencent history coverage too low: {len(out)}/{len(selected)}, require >= {required}')
-        print(f'[market] historical source=tencent symbols={len(out)}/{len(selected)}')
+            raise RuntimeError(f'Tencent current-history coverage too low: {len(out)}/{len(selected)}, require >= {required}; stale={stale_count}')
+        print(f'[market] historical source=tencent current_symbols={len(out)}/{len(selected)} stale_or_suspended={stale_count}')
         return out
 
     def snapshot_from_histories(self, selected: list[dict], histories: dict[str,list[dict]], trade_date: str) -> list[dict]:
