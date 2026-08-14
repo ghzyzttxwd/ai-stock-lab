@@ -1,20 +1,14 @@
-name: V2 data validation (shadow only)
+name: V2 data validation (manual deep audit)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [v2-shadow]
-    paths:
-      - 'engine_v2/**'
-      - 'tests/test_v2_shadow.py'
-      - '.github/workflows/v2-data-validation.yml'
 
 permissions:
   contents: read
 
 concurrency:
-  group: v2-data-validation
-  cancel-in-progress: true
+  group: v2-deep-data-audit
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -74,6 +68,7 @@ jobs:
           print('[V2 SNAPSHOT] fundamentals=',json.dumps(s['fundamentals'],ensure_ascii=False))
           print('[V2 SNAPSHOT] industry=',json.dumps(s['industry']['counts'],ensure_ascii=False))
           print('[V2 SNAPSHOT] preselection_union=',s['preselection']['union_count'])
+          print('[V2 SNAPSHOT] data_quality=',json.dumps(s['preselection'].get('data_quality',{}),ensure_ascii=False))
           print('[V2 SNAPSHOT] stock_source=',s['source_notes']['stock_snapshot'])
           print('[V2 SNAPSHOT] safety=',json.dumps(s['safety'],ensure_ascii=False))
           if not sw['ready']:
@@ -82,6 +77,8 @@ jobs:
               raise SystemExit('mainboard financial point-in-time layer is not ready')
           if s['safety']['writes_ledgers'] or s['safety']['calls_sol']:
               raise SystemExit('shadow snapshot safety invariant violated')
+          if s['safety'].get('ready_for_shadow_accounting'):
+              raise SystemExit('normalized snapshot must not claim accounting readiness before history enrichment')
           if not (80 <= s['preselection']['union_count'] <= 180):
               raise SystemExit('shadow preselection size is suspicious')
           PY
