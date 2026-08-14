@@ -48,12 +48,12 @@ def targets_for(fund_id: str, candidates: list[dict], market_score: float, state
                 allowed={x['symbol'] for x in candidates}
                 proposed=[x for x in ai['targets'] if x.get('symbol') in allowed]
                 rejected=len(ai['targets'])-len(proposed)
-                clean, notes=clamp_d_targets(proposed)
+                clean, notes=clamp_d_targets(proposed,state)
                 if rejected:
                     notes.append(f'拒绝 {rejected} 个候选池外代码')
                 return clean, ai.get('diary','AI综合决策') + (('；'+'；'.join(notes)) if notes else '')
-            clean, notes=clamp_d_targets(strategy_d(candidates,market_score))
+            clean, notes=clamp_d_targets(strategy_d(candidates,market_score),state)
             return clean, 'AI调用失败，已启用D规则兜底' + (('；'+'；'.join(notes)) if notes else '')
-        clean, notes=clamp_d_targets(strategy_d(candidates,market_score))
+        clean, notes=clamp_d_targets(strategy_d(candidates,market_score),state)
         return clean, 'D演示规则' + (('；'+'；'.join(notes)) if notes else '')
     raise ValueError(f'unknown fund {fund_id}')
