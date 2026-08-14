@@ -54,6 +54,39 @@ def _call_with_timeout(seconds: int, fn):
         signal.signal(signal.SIGALRM,old_handler)
 
 
+def _tx_amount_mode(raw_amount: float, close: float, reference_amount: float = 0.0) -> str:
+    """Detect whether Tencent's ambiguous `amount` currently behaves like yuan or hands.
+
+    AKShare documents the field as hands, but upstream formats can drift. When a full-market
+    snapshot is available, compare both interpretations with its same-day turnover amount.
+    """
+    raw=max(0.0,_f(raw_amount))
+    px=max(0.0,_f(close))
+    ref=max(0.0,_f(reference_amount))
+    if raw <= 0:
+        return 'yuan'
+    if ref > 0 and px > 0:
+        as_yuan=raw
+        as_hands_yuan=raw*100.0*px
+        distance_yuan=abs(math.log(max(as_yuan,1.0)/ref))
+        distance_hands=abs(math.log(max(as_hands_yuan,1.0)/ref))
+        return 'yuan' if distance_yuan <= distance_hands else 'hands'
+    # Recovery mode may only have an old cached reference. For liquid main-board names,
+    # values already above 10m are much more likely turnover-yuan than lot counts.
+    return 'yuan' if raw >= 10_000_000 else 'hands'
+
+
+def _tx_amount_and_volume(raw_amount: float, close: float, mode: str) -> tuple[float,float]:
+    raw=max(0.0,_f(raw_amount))
+    px=max(0.0,_f(close))
+    if mode == 'hands':
+        shares=raw*100.0
+        return shares*px,shares
+    amount_yuan=raw
+    approx_shares=(raw/px) if px > 0 else 0.0
+    return amount_yuan,approx_shares
+
+
 class AKShareMarket:
     """Real-market loader with independent upstreams and conservative fallbacks.
 
@@ -204,6 +237,7 @@ class AKShareMarket:
         end=d.strftime('%Y%m%d')
         out={}
         stale_count=0
+        amount_modes={'yuan':0,'hands':0}
         for x in selected:
             try:
                 df=self.ak.stock_zh_a_hist_tx(
@@ -213,17 +247,22 @@ class AKShareMarket:
                     adjust='qfq',
                     timeout=20,
                 )
+                tail=df.tail(self.history_limit)
+                if tail is None or tail.empty:
+                    continue
+                last=tail.iloc[-1]
+                mode=_tx_amount_mode(last.get('amount'),last.get('close'),x.get('amount',0))
+                amount_modes[mode]+=1
                 rows=[]
-                for _,r in df.tail(self.history_limit).iterrows():
+                for _,r in tail.iterrows():
                     close=_f(r.get('close'))
-                    hands=_f(r.get('amount'))
-                    amount_yuan=max(0.0,hands*100.0*close)
+                    amount_yuan,volume_shares=_tx_amount_and_volume(r.get('amount'),close,mode)
                     rows.append({
                         'date':str(r.get('date'))[:10],
                         'code':x['code'],'name':x.get('name',x['code']),
                         'open':_f(r.get('open')),'high':_f(r.get('high')),
                         'low':_f(r.get('low')),'close':close,
-                        'volume':hands*100.0,'amount':amount_yuan,
+                        'volume':volume_shares,'amount':amount_yuan,
                         'turn':0.0,'pctChg':0.0,'tradestatus':'1','isST':'0',
                     })
                 if rows and rows[-1]['date'] == trade_date:
@@ -237,7 +276,11 @@ class AKShareMarket:
         required=max(1,math.ceil(len(selected)*0.75))
         if len(out) < required:
             raise RuntimeError(f'Tencent current-history coverage too low: {len(out)}/{len(selected)}, require >= {required}; stale={stale_count}')
-        print(f'[market] historical source=tencent current_symbols={len(out)}/{len(selected)} stale_or_suspended={stale_count}')
+        print(
+            f'[market] historical source=tencent current_symbols={len(out)}/{len(selected)} '
+            f'stale_or_suspended={stale_count} amount_mode_yuan={amount_modes["yuan"]} '
+            f'amount_mode_hands={amount_modes["hands"]}'
+        )
         return out
 
     def snapshot_from_histories(self, selected: list[dict], histories: dict[str,list[dict]], trade_date: str) -> list[dict]:
@@ -286,13 +329,15 @@ class AKShareMarket:
                         break
                     r=records[current_index]
                     prev=records[current_index-1] if current_index>0 else r
-                    close=_f(r.get('close')); hands=_f(r.get('amount'))
+                    close=_f(r.get('close'))
                     if close<=0 or _f(r.get('open'))<=0:
                         break
+                    mode=_tx_amount_mode(r.get('amount'),close,0)
+                    amount_yuan,_=_tx_amount_and_volume(r.get('amount'),close,mode)
                     out[sym]={
                         'code':sym,'raw_code':sym[-6:],'name':name,'source':'tencent-execution',
                         'open':_f(r.get('open')),'high':_f(r.get('high'),close),'low':_f(r.get('low'),close),'close':close,
-                        'preclose':_f(prev.get('close'),close),'amount':hands*100.0*close,'turn':0.0,
+                        'preclose':_f(prev.get('close'),close),'amount':amount_yuan,'turn':0.0,
                         'pctChg':0.0,'peTTM':0.0,'pbMRQ':0.0,'r60_snapshot':0.0,
                         'tradestatus':'1','isST':'0'
                     }
