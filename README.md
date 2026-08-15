@@ -4,6 +4,7 @@ Two independent mobile-first virtual A-share fund web apps:
 
 - `/web/d/` — AI 综合基金 D, one independent ¥1,000,000 virtual account.
 - `/web/e/` — AI 基金竞技场, three independent ¥1,000,000 virtual accounts (A/B/D).
+- `/web/v2/` — read-only V2 shadow arena for five isolated A/B/C/D/L accounts; it does not replace V1.
 
 ## Hard boundaries
 
@@ -21,6 +22,9 @@ python -m http.server 8080 -d web
 ```
 
 Open `http://localhost:8080/d/` and `http://localhost:8080/e/`.
+
+The V2 shadow branch also exposes `http://localhost:8080/v2/`. Its primary data source is
+`v2-shadow/shadow_state/v2/summary.json`; `web/v2/data.json` is an identical same-origin fallback.
 
 ## API configuration
 
@@ -48,3 +52,4 @@ For the first deployment, **do not configure an API key and do not enable the pr
 6. Re-enable the weekday cron only after that manual production run succeeds.
 
 The preview workflow uses synthetic demo data and cannot place real trades or access brokerage accounts.
+

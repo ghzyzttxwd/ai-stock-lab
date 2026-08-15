@@ -13,6 +13,7 @@ on:
       - 'engine_v2/enrichment.py'
       - 'engine_v2/enrichment_resilient.py'
       - 'engine_v2/resilient_snapshot.py'
+      - 'engine_v2/shadow_reporting.py'
       - 'tests/test_v2*.py'
       - '.github/workflows/v2-shadow-ledger.yml'
       - 'shadow_state/v2/.run-trigger'
@@ -116,12 +117,16 @@ jobs:
           echo "accounting_s=$(($(date +%s)-start))" >> /tmp/v2-timings.env
 
       - name: Build derived V2 comparison summary
-        run: python -m engine_v2.shadow_reporting --state-root shadow_state/v2 --output shadow_state/v2/summary.json
+        run: |
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
 
       - name: Assert isolation, auditability and no Sol
         shell: bash
         run: |
-          git diff --quiet -- state web
+          git diff --quiet -- state web/d web/e
           python - <<'PY'
           import json
           from pathlib import Path
@@ -137,6 +142,14 @@ jobs:
           safety=report.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 isolation invariant violated')
+          web=json.load(open('web/v2/data.json',encoding='utf-8'))
+          if web.get('summary_version') != 'v2-shadow-summary-1.1':
+              raise SystemExit('V2 web snapshot schema mismatch')
+          if set(web.get('funds') or {}) != set(('A','B','C','D','L')):
+              raise SystemExit('V2 web snapshot fund set mismatch')
+          web_safety=web.get('safety') or {}
+          if web_safety.get('calls_sol') or web_safety.get('reads_v1_ledger') or web_safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 web snapshot isolation invariant violated')
           if report['status'] == 'processed':
               for fund_id in ('A','B','C','D','L'):
                   state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
@@ -152,7 +165,7 @@ jobs:
               if not audit.exists():
                   raise SystemExit('immutable audit event missing')
           PY
-          changed=$(git status --short | awk '{print $2}' | grep -v '^shadow_state/v2/' || true)
+          changed=$(git status --short | awk '{print $2}' | grep -Ev '^(shadow_state/v2/|web/v2/data.json$)' || true)
           if [ -n "$changed" ]; then
             echo "Unexpected paths changed by V2 shadow run:"
             echo "$changed"
@@ -189,7 +202,7 @@ jobs:
         run: |
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
-          git add shadow_state/v2
+          git add shadow_state/v2 web/v2/data.json
           git diff --cached --quiet || git commit -m "v2-data: advance isolated shadow ledgers"
           git pull --rebase origin v2-shadow
           git push origin HEAD:v2-shadow
@@ -207,4 +220,5 @@ jobs:
             shadow_state/v2/audit/${{ steps.td.outputs.date }}.json
           if-no-files-found: warn
           retention-days: 30
+
 

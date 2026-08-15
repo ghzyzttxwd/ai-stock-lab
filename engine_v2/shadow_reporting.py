@@ -94,6 +94,29 @@ def ledger_metrics(state: dict) -> dict:
     }
 
 
+def ledger_holdings(state: dict, equity: float) -> list[dict]:
+    holdings = []
+    for symbol, position in (state.get('positions') or {}).items():
+        quantity = int(position.get('qty') or 0)
+        average_cost = float(position.get('avg_cost') or 0.0)
+        last_price = float(position.get('last_price') or average_cost)
+        market_value = quantity * last_price
+        holdings.append({
+            'symbol': symbol,
+            'name': position.get('name') or symbol,
+            'industry': position.get('industry') or '未分类',
+            'qty': quantity,
+            'avg_cost': round(average_cost, 4),
+            'last_price': round(last_price, 4),
+            'market_value': round(market_value, 2),
+            'weight_pct': round(market_value / equity * 100.0, 4) if equity > 0 else 0.0,
+            'pnl_pct': round((last_price / average_cost - 1.0) * 100.0, 4) if average_cost > 0 else None,
+            'thesis': position.get('thesis'),
+            'invalidation': position.get('invalidation'),
+        })
+    return sorted(holdings, key=lambda item: item['market_value'], reverse=True)
+
+
 def build_summary(state_root: Path) -> dict:
     verification=verify_audit_chain(state_root)
     ledgers = {}
@@ -104,10 +127,16 @@ def build_summary(state_root: Path) -> dict:
         state = json.loads(path.read_text(encoding='utf-8'))
         dates.add(str(state.get('last_processed_date') or '')[:10])
         heads.add(state.get('audit_head'))
+        metrics = ledger_metrics(state)
         ledgers[fund_id] = {
+            'fund_id': fund_id,
             'name': state.get('name'),
             'strategy_family': state.get('strategy_family'),
-            'metrics': ledger_metrics(state),
+            'metrics': metrics,
+            'holdings': ledger_holdings(state, float(metrics.get('equity') or 0.0)),
+            'recent_fills': list(state.get('fills') or [])[-20:],
+            'recent_rejected_orders': list(state.get('rejected_orders') or [])[-20:],
+            'equity_curve': list(state.get('equity_curve') or [])[-120:],
             'pending_decision': state.get('pending_decision'),
             'audit_head': state.get('audit_head'),
         }
@@ -115,8 +144,11 @@ def build_summary(state_root: Path) -> dict:
         raise RuntimeError(f'V2 ledgers are not aligned: dates={dates} heads={heads}')
     trade_date = next(iter(dates))
     audit = json.loads((state_root / 'audit' / f'{trade_date}.json').read_text(encoding='utf-8'))
+    concentration_flags = ((audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
+    for fund_id, fund in ledgers.items():
+        fund['concentration_flags'] = list(concentration_flags.get(fund_id) or [])
     return {
-        'summary_version': 'v2-shadow-summary-1.0',
+        'summary_version': 'v2-shadow-summary-1.1',
         'updated_at': trade_date,
         'initial_cash_per_fund': 1_000_000,
         'mode': 'FORWARD_SHADOW_ONLY',
@@ -139,11 +171,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--state-root', default='shadow_state/v2')
     parser.add_argument('--output', default='shadow_state/v2/summary.json')
+    parser.add_argument('--web-output', help='Optional same-origin fallback snapshot for the V2 page')
     args = parser.parse_args()
     summary = build_summary(Path(args.state_root))
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    serialized = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
+    output.write_text(serialized, encoding='utf-8')
+    if args.web_output:
+        web_output = Path(args.web_output)
+        web_output.parent.mkdir(parents=True, exist_ok=True)
+        web_output.write_text(serialized, encoding='utf-8')
     print(json.dumps({
         'updated_at': summary['updated_at'],
         'audit_head': summary['audit_head'],
@@ -154,3 +192,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+
