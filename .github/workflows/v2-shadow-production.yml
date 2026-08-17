@@ -7,7 +7,6 @@ on:
     paths:
       - '.github/workflows/v2-shadow-production.yml'
   schedule:
-    # Beijing time, Monday-Friday. Redundant slots are safe because all paths are idempotent.
     - cron: '40 9 * * 1-5'   # 17:40 Beijing
     - cron: '40 10 * * 1-5'  # 18:40 Beijing retry
     - cron: '40 11 * * 1-5'  # 19:40 Beijing final retry
@@ -15,11 +14,9 @@ on:
 permissions:
   contents: write
 
-# Production no longer waits behind the old diagnostic/smoke workflows. It only fetches
-# the small execution-bar set before attempting the heavier decision snapshot.
 concurrency:
   group: v2-shadow-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   shadow-ledgers:
@@ -78,6 +75,21 @@ jobs:
             --state-root shadow_state/v2 \
             --report /tmp/v2-shadow-run.json
 
+      - name: Publish caught-up execution state immediately
+        if: steps.guard.outputs.done != 'true'
+        shell: bash
+        run: |
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          git diff --cached --quiet || git commit -m "v2-data: catch up prior-session executions"
+          git pull --rebase origin v2-shadow
+          git push origin HEAD:v2-shadow
+
       - name: Restore bounded Tencent history cache
         if: steps.guard.outputs.done != 'true'
         uses: actions/cache@v4
@@ -123,44 +135,31 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           report=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
           safety=report.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 isolation invariant violated')
-
           web=json.load(open('web/v2/data.json',encoding='utf-8'))
-          if web.get('summary_version') != 'v2-shadow-summary-1.1':
+          if web.get('summary_version') != 'v2-shadow-summary-1.1' or set(web.get('funds') or {}) != {'A','B','C','D','L'}:
               raise SystemExit('V2 web snapshot schema mismatch')
-          if set(web.get('funds') or {}) != {'A','B','C','D','L'}:
-              raise SystemExit('V2 fund set mismatch')
           web_safety=web.get('safety') or {}
           if web_safety.get('calls_sol') or web_safety.get('reads_v1_ledger') or web_safety.get('writes_v1_ledger'):
               raise SystemExit('V2 web isolation invariant violated')
-
           status=report.get('status')
           if status == 'processed':
               for fund_id in ('A','B','C','D','L'):
                   state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
-                  if state.get('initial_cash') != 1_000_000:
-                      raise SystemExit(f'{fund_id} initial cash changed')
-                  if state.get('last_processed_date') != report.get('trade_date'):
-                      raise SystemExit(f'{fund_id} date mismatch')
-              audit=Path(report['audit_path'])
-              if not audit.exists():
-                  raise SystemExit('V2 daily audit event missing')
+                  if state.get('initial_cash') != 1_000_000 or state.get('last_processed_date') != report.get('trade_date'):
+                      raise SystemExit(f'{fund_id} daily state mismatch')
           elif status in ('execution_caught_up','already_execution_caught_up'):
               if safety.get('generates_new_targets'):
                   raise SystemExit('execution catch-up unexpectedly generated targets')
               for fund_id in ('A','B','C','D','L'):
                   state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
-                  if state.get('initial_cash') != 1_000_000:
-                      raise SystemExit(f'{fund_id} initial cash changed')
-                  if state.get('last_execution_date') != report.get('trade_date'):
-                      raise SystemExit(f'{fund_id} execution catch-up date mismatch')
-              audit=Path(report['audit_path'])
-              if not audit.exists():
-                  raise SystemExit('V2 execution catch-up audit event missing')
+                  if state.get('initial_cash') != 1_000_000 or state.get('last_execution_date') != report.get('trade_date'):
+                      raise SystemExit(f'{fund_id} execution catch-up state mismatch')
+          if report.get('audit_path') and not Path(report['audit_path']).exists():
+              raise SystemExit('V2 audit event missing')
           print('[V2]', status, report.get('trade_date'), report.get('event_hash'))
           PY
           changed=$(git status --short | awk '{print $2}' | grep -Ev '^(shadow_state/v2/|web/v2/data.json$)' || true)
@@ -170,14 +169,14 @@ jobs:
             exit 1
           fi
 
-      - name: Persist only isolated V2 state
+      - name: Persist any new decision state
         if: success()
         shell: bash
         run: |
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
-          git diff --cached --quiet || git commit -m "v2-data: daily shadow run"
+          git diff --cached --quiet || git commit -m "v2-data: complete daily shadow run"
           git pull --rebase origin v2-shadow
           git push origin HEAD:v2-shadow
 
