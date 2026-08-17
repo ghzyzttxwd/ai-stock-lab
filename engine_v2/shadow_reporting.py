@@ -71,7 +71,8 @@ def ledger_metrics(state: dict) -> dict:
     curve_date = str(curve[-1].get('date') or '')[:10] if curve else ''
     execution_snapshot = dict(state.get('last_execution_snapshot') or {})
     execution_date = str(execution_snapshot.get('date') or '')[:10]
-    if execution_date and (not curve_date or execution_date > curve_date):
+    execution_only = bool(execution_date and (not curve_date or execution_date > curve_date))
+    if execution_only:
         current = float(execution_snapshot.get('equity') or (float(state.get('cash') or 0.0) + market_value))
     else:
         current = values[-1] if values else float(state.get('initial_cash') or 0.0)
@@ -83,7 +84,7 @@ def ledger_metrics(state: dict) -> dict:
     if len(daily_returns) > 1:
         avg = sum(daily_returns) / len(daily_returns)
         volatility = math.sqrt(sum((x - avg) ** 2 for x in daily_returns) / len(daily_returns))
-    return {
+    metrics = {
         'trading_days': len(curve),
         'equity': round(current, 2),
         'cash': round(float(state.get('cash') or 0.0), 2),
@@ -103,8 +104,10 @@ def ledger_metrics(state: dict) -> dict:
         )) if market_value > 0 else {},
         'industry_hhi': round(hhi, 6),
         'effective_industries': round(1.0 / hhi, 4) if hhi > 0 else 0.0,
-        'execution_only_date': execution_date if execution_date and execution_date > curve_date else None,
     }
+    if execution_only:
+        metrics['execution_only_date'] = execution_date
+    return metrics
 
 
 def ledger_holdings(state: dict, equity: float) -> list[dict]:
@@ -167,7 +170,7 @@ def build_summary(state_root: Path) -> dict:
     concentration_flags = ((latest_decision_audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
     for fund_id, fund in ledgers.items():
         fund['concentration_flags'] = list(concentration_flags.get(fund_id) or [])
-    return {
+    summary = {
         'summary_version': 'v2-shadow-summary-1.1',
         'updated_at': trade_date,
         'initial_cash_per_fund': 1_000_000,
@@ -177,7 +180,6 @@ def build_summary(state_root: Path) -> dict:
         'target_diagnostics': latest_decision_audit.get('target_diagnostics'),
         'funds': ledgers,
         'audit_head': head,
-        'audit_event_kind': current_audit.get('event_kind','daily_decision'),
         'audit_verification': verification,
         'safety': {
             'calls_sol': False,
@@ -186,6 +188,9 @@ def build_summary(state_root: Path) -> dict:
             'not_for_production_trading': True,
         },
     }
+    if current_audit.get('event_kind'):
+        summary['audit_event_kind'] = current_audit['event_kind']
+    return summary
 
 
 def main() -> None:
