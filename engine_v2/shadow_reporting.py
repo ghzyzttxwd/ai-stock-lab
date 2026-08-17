@@ -9,6 +9,10 @@ from pathlib import Path
 from .shadow_ledger import FUND_NAMES, ledger_content_hash, sha256_json
 
 
+def _audit_events(state_root: Path) -> list[tuple[Path, dict]]:
+    return [(path, json.loads(path.read_text(encoding='utf-8'))) for path in sorted((state_root/'audit').glob('*.json'))]
+
+
 def verify_audit_chain(state_root: Path) -> dict:
     files=sorted((state_root/'audit').glob('*.json'))
     if not files:
@@ -52,7 +56,6 @@ def _max_drawdown(values: list[float]) -> float:
 def ledger_metrics(state: dict) -> dict:
     curve = list(state.get('equity_curve') or [])
     values = [float(x.get('equity') or 0.0) for x in curve]
-    current = values[-1] if values else float(state.get('initial_cash') or 0.0)
     initial = float(state.get('initial_cash') or 1_000_000.0)
     fills = list(state.get('fills') or [])
     gross = sum(float(x.get('gross') or 0.0) for x in fills)
@@ -64,6 +67,15 @@ def ledger_metrics(state: dict) -> dict:
         value = int(position.get('qty') or 0) * float(position.get('last_price') or position.get('avg_cost') or 0.0)
         market_value += value
         industry_values[str(position.get('industry') or 'UNKNOWN')] += value
+
+    curve_date = str(curve[-1].get('date') or '')[:10] if curve else ''
+    execution_snapshot = dict(state.get('last_execution_snapshot') or {})
+    execution_date = str(execution_snapshot.get('date') or '')[:10]
+    if execution_date and (not curve_date or execution_date > curve_date):
+        current = float(execution_snapshot.get('equity') or (float(state.get('cash') or 0.0) + market_value))
+    else:
+        current = values[-1] if values else float(state.get('initial_cash') or 0.0)
+
     shares = [value / market_value for value in industry_values.values()] if market_value > 0 else []
     hhi = sum(value * value for value in shares)
     daily_returns = [values[i] / values[i - 1] - 1.0 for i in range(1, len(values)) if values[i - 1] > 0]
@@ -91,6 +103,7 @@ def ledger_metrics(state: dict) -> dict:
         )) if market_value > 0 else {},
         'industry_hhi': round(hhi, 6),
         'effective_industries': round(1.0 / hhi, 4) if hhi > 0 else 0.0,
+        'execution_only_date': execution_date if execution_date and execution_date > curve_date else None,
     }
 
 
@@ -119,13 +132,16 @@ def ledger_holdings(state: dict, equity: float) -> list[dict]:
 
 def build_summary(state_root: Path) -> dict:
     verification=verify_audit_chain(state_root)
+    events=_audit_events(state_root)
     ledgers = {}
-    dates = set()
+    effective_dates = set()
     heads = set()
     for fund_id in FUND_NAMES:
         path = state_root / 'ledgers' / f'{fund_id}.json'
         state = json.loads(path.read_text(encoding='utf-8'))
-        dates.add(str(state.get('last_processed_date') or '')[:10])
+        processed=str(state.get('last_processed_date') or '')[:10]
+        executed=str(state.get('last_execution_date') or '')[:10]
+        effective_dates.add(max(processed,executed))
         heads.add(state.get('audit_head'))
         metrics = ledger_metrics(state)
         ledgers[fund_id] = {
@@ -140,11 +156,15 @@ def build_summary(state_root: Path) -> dict:
             'pending_decision': state.get('pending_decision'),
             'audit_head': state.get('audit_head'),
         }
-    if len(dates) != 1 or len(heads) != 1:
-        raise RuntimeError(f'V2 ledgers are not aligned: dates={dates} heads={heads}')
-    trade_date = next(iter(dates))
-    audit = json.loads((state_root / 'audit' / f'{trade_date}.json').read_text(encoding='utf-8'))
-    concentration_flags = ((audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
+    if len(effective_dates) != 1 or len(heads) != 1:
+        raise RuntimeError(f'V2 ledgers are not aligned: dates={effective_dates} heads={heads}')
+    trade_date = next(iter(effective_dates))
+    head=next(iter(heads))
+    current_audit=next((event for _,event in reversed(events) if event.get('event_hash')==head),None)
+    if not current_audit:
+        raise RuntimeError(f'V2 current audit head not found: {head}')
+    latest_decision_audit=next((event for _,event in reversed(events) if event.get('target_diagnostics') is not None),current_audit)
+    concentration_flags = ((latest_decision_audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
     for fund_id, fund in ledgers.items():
         fund['concentration_flags'] = list(concentration_flags.get(fund_id) or [])
     return {
@@ -152,11 +172,12 @@ def build_summary(state_root: Path) -> dict:
         'updated_at': trade_date,
         'initial_cash_per_fund': 1_000_000,
         'mode': 'FORWARD_SHADOW_ONLY',
-        'regime': audit.get('regime'),
-        'source_ref': audit.get('source_ref'),
-        'target_diagnostics': audit.get('target_diagnostics'),
+        'regime': latest_decision_audit.get('regime'),
+        'source_ref': current_audit.get('source_ref'),
+        'target_diagnostics': latest_decision_audit.get('target_diagnostics'),
         'funds': ledgers,
-        'audit_head': next(iter(heads)),
+        'audit_head': head,
+        'audit_event_kind': current_audit.get('event_kind','daily_decision'),
         'audit_verification': verification,
         'safety': {
             'calls_sol': False,
@@ -192,4 +213,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-
