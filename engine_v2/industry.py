@@ -91,6 +91,42 @@ def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 
     raise RuntimeError(f'{label} failed after {attempts} attempts: {type(last).__name__}: {last}') from last
 
 
+def _load_daily_analysis_chunked(ak, td: date, *, lookback_days: int = 140, chunk_days: int = 35):
+    """Fetch the same SW L1 daily-analysis dataset in bounded date chunks.
+
+    AKShare's all-industry endpoint paginates internally. A ~100-day single request can exceed
+    GitHub Actions/provider timeouts even when each page is healthy. Splitting the exact same
+    point-in-time history keeps the V2 factors unchanged while bounding each provider call.
+    """
+    import pandas as pd
+
+    start=td-timedelta(days=lookback_days)
+    cursor=start
+    frames=[]
+    while cursor<=td:
+        end=min(cursor+timedelta(days=chunk_days-1),td)
+        start_text=cursor.strftime('%Y%m%d')
+        end_text=end.strftime('%Y%m%d')
+        frame=_bounded_retry(
+            f'SW L1 daily analysis {start_text}-{end_text}',
+            lambda s=start_text,e=end_text:ak.index_analysis_daily_sw(
+                symbol='一级行业', start_date=s, end_date=e,
+            ),
+            attempts=2,
+            timeout_seconds=35,
+            delay_seconds=2.0,
+        )
+        if frame is not None and not frame.empty:
+            frames.append(frame)
+        cursor=end+timedelta(days=1)
+    if not frames:
+        raise RuntimeError('SW L1 chunked daily analysis returned no rows')
+    analysis=pd.concat(frames,ignore_index=True)
+    if {'指数代码','发布日期'}.issubset(set(analysis.columns)):
+        analysis=analysis.drop_duplicates(subset=['指数代码','发布日期'],keep='last')
+    return analysis
+
+
 def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
     """Convert SW L1 daily analysis into transparent relative-strength scores."""
     if analysis is None or analysis.empty:
@@ -195,17 +231,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
     td=date.fromisoformat(trade_date)
     catalog,catalog_meta=_load_l1_catalog(ak)
-    analysis=_bounded_retry(
-        'SW L1 daily analysis',
-        lambda:ak.index_analysis_daily_sw(
-            symbol='一级行业',
-            start_date=(td-timedelta(days=100)).strftime('%Y%m%d'),
-            end_date=td.strftime('%Y%m%d'),
-        ),
-        attempts=2,
-        timeout_seconds=45,
-        delay_seconds=3.0,
-    )
+    analysis=_load_daily_analysis_chunked(ak,td)
     industries=build_industry_scores(analysis,trade_date)
     latest_asof=max((x.get('asof') or '' for x in industries.values()),default='')
     if len(industries)<25 or latest_asof!=trade_date:
@@ -261,7 +287,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         },
         'source':{
             'catalog':catalog_meta,
-            'analysis':'sws-index-analysis-daily-bounded-retry-2',
+            'analysis':'sws-index-analysis-daily-chunked-140d-35d',
             'components':'sws-index-component',
             'successful_declared_components':successful_declared,
             'unique_vs_declared_ratio':round(len(stock_map)/successful_declared,4) if successful_declared else None,
