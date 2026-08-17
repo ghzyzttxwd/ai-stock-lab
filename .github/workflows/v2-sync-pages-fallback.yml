@@ -11,20 +11,16 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
+  actions: write
 
 concurrency:
-  group: pages-auto-deploy
+  group: v2-sync-pages-fallback
   cancel-in-progress: true
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 12
     steps:
       - name: Checkout V2 shadow branch
         uses: actions/checkout@v4
@@ -52,8 +48,10 @@ jobs:
           sha256sum /tmp/v2-data.json
 
       - name: Sync exact V2 snapshot into main
+        id: sync_main
         shell: bash
         run: |
+          set -euo pipefail
           git fetch origin main
           git checkout -B main origin/main
           cp /tmp/v2-data.json web/v2/data.json
@@ -68,48 +66,34 @@ jobs:
             git pull --rebase origin main
             git push origin HEAD:main
           fi
+          main_sha="$(git rev-parse HEAD)"
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
+          echo "main_sha=$main_sha"
 
-      - name: Assert main copy is exact before publish
-        run: |
-          cmp /tmp/v2-data.json web/v2/data.json
-          echo "main/web/v2/data.json exactly matches V2 source"
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Verify public V2 data is the exact deployed snapshot
+      - name: Dispatch official Pages deploy and wait for terminal result
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN_SHA: ${{ steps.sync_main.outputs.main_sha }}
         run: |
           set -euo pipefail
-          expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
-          echo "expected_sha256=$expected"
-          for i in $(seq 1 12); do
-            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${i}"
-            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
-              actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
-              echo "attempt=$i actual_sha256=$actual"
-              if [ "$actual" = "$expected" ]; then
-                python - <<'PY'
-          import json
-          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
-          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
-          for fund_id in 'ABCDL':
-              m=live['funds'][fund_id]['metrics']
-              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
-          PY
-                exit 0
-              fi
+          echo "Waiting for verified Pages deployment of main_sha=$MAIN_SHA"
+          gh workflow run auto-deploy.yml --ref main
+
+          run_id=""
+          for i in $(seq 1 30); do
+            run_id="$(gh run list --workflow auto-deploy.yml --branch main --event workflow_dispatch --limit 20 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$MAIN_SHA\") | .databaseId" | head -n 1)"
+            if [ -n "$run_id" ]; then
+              break
             fi
-            sleep 5
+            sleep 2
           done
-          echo "Public GitHub Pages did not serve the exact V2 snapshot after deployment."
-          exit 1
+
+          if [ -z "$run_id" ]; then
+            echo "Could not locate the Pages workflow run for main_sha=$MAIN_SHA"
+            exit 1
+          fi
+
+          echo "pages_run_id=$run_id"
+          gh run watch "$run_id" --exit-status
+          echo "Verified Pages workflow completed successfully."
