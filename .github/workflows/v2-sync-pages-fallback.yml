@@ -70,30 +70,46 @@ jobs:
           echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
           echo "main_sha=$main_sha"
 
-      - name: Dispatch official Pages deploy and wait for terminal result
+      - name: Dispatch official Pages deploy and require terminal verification
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MAIN_SHA: ${{ steps.sync_main.outputs.main_sha }}
         run: |
           set -euo pipefail
-          echo "Waiting for verified Pages deployment of main_sha=$MAIN_SHA"
-          gh workflow run auto-deploy.yml --ref main
+          echo "Requiring verified Pages deployment of main_sha=$MAIN_SHA"
+          last_run_id=""
 
-          run_id=""
-          for i in $(seq 1 30); do
-            run_id="$(gh run list --workflow auto-deploy.yml --branch main --event workflow_dispatch --limit 20 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$MAIN_SHA\") | .databaseId" | head -n 1)"
-            if [ -n "$run_id" ]; then
-              break
+          for deploy_attempt in 1 2 3; do
+            echo "Pages deployment attempt $deploy_attempt/3"
+            gh workflow run auto-deploy.yml --ref main
+
+            run_id=""
+            for i in $(seq 1 30); do
+              run_id="$(gh run list --workflow auto-deploy.yml --branch main --event workflow_dispatch --limit 30 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$MAIN_SHA\" and (.databaseId | tostring) != \"$last_run_id\") | .databaseId" | head -n 1)"
+              if [ -n "$run_id" ]; then
+                break
+              fi
+              sleep 2
+            done
+
+            if [ -z "$run_id" ]; then
+              echo "Could not locate Pages workflow run for main_sha=$MAIN_SHA on attempt $deploy_attempt"
+            else
+              echo "pages_run_id=$run_id"
+              last_run_id="$run_id"
+              if gh run watch "$run_id" --exit-status; then
+                echo "Verified Pages workflow completed successfully on attempt $deploy_attempt."
+                exit 0
+              fi
+              echo "Pages workflow failed on attempt $deploy_attempt."
             fi
-            sleep 2
+
+            if [ "$deploy_attempt" -lt 3 ]; then
+              echo "Waiting 25s before retrying transient GitHub Pages failure."
+              sleep 25
+            fi
           done
 
-          if [ -z "$run_id" ]; then
-            echo "Could not locate the Pages workflow run for main_sha=$MAIN_SHA"
-            exit 1
-          fi
-
-          echo "pages_run_id=$run_id"
-          gh run watch "$run_id" --exit-status
-          echo "Verified Pages workflow completed successfully."
+          echo "All 3 verified Pages deployment attempts failed."
+          exit 1
