@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 from .provider import bounded_call
@@ -134,7 +135,6 @@ def _history_metric(frame, industry_code: str, industry_name: str, trade_date: s
         'r60': _period_return(closes, 60),
         'day_pct': closes[-1] / closes[-2] - 1 if len(closes) >= 2 and closes[-2] > 0 else None,
         'amount_activity': amount_activity,
-        # Kept for schema compatibility; sector PE/PB are not consumed by downstream V2 selection.
         'turnover_pct': None,
         'pe': None,
         'pb': None,
@@ -245,28 +245,83 @@ def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
         raise RuntimeError('SW L1 directory unavailable; ' + ' | '.join(errors)) from exc
 
 
+def _fetch_sw_history_direct(code: str):
+    """Mirror AKShare index_hist_sw with explicit network timeouts for worker safety."""
+    import pandas as pd
+    import requests
+
+    url = 'https://www.swsresearch.com/institute-sw/api/index_publish/trend/'
+    params = {'swindexcode': code, 'period': 'DAY'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      'Chrome/114.0.0.0 Safari/537.36'
+    }
+    last = None
+    for attempt in range(1, 3):
+        try:
+            response = requests.get(
+                url, params=params, headers=headers, verify=False, timeout=(5, 15)
+            )
+            response.raise_for_status()
+            payload = response.json()
+            rows = payload.get('data')
+            if not isinstance(rows, list) or not rows:
+                raise RuntimeError(f'empty/invalid SW history payload code={code}')
+            frame = pd.DataFrame(rows)
+            frame.rename(columns={
+                'swindexcode': '代码', 'bargaindate': '日期', 'openindex': '开盘',
+                'maxindex': '最高', 'minindex': '最低', 'closeindex': '收盘',
+                'bargainamount': '成交量', 'bargainsum': '成交额',
+            }, inplace=True)
+            required = ['代码', '日期', '收盘', '开盘', '最高', '最低', '成交量', '成交额']
+            missing = [x for x in required if x not in frame.columns]
+            if missing:
+                raise RuntimeError(f'SW history payload missing columns code={code}: {missing}')
+            return frame[required]
+        except Exception as exc:
+            last = exc
+            if attempt < 2:
+                time.sleep(0.5)
+    raise RuntimeError(f'SW index history {code} failed after 2 attempts: {type(last).__name__}: {last}') from last
+
+
 def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[dict[str, dict], list[dict]]:
+    del ak  # kept in signature so callers/tests remain stable
     metrics = {}
     failures = []
-    for row in catalog:
+
+    def work(row: dict):
         code = row['industry_code']
-        name = row['industry_name']
-        try:
-            frame = _bounded_retry(
-                f'SW index history {code}',
-                lambda c=code: ak.index_hist_sw(symbol=c, period='day'),
-                attempts=2,
-                timeout_seconds=20,
-                delay_seconds=1.0,
-            )
-            metrics[code] = _history_metric(frame, code, name, trade_date)
-        except Exception as exc:
-            failures.append({'industry_code': code, 'industry_name': name, 'error': f'{type(exc).__name__}: {exc}'})
+        frame = _fetch_sw_history_direct(code)
+        return code, _history_metric(frame, code, row['industry_name'], trade_date)
+
+    executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='v2-sw-history')
+    futures = {executor.submit(work, row): row for row in catalog}
+    try:
+        for future in as_completed(futures):
+            row = futures[future]
+            try:
+                code, metric = future.result()
+                metrics[code] = metric
+            except Exception as exc:
+                failures.append({
+                    'industry_code': row['industry_code'],
+                    'industry_name': row['industry_name'],
+                    'error': f'{type(exc).__name__}: {exc}',
+                })
+                if len(failures) > 2:
+                    for pending in futures:
+                        pending.cancel()
+                    raise RuntimeError(
+                        f'Shenwan per-index history exceeded failure budget: {failures[:3]}'
+                    ) from exc
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+
     if len(metrics) < max(25, len(catalog) - 2):
         raise RuntimeError(
             f'Shenwan per-index history incomplete industries={len(metrics)}/{len(catalog)} failures={len(failures)}'
         )
-    # Any rare missing industry gets a neutral score rather than silently looking weak.
     scored = _score_industries(metrics)
     for row in catalog:
         code = row['industry_code']
@@ -293,7 +348,6 @@ def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[
 def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
 
-    # Parse eagerly so malformed dates fail before any provider calls.
     date.fromisoformat(trade_date)
     catalog, catalog_meta = _load_l1_catalog(ak)
     industries, history_failures = _load_industry_histories(ak, catalog, trade_date)
@@ -351,7 +405,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         },
         'source': {
             'catalog': catalog_meta,
-            'analysis': 'sws-per-index-history-day; r20/r60/day + relative-20d-amount activity',
+            'analysis': 'sws-per-index-history-day; bounded-parallel; r20/r60/day + relative-20d-amount activity',
             'components': 'sws-index-component',
             'successful_declared_components': successful_declared,
             'unique_vs_declared_ratio': round(len(stock_map) / successful_declared, 4) if successful_declared else None,
