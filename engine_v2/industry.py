@@ -94,18 +94,19 @@ def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 
 def _load_daily_analysis_chunked(ak, td: date, *, lookback_days: int = 140, chunk_days: int = 35):
     """Fetch the same SW L1 daily-analysis dataset in bounded date chunks.
 
-    AKShare's all-industry endpoint paginates internally. A ~100-day single request can exceed
-    GitHub Actions/provider timeouts even when each page is healthy. Splitting the exact same
-    point-in-time history keeps the V2 factors unchanged while bounding each provider call.
+    AKShare's all-industry endpoint paginates internally. A long single request can exceed
+    GitHub Actions/provider timeouts even when each page is healthy. Chunks are built backwards
+    from the requested trade date so the newest chunk always contains a useful history window;
+    this avoids an empty same-day-only tail while preserving the exact point-in-time dataset.
     """
     import pandas as pd
 
-    start=td-timedelta(days=lookback_days)
-    cursor=start
+    oldest=td-timedelta(days=lookback_days)
+    end=td
     frames=[]
-    while cursor<=td:
-        end=min(cursor+timedelta(days=chunk_days-1),td)
-        start_text=cursor.strftime('%Y%m%d')
+    while end>=oldest:
+        start=max(oldest,end-timedelta(days=chunk_days-1))
+        start_text=start.strftime('%Y%m%d')
         end_text=end.strftime('%Y%m%d')
         frame=_bounded_retry(
             f'SW L1 daily analysis {start_text}-{end_text}',
@@ -118,7 +119,7 @@ def _load_daily_analysis_chunked(ak, td: date, *, lookback_days: int = 140, chun
         )
         if frame is not None and not frame.empty:
             frames.append(frame)
-        cursor=end+timedelta(days=1)
+        end=start-timedelta(days=1)
     if not frames:
         raise RuntimeError('SW L1 chunked daily analysis returned no rows')
     analysis=pd.concat(frames,ignore_index=True)
@@ -287,7 +288,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         },
         'source':{
             'catalog':catalog_meta,
-            'analysis':'sws-index-analysis-daily-chunked-140d-35d',
+            'analysis':'sws-index-analysis-daily-chunked-backward-140d-35d',
             'components':'sws-index-component',
             'successful_declared_components':successful_declared,
             'unique_vs_declared_ratio':round(len(stock_map)/successful_declared,4) if successful_declared else None,
