@@ -3,29 +3,32 @@ from unittest.mock import patch
 
 import pandas as pd
 
+from engine.real_market import AKShareMarket
 from engine.tencent_full_market import fetch_tencent_full_rows, _overlay_execution_bars
+
+
+def _fake_full_rows():
+    rows = []
+    for i in range(1501):
+        code = f'sh{600000 + i:06d}'
+        rows.append({
+            'code': code,
+            'name': f'测试{i}',
+            'zxj': '10.00',
+            'zdf': '1.00',
+            'turnover': '5000',  # Tencent unit is 10k yuan => 50m yuan
+            'pe_ttm': '12.5',
+            'hsl': '2.0',
+            'zdf_d60': '15.0',
+        })
+    return rows
 
 
 class TencentFullMarketTests(unittest.TestCase):
     def test_full_market_parser_keeps_broad_mainboard_and_no_fake_open(self):
-        rows = []
-        for i in range(1501):
-            # Produce valid Shanghai main-board codes without relying on a live provider.
-            code = f'sh{600000 + i:06d}'
-            rows.append({
-                'code': code,
-                'name': f'测试{i}',
-                'zxj': '10.00',
-                'zdf': '1.00',
-                'turnover': '5000',  # Tencent unit is 10k yuan => 50m yuan
-                'pe_ttm': '12.5',
-                'hsl': '2.0',
-                'zdf_d60': '15.0',
-            })
-
         class FakeAk:
             def stock_zh_a_spot_tx(self):
-                return pd.DataFrame(rows)
+                return pd.DataFrame(_fake_full_rows())
 
         parsed = fetch_tencent_full_rows(FakeAk())
         self.assertEqual(len(parsed), 1501)
@@ -82,6 +85,47 @@ class TencentFullMarketTests(unittest.TestCase):
         self.assertEqual(row['peTTM'], 19.85)
         self.assertEqual(row['r60_snapshot'], 0.0245)
         self.assertEqual(row['amount'], 10_200_000_000.0)
+
+    def test_installed_v1_snapshot_forces_eastmoney_sina_failure_then_uses_tencent(self):
+        class FakeAk:
+            def stock_zh_a_spot_em(self):
+                raise RuntimeError('forced Eastmoney outage')
+
+            def stock_zh_a_spot(self):
+                raise RuntimeError('forced Sina outage')
+
+            def stock_zh_a_spot_tx(self):
+                return pd.DataFrame(_fake_full_rows())
+
+        market = AKShareMarket.__new__(AKShareMarket)
+        market.ak = FakeAk()
+        market._resolved_trade_date = '2026-08-17'
+        market.execution_bars = lambda symbols, trade_date: {
+            'sh.600000': {
+                'code': 'sh.600000',
+                'name': '测试0',
+                'source': 'tencent-execution',
+                'open': 9.8,
+                'high': 10.2,
+                'low': 9.7,
+                'close': 10.0,
+                'preclose': 9.9,
+                'amount': 60_000_000.0,
+                'tradestatus': '1',
+            }
+        }
+
+        with patch('engine.real_market.time.sleep', return_value=None), \
+             patch('engine.tencent_full_market.time.sleep', return_value=None), \
+             patch('engine.tencent_full_market._critical_symbols', return_value={'sh.600000': '测试0'}):
+            rows = market.snapshot()
+
+        by_code = {row['code']: row for row in rows}
+        self.assertGreaterEqual(len(rows), 1500)
+        self.assertEqual(by_code['sh.600000']['source'], 'tencent-full')
+        self.assertEqual(by_code['sh.600000']['open'], 9.8)
+        self.assertEqual(by_code['sh.600000']['preclose'], 9.9)
+        self.assertEqual(by_code['sh.600000']['peTTM'], 12.5)
 
 
 if __name__ == '__main__':
