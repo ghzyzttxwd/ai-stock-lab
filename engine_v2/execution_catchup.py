@@ -18,7 +18,7 @@ from .shadow_ledger import (
     sha256_json,
     validate_ledger,
 )
-from .shadow_run import critical_symbols, previous_trade_session
+from .shadow_run import critical_symbols
 
 
 def _close_snapshot(state: dict, bars: dict[str, dict], trade_date: str, fees: float) -> dict:
@@ -70,6 +70,23 @@ def _already_done(state_root: Path, trade_date: str) -> dict | None:
     }
 
 
+def _pending_decision_date(states: dict[str, dict], trade_date: str) -> str | None:
+    dates = {
+        str((state.get('pending_decision') or {}).get('decision_date') or '')[:10]
+        for state in states.values()
+        if state.get('pending_decision')
+    }
+    dates.discard('')
+    if len(dates) > 1:
+        raise RuntimeError(f'V2 pending decisions are not aligned: {sorted(dates)}')
+    if not dates:
+        return None
+    decision_date = next(iter(dates))
+    if decision_date >= trade_date:
+        raise RuntimeError(f'V2 pending decision is not from an earlier session: decision={decision_date} trade={trade_date}')
+    return decision_date
+
+
 def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
     existing = _already_done(state_root, trade_date)
     if existing:
@@ -83,7 +100,9 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
     if True in processed:
         raise RuntimeError(f'partial V2 daily processing detected for {trade_date}; refusing execution catch-up')
 
-    previous_trade_date = previous_trade_session(trade_date)
+    # The pending ledgers are the authoritative source for the decision session. This avoids
+    # an unnecessary market-index network request before we can execute already-fixed orders.
+    previous_trade_date = _pending_decision_date(states, trade_date)
     critical = critical_symbols(states)
     from engine.real_market import AKShareMarket
     bars = AKShareMarket().execution_bars(critical, trade_date) if critical else {}
@@ -99,7 +118,7 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
     for fund_id, state in states.items():
         pending = state.get('pending_decision')
         if pending:
-            if str(pending.get('decision_date') or '')[:10] == previous_trade_date:
+            if previous_trade_date and str(pending.get('decision_date') or '')[:10] == previous_trade_date:
                 execution = execute_pending(state, pending, bars, trade_date)
             else:
                 execution = expire_pending(state, pending, trade_date, previous_trade_date)
@@ -138,7 +157,7 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
         'source_ref': {
             'execution_bar_source': 'engine.real_market.AKShareMarket.execution_bars',
             'missing_critical_execution_bars': missing_critical,
-            'note': 'Previous-session targets executed independently because the current-session decision snapshot was unavailable.',
+            'note': 'Previous-session targets executed independently before current-session target generation.',
         },
         'regime': None,
         'target_diagnostics': None,
@@ -158,13 +177,11 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
         state['audit_head'] = event_hash
         fund_events[fund_id]['closing_ledger_content_sha256'] = ledger_content_hash(state)
 
-    # The per-fund closing hashes are part of the immutable event, so recompute after adding them.
     event.pop('event_hash', None)
     event_hash = sha256_json(event)
     event['event_hash'] = event_hash
     for state in states.values():
         state['audit_head'] = event_hash
-    # audit_head is excluded from ledger_content_hash, so closing hashes remain valid.
 
     audit_path = state_root / 'audit' / f'{trade_date}-execution.json'
     immutable_write(audit_path, event)
