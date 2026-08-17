@@ -1,4 +1,4 @@
-name: Baostock full-market smoke test
+name: Tencent full-market smoke test
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,62 +21,53 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
-      - name: Verify Baostock universe and same-day daily bars
+      - name: Verify Tencent full-market quote endpoint
         shell: bash
         run: |
           python - <<'PY'
-          import json, time
-          import baostock as bs
-          from pathlib import Path
+          import json, signal, time
+          import akshare as ak
 
-          trade_date = '2026-08-17'
-          lg = bs.login()
-          if lg.error_code != '0':
-              raise SystemExit(f'baostock login failed: {lg.error_code} {lg.error_msg}')
+          def alarm(_sig,_frame):
+              raise TimeoutError('Tencent full-market call exceeded 90s')
+          signal.signal(signal.SIGALRM,alarm)
+          signal.alarm(90)
+          t0=time.time()
           try:
-              rs = bs.query_all_stock(day=trade_date)
-              if rs.error_code != '0':
-                  raise SystemExit(f'query_all_stock failed: {rs.error_code} {rs.error_msg}')
-              universe=[]
-              while rs.next():
-                  row=rs.get_row_data()
-                  item=dict(zip(rs.fields,row))
-                  code=item.get('code','')
-                  if code.startswith(('sh.600','sh.601','sh.603','sh.605','sz.000','sz.001','sz.002','sz.003')):
-                      universe.append(code)
-              if len(universe) < 1500:
-                  raise SystemExit(f'suspiciously small main-board universe: {len(universe)}')
-
-              fields='date,code,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,peTTM,pbMRQ,isST'
-              rows=[]; errors=[]; t0=time.time()
-              for i, code in enumerate(universe,1):
-                  q=bs.query_history_k_data_plus(code, fields, start_date=trade_date, end_date=trade_date, frequency='d', adjustflag='3')
-                  if q.error_code != '0':
-                      errors.append((code,q.error_code,q.error_msg))
-                      continue
-                  while q.next():
-                      item=dict(zip(q.fields,q.get_row_data()))
-                      if item.get('date') == trade_date:
-                          rows.append(item)
-                  if i % 300 == 0:
-                      print(f'[baostock] progress={i}/{len(universe)} rows={len(rows)} errors={len(errors)} elapsed={time.time()-t0:.1f}s')
-
-              tradable=[r for r in rows if r.get('tradestatus') == '1' and r.get('close') not in ('','0','0.0')]
-              report={
-                  'trade_date':trade_date,
-                  'universe':len(universe),
-                  'daily_rows':len(rows),
-                  'tradable_rows':len(tradable),
-                  'errors':len(errors),
-                  'elapsed_sec':round(time.time()-t0,2),
-                  'sample':tradable[:3],
-              }
-              print(json.dumps(report,ensure_ascii=False,indent=2))
-              Path('/tmp/baostock-smoke.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-              if len(tradable) < 1400:
-                  raise SystemExit(f'Baostock same-day coverage too low: {len(tradable)}/{len(universe)}')
-              if len(errors) > 20:
-                  raise SystemExit(f'Baostock error count too high: {len(errors)}')
+              df=ak.stock_zh_a_spot_tx()
           finally:
-              bs.logout()
+              signal.alarm(0)
+          if df is None or df.empty:
+              raise SystemExit('Tencent full-market returned empty dataframe')
+          print('[tx-full] columns=',list(df.columns))
+          print('[tx-full] rows=',len(df),'elapsed=',round(time.time()-t0,2))
+          print(df.head(3).to_json(force_ascii=False,orient='records'))
+
+          code_col=next((c for c in df.columns if str(c).lower() in ('代码','code','symbol','证券代码')),None)
+          if code_col is None:
+              for c in df.columns:
+                  vals=df[c].astype(str).head(200)
+                  if vals.str.contains(r'^(sh|sz|bj)?\.?\d{6}$',regex=True).mean() > 0.5:
+                      code_col=c; break
+          if code_col is None:
+              raise SystemExit(f'cannot identify Tencent code column from {list(df.columns)}')
+
+          def norm(x):
+              s=str(x).lower().strip().replace('.','')
+              if s.startswith(('sh','sz','bj')):
+                  return s
+              digits=''.join(ch for ch in s if ch.isdigit())[-6:]
+              if len(digits)!=6: return ''
+              if digits.startswith(('600','601','603','605','688')): return 'sh'+digits
+              if digits.startswith(('000','001','002','003','300','301')): return 'sz'+digits
+              if digits.startswith(('4','8','9')): return 'bj'+digits
+              return digits
+
+          codes=[norm(x) for x in df[code_col].tolist()]
+          main=[c for c in codes if c.startswith(('sh600','sh601','sh603','sh605','sz000','sz001','sz002','sz003'))]
+          unique_main=len(set(main))
+          report={'rows':len(df),'unique_main_board':unique_main,'elapsed_sec':round(time.time()-t0,2),'code_col':str(code_col)}
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          if unique_main < 2500:
+              raise SystemExit(f'Tencent full-market main-board coverage suspiciously low: {unique_main}')
           PY
