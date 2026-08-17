@@ -1,0 +1,172 @@
+name: V2 shadow daily production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v2-shadow-production.yml'
+  schedule:
+    # Beijing time, Monday-Friday. Redundant slots are safe because shadow_guard is idempotent.
+    - cron: '40 9 * * 1-5'   # 17:40 Beijing
+    - cron: '40 10 * * 1-5'  # 18:40 Beijing retry
+    - cron: '40 11 * * 1-5'  # 19:40 Beijing final retry
+
+permissions:
+  contents: write
+
+# Share the same lock used by the isolated V2 branch workflows so public market
+# providers are not hit concurrently by multiple V2 jobs.
+concurrency:
+  group: v2-snapshot-smoke
+  cancel-in-progress: false
+
+jobs:
+  shadow-ledgers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout isolated V2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run V2 tests before accounting
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+
+      - name: Resolve latest completed A-share session
+        id: td
+        shell: bash
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from engine_v2.data_validation import _safe_requested_date
+          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
+          PY
+          )
+          echo "date=$TD" >> "$GITHUB_OUTPUT"
+          echo "trade_date=$TD"
+
+      - name: Skip provider calls when session is already audited
+        id: guard
+        run: |
+          python -m engine_v2.shadow_guard \
+            --state-root shadow_state/v2 \
+            --trade-date "${{ steps.td.outputs.date }}" \
+            --report /tmp/v2-shadow-run.json
+
+      - name: Restore bounded Tencent history cache
+        if: steps.guard.outputs.done != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .cache/v2-history
+          key: v2-history-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('requirements.txt', 'engine_v2/history_cache.py') }}
+          restore-keys: |
+            v2-history-${{ runner.os }}-
+
+      - name: Assert isolated branch checkout
+        shell: bash
+        run: test "$(git branch --show-current)" = "v2-shadow"
+
+      - name: Build resilient market snapshot
+        if: steps.guard.outputs.done != 'true'
+        run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
+
+      - name: Enrich candidates with cached histories
+        if: steps.guard.outputs.done != 'true'
+        env:
+          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
+          V2_HISTORY_WORKERS: '3'
+        run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
+
+      - name: Advance five isolated shadow ledgers
+        if: steps.guard.outputs.done != 'true'
+        run: |
+          python -m engine_v2.shadow_run \
+            --snapshot /tmp/v2-normalized-snapshot.json \
+            --enriched /tmp/v2-enriched-candidates.json \
+            --state-root shadow_state/v2 \
+            --report /tmp/v2-shadow-run.json
+
+      - name: Rebuild public V2 summary
+        run: |
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+
+      - name: Assert V2 isolation and schema
+        shell: bash
+        run: |
+          git diff --quiet -- state web/d web/e
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
+          safety=report.get('safety') or {}
+          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 isolation invariant violated')
+
+          web=json.load(open('web/v2/data.json',encoding='utf-8'))
+          if web.get('summary_version') != 'v2-shadow-summary-1.1':
+              raise SystemExit('V2 web snapshot schema mismatch')
+          if set(web.get('funds') or {}) != {'A','B','C','D','L'}:
+              raise SystemExit('V2 fund set mismatch')
+          web_safety=web.get('safety') or {}
+          if web_safety.get('calls_sol') or web_safety.get('reads_v1_ledger') or web_safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 web isolation invariant violated')
+
+          if report.get('status') == 'processed':
+              for fund_id in ('A','B','C','D','L'):
+                  state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
+                  if state.get('initial_cash') != 1_000_000:
+                      raise SystemExit(f'{fund_id} initial cash changed')
+                  if state.get('last_processed_date') != report.get('trade_date'):
+                      raise SystemExit(f'{fund_id} date mismatch')
+              audit=Path(report['audit_path'])
+              if not audit.exists():
+                  raise SystemExit('V2 audit event missing')
+          print('[V2]', report.get('status'), report.get('trade_date'), report.get('event_hash'))
+          PY
+          changed=$(git status --short | awk '{print $2}' | grep -Ev '^(shadow_state/v2/|web/v2/data.json$)' || true)
+          if [ -n "$changed" ]; then
+            echo "Unexpected paths changed by V2 run:"
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Persist only isolated V2 state
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          git diff --cached --quiet || git commit -m "v2-data: daily shadow run"
+          git pull --rebase origin v2-shadow
+          git push origin HEAD:v2-shadow
+
+      - name: Upload reproducibility artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-shadow-daily-${{ steps.td.outputs.date }}
+          path: |
+            /tmp/v2-normalized-snapshot.json
+            /tmp/v2-enriched-candidates.json
+            /tmp/v2-shadow-run.json
+            shadow_state/v2/audit/${{ steps.td.outputs.date }}.json
+          if-no-files-found: warn
+          retention-days: 30
