@@ -11,16 +11,20 @@ on:
 
 permissions:
   contents: write
-  actions: write
+  pages: write
+  id-token: write
 
 concurrency:
-  group: v2-sync-pages-fallback
+  group: pages-auto-deploy
   cancel-in-progress: true
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout V2 shadow branch
         uses: actions/checkout@v4
@@ -28,7 +32,7 @@ jobs:
           ref: v2-shadow
           fetch-depth: 0
 
-      - name: Validate V2 fallback source
+      - name: Validate V2 source and freeze expected snapshot
         run: |
           python - <<'PY'
           import json
@@ -44,26 +48,68 @@ jobs:
               metrics = data['funds'][fund_id].get('metrics', {})
               print(fund_id, 'equity=', metrics.get('equity'), 'return_pct=', metrics.get('return_pct'), 'positions=', metrics.get('positions'))
           PY
+          cp web/v2/data.json /tmp/v2-data.json
+          sha256sum /tmp/v2-data.json
 
-      - name: Sync exact V2 data into Pages fallback
+      - name: Sync exact V2 snapshot into main
         shell: bash
         run: |
-          cp web/v2/data.json /tmp/v2-data.json
           git fetch origin main
           git checkout -B main origin/main
           cp /tmp/v2-data.json web/v2/data.json
+          cmp /tmp/v2-data.json web/v2/data.json
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add web/v2/data.json
           if git diff --cached --quiet; then
-            echo "Pages fallback already matches V2 shadow data."
+            echo "Pages copy already matches V2 shadow data."
           else
             git commit -m "v2-data: sync Pages fallback"
             git pull --rebase origin main
             git push origin HEAD:main
           fi
 
-      - name: Explicitly publish latest main to GitHub Pages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run auto-deploy.yml --ref main
+      - name: Assert main copy is exact before publish
+        run: |
+          cmp /tmp/v2-data.json web/v2/data.json
+          echo "main/web/v2/data.json exactly matches V2 source"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public V2 data is the exact deployed snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected"
+          for i in $(seq 1 12); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
+              actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
+              echo "attempt=$i actual_sha256=$actual"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
+          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
+          for fund_id in 'ABCDL':
+              m=live['funds'][fund_id]['metrics']
+              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public GitHub Pages did not serve the exact V2 snapshot after deployment."
+          exit 1
