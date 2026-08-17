@@ -78,31 +78,22 @@ jobs:
         run: |
           set -euo pipefail
           echo "Requiring verified Pages deployment of main_sha=$MAIN_SHA"
-          last_run_id=""
 
           for deploy_attempt in 1 2 3; do
             echo "Pages deployment attempt $deploy_attempt/3"
-            gh workflow run auto-deploy.yml --ref main
+            dispatch_url="$(gh workflow run auto-deploy.yml --ref main)"
+            echo "dispatch_url=$dispatch_url"
+            run_id="${dispatch_url##*/}"
 
-            run_id=""
-            for i in $(seq 1 30); do
-              run_id="$(gh run list --workflow auto-deploy.yml --branch main --event workflow_dispatch --limit 30 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$MAIN_SHA\" and (.databaseId | tostring) != \"$last_run_id\") | .databaseId" | head -n 1)"
-              if [ -n "$run_id" ]; then
-                break
-              fi
-              sleep 2
-            done
-
-            if [ -z "$run_id" ]; then
-              echo "Could not locate Pages workflow run for main_sha=$MAIN_SHA on attempt $deploy_attempt"
+            if ! [[ "$run_id" =~ ^[0-9]+$ ]]; then
+              echo "Could not parse exact Pages run id from dispatch URL: $dispatch_url"
             else
-              echo "pages_run_id=$run_id"
-              last_run_id="$run_id"
+              echo "exact_pages_run_id=$run_id"
               if gh run watch "$run_id" --exit-status; then
-                echo "Verified Pages workflow completed successfully on attempt $deploy_attempt."
+                echo "Exact dispatched Pages workflow $run_id completed successfully on attempt $deploy_attempt."
                 exit 0
               fi
-              echo "Pages workflow failed on attempt $deploy_attempt."
+              echo "Exact dispatched Pages workflow $run_id failed on attempt $deploy_attempt."
             fi
 
             if [ "$deploy_attempt" -lt 3 ]; then
@@ -111,5 +102,5 @@ jobs:
             fi
           done
 
-          echo "All 3 verified Pages deployment attempts failed."
+          echo "All 3 exact verified Pages deployment attempts failed."
           exit 1
