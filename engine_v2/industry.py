@@ -85,21 +85,7 @@ def _period_return(values: list[float], sessions: int) -> float | None:
     return values[-1] / values[-1 - sessions] - 1
 
 
-def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 25, delay_seconds: float = 1.0):
-    last = None
-    for attempt in range(1, attempts + 1):
-        try:
-            return bounded_call(timeout_seconds, fn, f'{label} attempt {attempt}/{attempts}')
-        except Exception as exc:
-            last = exc
-            print(f'[V2 INDUSTRY] {label} attempt {attempt}/{attempts} failed: {type(exc).__name__}: {exc}')
-            if attempt < attempts:
-                time.sleep(delay_seconds)
-    raise RuntimeError(f'{label} failed after {attempts} attempts: {type(last).__name__}: {last}') from last
-
-
 def _history_metric(frame, industry_code: str, industry_name: str, trade_date: str) -> dict:
-    """Build point-in-time SW L1 strength from one industry index history."""
     if frame is None or frame.empty:
         raise RuntimeError(f'empty SW index history for {industry_code}')
     work = frame.copy()
@@ -112,12 +98,10 @@ def _history_metric(frame, industry_code: str, industry_name: str, trade_date: s
     if work.empty or str(work.iloc[-1]['_date']) != trade_date:
         latest = str(work.iloc[-1]['_date']) if not work.empty else None
         raise RuntimeError(f'SW index history stale {industry_code}: latest={latest} trade_date={trade_date}')
-
     closes = [_num(x) for x in work['收盘'].tolist()]
     closes = [x for x in closes if x is not None and x > 0]
     if len(closes) < 61:
         raise RuntimeError(f'SW index history too short {industry_code}: {len(closes)} sessions')
-
     amounts = [_num(x) for x in work['成交额'].tolist()] if '成交额' in work.columns else []
     latest_amount = amounts[-1] if amounts else None
     recent_amounts = [x for x in amounts[-20:] if x is not None and x > 0]
@@ -126,7 +110,6 @@ def _history_metric(frame, industry_code: str, industry_name: str, trade_date: s
         baseline = sum(recent_amounts) / len(recent_amounts)
         if baseline > 0:
             amount_activity = latest_amount / baseline
-
     return {
         'industry_code': industry_code,
         'industry_name': industry_name,
@@ -201,7 +184,6 @@ def build_industry_scores(analysis, trade_date: str) -> dict[str, dict]:
 
 
 def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
-    """Load stable SW L1 industry codes/names; live realtime prices are not required."""
     errors = []
     try:
         info = bounded_call(30, ak.sw_index_first_info, 'SW L1 directory Legulegu')
@@ -224,7 +206,6 @@ def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
         return rows, {'source': 'legulegu-sw-index-first-info', 'errors': errors}
     except Exception as exc:
         errors.append(f'legulegu={type(exc).__name__}: {exc}')
-
     try:
         realtime = bounded_call(35, lambda: ak.index_realtime_sw(symbol='一级行业'), 'SW L1 directory SWS fallback')
         need = {'指数代码', '指数名称'}
@@ -245,64 +226,71 @@ def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
         raise RuntimeError('SW L1 directory unavailable; ' + ' | '.join(errors)) from exc
 
 
-def _fetch_sw_history_direct(code: str):
-    """Mirror AKShare index_hist_sw with explicit network timeouts for worker safety."""
-    import pandas as pd
+def _request_json(url: str, params: dict, label: str) -> dict:
     import requests
-
-    url = 'https://www.swsresearch.com/institute-sw/api/index_publish/trend/'
-    params = {'swindexcode': code, 'period': 'DAY'}
+    last = None
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                       'Chrome/114.0.0.0 Safari/537.36'
     }
-    last = None
     for attempt in range(1, 3):
         try:
-            response = requests.get(
-                url, params=params, headers=headers, verify=False, timeout=(5, 15)
-            )
+            response = requests.get(url, params=params, headers=headers, verify=False, timeout=(5, 15))
             response.raise_for_status()
-            payload = response.json()
-            rows = payload.get('data')
-            if not isinstance(rows, list) or not rows:
-                raise RuntimeError(f'empty/invalid SW history payload code={code}')
-            frame = pd.DataFrame(rows)
-            frame.rename(columns={
-                'swindexcode': '代码', 'bargaindate': '日期', 'openindex': '开盘',
-                'maxindex': '最高', 'minindex': '最低', 'closeindex': '收盘',
-                'bargainamount': '成交量', 'bargainsum': '成交额',
-            }, inplace=True)
-            required = ['代码', '日期', '收盘', '开盘', '最高', '最低', '成交量', '成交额']
-            missing = [x for x in required if x not in frame.columns]
-            if missing:
-                raise RuntimeError(f'SW history payload missing columns code={code}: {missing}')
-            return frame[required]
+            return response.json()
         except Exception as exc:
             last = exc
             if attempt < 2:
                 time.sleep(0.5)
-    raise RuntimeError(f'SW index history {code} failed after 2 attempts: {type(last).__name__}: {last}') from last
+    raise RuntimeError(f'{label} failed after 2 attempts: {type(last).__name__}: {last}') from last
 
 
-def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[dict[str, dict], list[dict]]:
-    del ak  # kept in signature so callers/tests remain stable
-    metrics = {}
+def _fetch_sw_history_direct(code: str):
+    import pandas as pd
+    payload = _request_json(
+        'https://www.swsresearch.com/institute-sw/api/index_publish/trend/',
+        {'swindexcode': code, 'period': 'DAY'},
+        f'SW index history {code}',
+    )
+    rows = payload.get('data')
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError(f'empty/invalid SW history payload code={code}')
+    frame = pd.DataFrame(rows)
+    frame.rename(columns={
+        'swindexcode': '代码', 'bargaindate': '日期', 'openindex': '开盘',
+        'maxindex': '最高', 'minindex': '最低', 'closeindex': '收盘',
+        'bargainamount': '成交量', 'bargainsum': '成交额',
+    }, inplace=True)
+    required = ['代码', '日期', '收盘', '开盘', '最高', '最低', '成交量', '成交额']
+    missing = [x for x in required if x not in frame.columns]
+    if missing:
+        raise RuntimeError(f'SW history payload missing columns code={code}: {missing}')
+    return frame[required]
+
+
+def _fetch_sw_components_direct(code: str) -> list[dict]:
+    payload = _request_json(
+        'https://www.swsresearch.com/institute-sw/api/index_publish/details/component_stocks/',
+        {'swindexcode': code, 'page': '1', 'page_size': '10000'},
+        f'SW components {code}',
+    )
+    data = payload.get('data') or {}
+    rows = data.get('results')
+    if not isinstance(rows, list):
+        raise RuntimeError(f'invalid SW component payload code={code}')
+    return rows
+
+
+def _parallel_catalog_fetch(catalog: list[dict], worker, label: str) -> tuple[dict[str, object], list[dict]]:
+    values = {}
     failures = []
-
-    def work(row: dict):
-        code = row['industry_code']
-        frame = _fetch_sw_history_direct(code)
-        return code, _history_metric(frame, code, row['industry_name'], trade_date)
-
-    executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='v2-sw-history')
-    futures = {executor.submit(work, row): row for row in catalog}
+    executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix=f'v2-sw-{label}')
+    futures = {executor.submit(worker, row): row for row in catalog}
     try:
         for future in as_completed(futures):
             row = futures[future]
             try:
-                code, metric = future.result()
-                metrics[code] = metric
+                values[row['industry_code']] = future.result()
             except Exception as exc:
                 failures.append({
                     'industry_code': row['industry_code'],
@@ -312,13 +300,31 @@ def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[
                 if len(failures) > 2:
                     for pending in futures:
                         pending.cancel()
-                    raise RuntimeError(
-                        f'Shenwan per-index history exceeded failure budget: {failures[:3]}'
-                    ) from exc
+                    raise RuntimeError(f'Shenwan {label} exceeded failure budget: {failures[:3]}') from exc
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
+    return values, failures
 
-    if len(metrics) < max(25, len(catalog) - 2):
+
+def _load_industry_histories(catalog: list[dict], trade_date: str) -> tuple[dict[str, dict], list[dict]]:
+    by_code = {row['industry_code']: row for row in catalog}
+    frames, failures = _parallel_catalog_fetch(
+        catalog,
+        lambda row: _fetch_sw_history_direct(row['industry_code']),
+        'history',
+    )
+    metrics = {}
+    for code, frame in frames.items():
+        row = by_code[code]
+        try:
+            metrics[code] = _history_metric(frame, code, row['industry_name'], trade_date)
+        except Exception as exc:
+            failures.append({
+                'industry_code': code,
+                'industry_name': row['industry_name'],
+                'error': f'{type(exc).__name__}: {exc}',
+            })
+    if len(failures) > 2 or len(metrics) < max(25, len(catalog) - 2):
         raise RuntimeError(
             f'Shenwan per-index history incomplete industries={len(metrics)}/{len(catalog)} failures={len(failures)}'
         )
@@ -327,17 +333,9 @@ def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[
         code = row['industry_code']
         if code not in scored:
             scored[code] = {
-                'industry_code': code,
-                'industry_name': row['industry_name'],
-                'asof': None,
-                'r20': None,
-                'r60': None,
-                'day_pct': None,
-                'amount_activity': None,
-                'turnover_pct': None,
-                'pe': None,
-                'pb': None,
-                'industry_score': 50.0,
+                'industry_code': code, 'industry_name': row['industry_name'], 'asof': None,
+                'r20': None, 'r60': None, 'day_pct': None, 'amount_activity': None,
+                'turnover_pct': None, 'pe': None, 'pb': None, 'industry_score': 50.0,
                 'score_components': {
                     'r20_rank': None, 'r60_rank': None, 'day_rank': None, 'activity_rank': None,
                 },
@@ -345,43 +343,47 @@ def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[
     return scored, failures
 
 
+def _load_component_memberships(
+    catalog: list[dict], trade_date: str, industries: dict[str, dict]
+) -> tuple[dict, dict, int, int, list[dict]]:
+    component_sets, failures = _parallel_catalog_fetch(
+        catalog,
+        lambda row: _fetch_sw_components_direct(row['industry_code']),
+        'components',
+    )
+    stock_map = {}
+    duplicates = {}
+    rows_mainboard = 0
+    successful_declared = 0
+    by_code = {row['industry_code']: row for row in catalog}
+    for industry_code, rows in component_sets.items():
+        catalog_row = by_code[industry_code]
+        successful_declared += int(catalog_row.get('declared_components') or 0)
+        for raw in rows:
+            code = _stock_code(raw.get('stockcode'))
+            if not _is_mainboard(code):
+                continue
+            rows_mainboard += 1
+            included = str(raw.get('beginningdate') or '')[:10]
+            if included and included not in {'NaT', 'None'} and included > trade_date:
+                continue
+            _assign_membership(stock_map, duplicates, code, {
+                'industry_code': industry_code,
+                'industry_name': catalog_row['industry_name'],
+                'included_date': included if included and included not in {'NaT', 'None'} else None,
+                'industry_score': industries.get(industry_code, {}).get('industry_score', 50.0),
+            })
+    return stock_map, duplicates, rows_mainboard, successful_declared, failures
+
+
 def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
-
     date.fromisoformat(trade_date)
     catalog, catalog_meta = _load_l1_catalog(ak)
-    industries, history_failures = _load_industry_histories(ak, catalog, trade_date)
-
-    stock_map = {}
-    component_failures = []
-    duplicate_assignments = {}
-    component_rows_mainboard = 0
-    successful_declared = 0
-    for row in catalog:
-        idx = row['industry_code']
-        name = row['industry_name']
-        try:
-            df = bounded_call(25, lambda i=idx: ak.index_component_sw(symbol=i), f'SW component {idx}')
-            successful_declared += int(row.get('declared_components') or 0)
-            for _, r in df.iterrows():
-                code = _stock_code(r.get('证券代码'))
-                if not _is_mainboard(code):
-                    continue
-                component_rows_mainboard += 1
-                included = str(r.get('计入日期') or '')[:10]
-                if included and included != 'NaT' and included > trade_date:
-                    continue
-                _assign_membership(stock_map, duplicate_assignments, code, {
-                    'industry_code': idx,
-                    'industry_name': name,
-                    'included_date': included if included and included != 'NaT' else None,
-                    'industry_score': industries.get(idx, {}).get('industry_score', 50.0),
-                })
-        except Exception as exc:
-            component_failures.append({
-                'industry_code': idx, 'industry_name': name, 'error': f'{type(exc).__name__}: {exc}'
-            })
-
+    industries, history_failures = _load_industry_histories(catalog, trade_date)
+    stock_map, duplicate_assignments, component_rows_mainboard, successful_declared, component_failures = (
+        _load_component_memberships(catalog, trade_date, industries)
+    )
     duplicate_limit = max(10, int(max(1, len(stock_map)) * 0.005))
     if len(stock_map) < 2500 or len(component_failures) > 2 or len(duplicate_assignments) > duplicate_limit:
         raise RuntimeError(
@@ -389,7 +391,6 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
             f'component_failures={len(component_failures)} history_failures={len(history_failures)} '
             f'cross_industry_duplicates={len(duplicate_assignments)}'
         )
-
     return {
         'trade_date': trade_date,
         'taxonomy': 'Shenwan L1',
@@ -406,7 +407,7 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         'source': {
             'catalog': catalog_meta,
             'analysis': 'sws-per-index-history-day; bounded-parallel; r20/r60/day + relative-20d-amount activity',
-            'components': 'sws-index-component',
+            'components': 'sws-index-component; bounded-parallel',
             'successful_declared_components': successful_declared,
             'unique_vs_declared_ratio': round(len(stock_map) / successful_declared, 4) if successful_declared else None,
             'history_failure_sample': history_failures[:2],
