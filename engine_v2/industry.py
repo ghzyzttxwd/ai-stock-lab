@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
@@ -95,9 +96,11 @@ def _history_metric(frame, industry_code: str, industry_name: str, trade_date: s
         raise RuntimeError(f'SW index history {industry_code} missing columns: {sorted(missing)}')
     work['_date'] = work['日期'].astype(str).str[:10]
     work = work[work['_date'] <= trade_date].sort_values('_date')
-    if work.empty or str(work.iloc[-1]['_date']) != trade_date:
-        latest = str(work.iloc[-1]['_date']) if not work.empty else None
-        raise RuntimeError(f'SW index history stale {industry_code}: latest={latest} trade_date={trade_date}')
+    if work.empty:
+        raise RuntimeError(f'SW index history has no point-in-time row for {industry_code} <= {trade_date}')
+    latest = str(work.iloc[-1]['_date'])
+    if latest > trade_date:
+        raise RuntimeError(f'SW index history future date {industry_code}: latest={latest} trade_date={trade_date}')
     closes = [_num(x) for x in work['收盘'].tolist()]
     closes = [x for x in closes if x is not None and x > 0]
     if len(closes) < 61:
@@ -113,7 +116,7 @@ def _history_metric(frame, industry_code: str, industry_name: str, trade_date: s
     return {
         'industry_code': industry_code,
         'industry_name': industry_name,
-        'asof': trade_date,
+        'asof': latest,
         'r20': _period_return(closes, 20),
         'r60': _period_return(closes, 60),
         'day_pct': closes[-1] / closes[-2] - 1 if len(closes) >= 2 and closes[-2] > 0 else None,
@@ -324,6 +327,35 @@ def _load_industry_histories(catalog: list[dict], trade_date: str) -> tuple[dict
                 'industry_name': row['industry_name'],
                 'error': f'{type(exc).__name__}: {exc}',
             })
+    if not metrics:
+        raise RuntimeError('Shenwan per-index history returned no usable industries')
+
+    # SWS can publish sector-index closes one source-session after the equity market close.
+    # Rank only one common as-of date so the cross-section is point-in-time consistent.
+    asof_counts = Counter(item.get('asof') for item in metrics.values() if item.get('asof'))
+    common_asof, common_count = asof_counts.most_common(1)[0]
+    lag_days = (date.fromisoformat(trade_date) - date.fromisoformat(common_asof)).days
+    if lag_days < 0 or lag_days > 5:
+        raise RuntimeError(
+            f'Shenwan common industry asof outside freshness budget: asof={common_asof} '
+            f'trade_date={trade_date} lag_days={lag_days}'
+        )
+    required_consensus = max(25, len(metrics) - 2)
+    if common_count < required_consensus:
+        raise RuntimeError(
+            f'Shenwan industry asof consensus too weak: common={common_asof} '
+            f'count={common_count}/{len(metrics)} required={required_consensus}'
+        )
+    for code in list(metrics):
+        if metrics[code].get('asof') != common_asof:
+            row = by_code[code]
+            failures.append({
+                'industry_code': code,
+                'industry_name': row['industry_name'],
+                'error': f'source_asof_mismatch:{metrics[code].get("asof")}!=common:{common_asof}',
+            })
+            metrics.pop(code)
+
     if len(failures) > 2 or len(metrics) < max(25, len(catalog) - 2):
         raise RuntimeError(
             f'Shenwan per-index history incomplete industries={len(metrics)}/{len(catalog)} failures={len(failures)}'
@@ -333,7 +365,7 @@ def _load_industry_histories(catalog: list[dict], trade_date: str) -> tuple[dict
         code = row['industry_code']
         if code not in scored:
             scored[code] = {
-                'industry_code': code, 'industry_name': row['industry_name'], 'asof': None,
+                'industry_code': code, 'industry_name': row['industry_name'], 'asof': common_asof,
                 'r20': None, 'r60': None, 'day_pct': None, 'amount_activity': None,
                 'turnover_pct': None, 'pe': None, 'pb': None, 'industry_score': 50.0,
                 'score_components': {
@@ -391,6 +423,12 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
             f'component_failures={len(component_failures)} history_failures={len(history_failures)} '
             f'cross_industry_duplicates={len(duplicate_assignments)}'
         )
+    asof_counts = Counter(item.get('asof') for item in industries.values() if item.get('asof'))
+    industry_asof = asof_counts.most_common(1)[0][0] if asof_counts else None
+    industry_lag_days = (
+        (date.fromisoformat(trade_date) - date.fromisoformat(industry_asof)).days
+        if industry_asof else None
+    )
     return {
         'trade_date': trade_date,
         'taxonomy': 'Shenwan L1',
@@ -406,7 +444,10 @@ def load_sw_l1_snapshot(trade_date: str) -> dict:
         },
         'source': {
             'catalog': catalog_meta,
-            'analysis': 'sws-per-index-history-day; bounded-parallel; r20/r60/day + relative-20d-amount activity',
+            'analysis': 'sws-per-index-history-day; bounded-parallel; common-asof; r20/r60/day + relative-20d-amount activity',
+            'industry_asof': industry_asof,
+            'industry_calendar_lag_days': industry_lag_days,
+            'industry_asof_policy': 'modal-source-date; at-most-2-outliers; max-5-calendar-days-lag',
             'components': 'sws-index-component; bounded-parallel',
             'successful_declared_components': successful_declared,
             'unique_vs_declared_ratio': round(len(stock_map) / successful_declared, 4) if successful_declared else None,
