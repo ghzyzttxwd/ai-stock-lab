@@ -33,7 +33,12 @@ class V2MobileWebTests(unittest.TestCase):
             self.assertIsInstance(fund['recent_fills'], list)
             self.assertIsInstance(fund['recent_rejected_orders'], list)
             self.assertIsInstance(fund['concentration_flags'], list)
-            self.assertIn('targets', fund['pending_decision'])
+            pending=fund['pending_decision']
+            if pending is None:
+                self.assertEqual(summary.get('audit_event_kind'), 'execution_catchup')
+                self.assertEqual(fund['metrics'].get('execution_only_date'), summary['updated_at'])
+            else:
+                self.assertIn('targets', pending)
 
     def test_committed_fallback_is_exactly_the_v2_summary(self):
         expected = build_summary(STATE_ROOT)
@@ -62,4 +67,3 @@ class V2MobileWebTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
