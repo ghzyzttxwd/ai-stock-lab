@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import time
-from datetime import date, timedelta
+from datetime import date
 
 from .provider import bounded_call
 
@@ -11,7 +11,7 @@ def _num(value, default=None):
     try:
         if value is None:
             return default
-        x=float(value)
+        x = float(value)
         return default if math.isnan(x) or math.isinf(x) else x
     except (TypeError, ValueError):
         return default
@@ -20,279 +20,343 @@ def _num(value, default=None):
 def _stock_code(value) -> str | None:
     if value is None:
         return None
-    if isinstance(value,float):
-        if math.isnan(value): return None
-        if value.is_integer(): value=int(value)
-    text=str(value).strip()
-    if text.endswith('.0') and text[:-2].isdigit(): text=text[:-2]
-    digits=''.join(ch for ch in text if ch.isdigit())
-    if not digits: return None
+    if isinstance(value, float):
+        if math.isnan(value):
+            return None
+        if value.is_integer():
+            value = int(value)
+    text = str(value).strip()
+    if text.endswith('.0') and text[:-2].isdigit():
+        text = text[:-2]
+    digits = ''.join(ch for ch in text if ch.isdigit())
+    if not digits:
+        return None
     return digits[-6:].zfill(6)
 
 
 def _industry_code(value) -> str:
-    text=str(value or '').strip()
+    text = str(value or '').strip()
     if text.endswith('.SI'):
-        text=text[:-3]
+        text = text[:-3]
     return text
 
 
 def _is_mainboard(code: str | None) -> bool:
-    return bool(code) and code.startswith(('600','601','603','605','000','001','002','003'))
+    return bool(code) and code.startswith(('600', '601', '603', '605', '000', '001', '002', '003'))
 
 
 def _assign_membership(stock_map: dict, duplicates: dict, code: str, item: dict) -> None:
-    previous=stock_map.get(code)
+    previous = stock_map.get(code)
     if previous and previous.get('industry_code') != item.get('industry_code'):
-        duplicates.setdefault(code,{
-            'code':code,
-            'industry_codes':[previous.get('industry_code')],
-            'industry_names':[previous.get('industry_name')],
+        duplicates.setdefault(code, {
+            'code': code,
+            'industry_codes': [previous.get('industry_code')],
+            'industry_names': [previous.get('industry_name')],
         })
         if item.get('industry_code') not in duplicates[code]['industry_codes']:
             duplicates[code]['industry_codes'].append(item.get('industry_code'))
             duplicates[code]['industry_names'].append(item.get('industry_name'))
-    stock_map[code]=item
+    stock_map[code] = item
 
 
-def _rank(values: dict[str,float | None]) -> dict[str,float | None]:
-    valid=sorted((float(v),k) for k,v in values.items() if v is not None)
-    out={k:None for k in values}
-    n=len(valid)
-    if not n: return out
-    i=0
-    while i<n:
-        j=i+1
-        while j<n and valid[j][0]==valid[i][0]: j+=1
-        avg=(i+j-1)/2
-        score=50.0 if n==1 else 100.0*avg/(n-1)
-        for _,k in valid[i:j]: out[k]=round(score,2)
-        i=j
+def _rank(values: dict[str, float | None]) -> dict[str, float | None]:
+    valid = sorted((float(v), k) for k, v in values.items() if v is not None)
+    out = {k: None for k in values}
+    n = len(valid)
+    if not n:
+        return out
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n and valid[j][0] == valid[i][0]:
+            j += 1
+        avg = (i + j - 1) / 2
+        score = 50.0 if n == 1 else 100.0 * avg / (n - 1)
+        for _, k in valid[i:j]:
+            out[k] = round(score, 2)
+        i = j
     return out
 
 
 def _period_return(values: list[float], sessions: int) -> float | None:
-    if len(values)<=sessions or values[-1-sessions]<=0:
+    if len(values) <= sessions or values[-1 - sessions] <= 0:
         return None
-    return values[-1]/values[-1-sessions]-1
+    return values[-1] / values[-1 - sessions] - 1
 
 
-def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 45, delay_seconds: float = 3.0):
-    """Bounded retry for transient provider responses; never loop indefinitely."""
-    last=None
-    for attempt in range(1, attempts+1):
+def _bounded_retry(label: str, fn, *, attempts: int = 2, timeout_seconds: int = 25, delay_seconds: float = 1.0):
+    last = None
+    for attempt in range(1, attempts + 1):
         try:
-            return bounded_call(timeout_seconds,fn,f'{label} attempt {attempt}/{attempts}')
+            return bounded_call(timeout_seconds, fn, f'{label} attempt {attempt}/{attempts}')
         except Exception as exc:
-            last=exc
+            last = exc
             print(f'[V2 INDUSTRY] {label} attempt {attempt}/{attempts} failed: {type(exc).__name__}: {exc}')
             if attempt < attempts:
                 time.sleep(delay_seconds)
     raise RuntimeError(f'{label} failed after {attempts} attempts: {type(last).__name__}: {last}') from last
 
 
-def _load_daily_analysis_chunked(ak, td: date, *, lookback_days: int = 140, chunk_days: int = 35):
-    """Fetch the same SW L1 daily-analysis dataset in bounded date chunks.
+def _history_metric(frame, industry_code: str, industry_name: str, trade_date: str) -> dict:
+    """Build point-in-time SW L1 strength from one industry index history."""
+    if frame is None or frame.empty:
+        raise RuntimeError(f'empty SW index history for {industry_code}')
+    work = frame.copy()
+    required = {'日期', '收盘'}
+    missing = required - set(work.columns)
+    if missing:
+        raise RuntimeError(f'SW index history {industry_code} missing columns: {sorted(missing)}')
+    work['_date'] = work['日期'].astype(str).str[:10]
+    work = work[work['_date'] <= trade_date].sort_values('_date')
+    if work.empty or str(work.iloc[-1]['_date']) != trade_date:
+        latest = str(work.iloc[-1]['_date']) if not work.empty else None
+        raise RuntimeError(f'SW index history stale {industry_code}: latest={latest} trade_date={trade_date}')
 
-    AKShare's all-industry endpoint paginates internally. A long single request can exceed
-    GitHub Actions/provider timeouts even when each page is healthy. Chunks are built backwards
-    from the requested trade date so the newest chunk always contains a useful history window;
-    this avoids an empty same-day-only tail while preserving the exact point-in-time dataset.
-    """
-    import pandas as pd
+    closes = [_num(x) for x in work['收盘'].tolist()]
+    closes = [x for x in closes if x is not None and x > 0]
+    if len(closes) < 61:
+        raise RuntimeError(f'SW index history too short {industry_code}: {len(closes)} sessions')
 
-    oldest=td-timedelta(days=lookback_days)
-    end=td
-    frames=[]
-    while end>=oldest:
-        start=max(oldest,end-timedelta(days=chunk_days-1))
-        start_text=start.strftime('%Y%m%d')
-        end_text=end.strftime('%Y%m%d')
-        frame=_bounded_retry(
-            f'SW L1 daily analysis {start_text}-{end_text}',
-            lambda s=start_text,e=end_text:ak.index_analysis_daily_sw(
-                symbol='一级行业', start_date=s, end_date=e,
-            ),
-            attempts=2,
-            timeout_seconds=35,
-            delay_seconds=2.0,
-        )
-        if frame is not None and not frame.empty:
-            frames.append(frame)
-        end=start-timedelta(days=1)
-    if not frames:
-        raise RuntimeError('SW L1 chunked daily analysis returned no rows')
-    analysis=pd.concat(frames,ignore_index=True)
-    if {'指数代码','发布日期'}.issubset(set(analysis.columns)):
-        analysis=analysis.drop_duplicates(subset=['指数代码','发布日期'],keep='last')
-    return analysis
+    amounts = [_num(x) for x in work['成交额'].tolist()] if '成交额' in work.columns else []
+    latest_amount = amounts[-1] if amounts else None
+    recent_amounts = [x for x in amounts[-20:] if x is not None and x > 0]
+    amount_activity = None
+    if latest_amount is not None and latest_amount > 0 and recent_amounts:
+        baseline = sum(recent_amounts) / len(recent_amounts)
+        if baseline > 0:
+            amount_activity = latest_amount / baseline
 
-
-def build_industry_scores(analysis, trade_date: str) -> dict[str,dict]:
-    """Convert SW L1 daily analysis into transparent relative-strength scores."""
-    if analysis is None or analysis.empty:
-        return {}
-    work=analysis.copy()
-    work['_date']=work['发布日期'].astype(str).str[:10]
-    work=work[work['_date']<=trade_date]
-    metrics={}
-    for code,group in work.groupby(work['指数代码'].astype(str)):
-        g=group.sort_values('_date')
-        closes=[_num(x) for x in g['收盘指数'].tolist()]
-        closes=[x for x in closes if x is not None and x>0]
-        if len(closes)<21:
-            continue
-        latest=g.iloc[-1]
-        normalized_code=_industry_code(code)
-        metrics[normalized_code]={
-            'industry_code':normalized_code,
-            'industry_name':str(latest['指数名称']).strip(),
-            'asof':str(latest['_date']),
-            'r20':_period_return(closes,20),
-            'r60':_period_return(closes,60),
-            'day_pct':(_num(latest.get('涨跌幅'),0.0) or 0.0)/100.0,
-            'turnover_pct':_num(latest.get('换手率')),
-            'pe':_num(latest.get('市盈率')),
-            'pb':_num(latest.get('市净率')),
-        }
-    ranks={
-        'r20':_rank({k:v['r20'] for k,v in metrics.items()}),
-        'r60':_rank({k:v['r60'] for k,v in metrics.items()}),
-        'day':_rank({k:v['day_pct'] for k,v in metrics.items()}),
-        'turn':_rank({k:v['turnover_pct'] for k,v in metrics.items()}),
+    return {
+        'industry_code': industry_code,
+        'industry_name': industry_name,
+        'asof': trade_date,
+        'r20': _period_return(closes, 20),
+        'r60': _period_return(closes, 60),
+        'day_pct': closes[-1] / closes[-2] - 1 if len(closes) >= 2 and closes[-2] > 0 else None,
+        'amount_activity': amount_activity,
+        # Kept for schema compatibility; sector PE/PB are not consumed by downstream V2 selection.
+        'turnover_pct': None,
+        'pe': None,
+        'pb': None,
     }
-    for code,item in metrics.items():
-        parts=[
-            (ranks['r20'].get(code),0.45),
-            (ranks['r60'].get(code),0.30),
-            (ranks['day'].get(code),0.15),
-            (ranks['turn'].get(code),0.10),
+
+
+def _score_industries(metrics: dict[str, dict]) -> dict[str, dict]:
+    ranks = {
+        'r20': _rank({k: v.get('r20') for k, v in metrics.items()}),
+        'r60': _rank({k: v.get('r60') for k, v in metrics.items()}),
+        'day': _rank({k: v.get('day_pct') for k, v in metrics.items()}),
+        'activity': _rank({k: v.get('amount_activity') for k, v in metrics.items()}),
+    }
+    for code, item in metrics.items():
+        parts = [
+            (ranks['r20'].get(code), 0.45),
+            (ranks['r60'].get(code), 0.30),
+            (ranks['day'].get(code), 0.15),
+            (ranks['activity'].get(code), 0.10),
         ]
-        usable=[(v,w) for v,w in parts if v is not None]
-        item['industry_score']=round(sum(v*w for v,w in usable)/sum(w for _,w in usable),2) if usable else 50.0
-        item['score_components']={
-            'r20_rank':ranks['r20'].get(code),
-            'r60_rank':ranks['r60'].get(code),
-            'day_rank':ranks['day'].get(code),
-            'turnover_rank':ranks['turn'].get(code),
+        usable = [(v, w) for v, w in parts if v is not None]
+        item['industry_score'] = round(
+            sum(v * w for v, w in usable) / sum(w for _, w in usable), 2
+        ) if usable else 50.0
+        item['score_components'] = {
+            'r20_rank': ranks['r20'].get(code),
+            'r60_rank': ranks['r60'].get(code),
+            'day_rank': ranks['day'].get(code),
+            'activity_rank': ranks['activity'].get(code),
         }
     return metrics
 
 
-def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
-    """Load the SW L1 directory without depending on the realtime SWS endpoint.
+def build_industry_scores(analysis, trade_date: str) -> dict[str, dict]:
+    """Legacy pure helper retained for tests and old cached artifacts."""
+    if analysis is None or analysis.empty:
+        return {}
+    work = analysis.copy()
+    work['_date'] = work['发布日期'].astype(str).str[:10]
+    work = work[work['_date'] <= trade_date]
+    metrics = {}
+    for code, group in work.groupby(work['指数代码'].astype(str)):
+        g = group.sort_values('_date')
+        closes = [_num(x) for x in g['收盘指数'].tolist()]
+        closes = [x for x in closes if x is not None and x > 0]
+        if len(closes) < 21:
+            continue
+        latest = g.iloc[-1]
+        normalized_code = _industry_code(code)
+        turnover = _num(latest.get('换手率'))
+        metrics[normalized_code] = {
+            'industry_code': normalized_code,
+            'industry_name': str(latest['指数名称']).strip(),
+            'asof': str(latest['_date']),
+            'r20': _period_return(closes, 20),
+            'r60': _period_return(closes, 60),
+            'day_pct': (_num(latest.get('涨跌幅'), 0.0) or 0.0) / 100.0,
+            'amount_activity': turnover,
+            'turnover_pct': turnover,
+            'pe': _num(latest.get('市盈率')),
+            'pb': _num(latest.get('市净率')),
+        }
+    return _score_industries(metrics)
 
-    The directory only supplies stable industry codes/names; live prices are not required here.
-    Prefer the independent Legulegu-backed AKShare interface and keep SWS realtime as fallback.
-    """
-    errors=[]
+
+def _load_l1_catalog(ak) -> tuple[list[dict], dict]:
+    """Load stable SW L1 industry codes/names; live realtime prices are not required."""
+    errors = []
     try:
-        info=bounded_call(30,ak.sw_index_first_info,'SW L1 directory Legulegu')
-        need={'行业代码','行业名称'}
-        missing=sorted(need-{str(x) for x in info.columns})
+        info = bounded_call(30, ak.sw_index_first_info, 'SW L1 directory Legulegu')
+        need = {'行业代码', '行业名称'}
+        missing = sorted(need - {str(x) for x in info.columns})
         if missing:
             raise RuntimeError(f'missing columns: {missing}')
-        rows=[]
-        for _,r in info.iterrows():
-            code=_industry_code(r.get('行业代码'))
-            name=str(r.get('行业名称') or '').strip()
+        rows = []
+        for _, r in info.iterrows():
+            code = _industry_code(r.get('行业代码'))
+            name = str(r.get('行业名称') or '').strip()
             if code and name:
                 rows.append({
-                    'industry_code':code,
-                    'industry_name':name,
-                    'declared_components':int(_num(r.get('成份个数'),0) or 0),
+                    'industry_code': code,
+                    'industry_name': name,
+                    'declared_components': int(_num(r.get('成份个数'), 0) or 0),
                 })
-        if len(rows)<25:
+        if len(rows) < 25:
             raise RuntimeError(f'too few SW L1 industries: {len(rows)}')
-        return rows,{'source':'legulegu-sw-index-first-info','errors':errors}
+        return rows, {'source': 'legulegu-sw-index-first-info', 'errors': errors}
     except Exception as exc:
         errors.append(f'legulegu={type(exc).__name__}: {exc}')
 
     try:
-        realtime=bounded_call(35,lambda:ak.index_realtime_sw(symbol='一级行业'),'SW L1 directory SWS fallback')
-        need={'指数代码','指数名称'}
-        missing=sorted(need-{str(x) for x in realtime.columns})
+        realtime = bounded_call(35, lambda: ak.index_realtime_sw(symbol='一级行业'), 'SW L1 directory SWS fallback')
+        need = {'指数代码', '指数名称'}
+        missing = sorted(need - {str(x) for x in realtime.columns})
         if missing:
             raise RuntimeError(f'missing columns: {missing}')
-        rows=[]
-        for _,r in realtime.iterrows():
-            code=_industry_code(r.get('指数代码'))
-            name=str(r.get('指数名称') or '').strip()
+        rows = []
+        for _, r in realtime.iterrows():
+            code = _industry_code(r.get('指数代码'))
+            name = str(r.get('指数名称') or '').strip()
             if code and name:
-                rows.append({'industry_code':code,'industry_name':name,'declared_components':0})
-        if len(rows)<25:
+                rows.append({'industry_code': code, 'industry_name': name, 'declared_components': 0})
+        if len(rows) < 25:
             raise RuntimeError(f'too few SW L1 industries: {len(rows)}')
-        return rows,{'source':'sws-realtime-fallback','errors':errors}
+        return rows, {'source': 'sws-realtime-fallback', 'errors': errors}
     except Exception as exc:
         errors.append(f'sws={type(exc).__name__}: {exc}')
-        raise RuntimeError('SW L1 directory unavailable; '+' | '.join(errors)) from exc
+        raise RuntimeError('SW L1 directory unavailable; ' + ' | '.join(errors)) from exc
+
+
+def _load_industry_histories(ak, catalog: list[dict], trade_date: str) -> tuple[dict[str, dict], list[dict]]:
+    metrics = {}
+    failures = []
+    for row in catalog:
+        code = row['industry_code']
+        name = row['industry_name']
+        try:
+            frame = _bounded_retry(
+                f'SW index history {code}',
+                lambda c=code: ak.index_hist_sw(symbol=c, period='day'),
+                attempts=2,
+                timeout_seconds=20,
+                delay_seconds=1.0,
+            )
+            metrics[code] = _history_metric(frame, code, name, trade_date)
+        except Exception as exc:
+            failures.append({'industry_code': code, 'industry_name': name, 'error': f'{type(exc).__name__}: {exc}'})
+    if len(metrics) < max(25, len(catalog) - 2):
+        raise RuntimeError(
+            f'Shenwan per-index history incomplete industries={len(metrics)}/{len(catalog)} failures={len(failures)}'
+        )
+    # Any rare missing industry gets a neutral score rather than silently looking weak.
+    scored = _score_industries(metrics)
+    for row in catalog:
+        code = row['industry_code']
+        if code not in scored:
+            scored[code] = {
+                'industry_code': code,
+                'industry_name': row['industry_name'],
+                'asof': None,
+                'r20': None,
+                'r60': None,
+                'day_pct': None,
+                'amount_activity': None,
+                'turnover_pct': None,
+                'pe': None,
+                'pb': None,
+                'industry_score': 50.0,
+                'score_components': {
+                    'r20_rank': None, 'r60_rank': None, 'day_rank': None, 'activity_rank': None,
+                },
+            }
+    return scored, failures
 
 
 def load_sw_l1_snapshot(trade_date: str) -> dict:
     import akshare as ak
-    td=date.fromisoformat(trade_date)
-    catalog,catalog_meta=_load_l1_catalog(ak)
-    analysis=_load_daily_analysis_chunked(ak,td)
-    industries=build_industry_scores(analysis,trade_date)
-    latest_asof=max((x.get('asof') or '' for x in industries.values()),default='')
-    if len(industries)<25 or latest_asof!=trade_date:
-        raise RuntimeError(
-            f'Shenwan industry analysis incomplete industries={len(industries)} latest={latest_asof} trade_date={trade_date}'
-        )
 
-    stock_map={}
-    failures=[]
-    duplicate_assignments={}
-    component_rows_mainboard=0
-    successful_declared=0
+    # Parse eagerly so malformed dates fail before any provider calls.
+    date.fromisoformat(trade_date)
+    catalog, catalog_meta = _load_l1_catalog(ak)
+    industries, history_failures = _load_industry_histories(ak, catalog, trade_date)
+
+    stock_map = {}
+    component_failures = []
+    duplicate_assignments = {}
+    component_rows_mainboard = 0
+    successful_declared = 0
     for row in catalog:
-        idx=row['industry_code']
-        name=row['industry_name']
+        idx = row['industry_code']
+        name = row['industry_name']
         try:
-            df=bounded_call(25,lambda i=idx:ak.index_component_sw(symbol=i),f'SW component {idx}')
+            df = bounded_call(25, lambda i=idx: ak.index_component_sw(symbol=i), f'SW component {idx}')
             successful_declared += int(row.get('declared_components') or 0)
-            for _,r in df.iterrows():
-                code=_stock_code(r.get('证券代码'))
+            for _, r in df.iterrows():
+                code = _stock_code(r.get('证券代码'))
                 if not _is_mainboard(code):
                     continue
                 component_rows_mainboard += 1
-                included=str(r.get('计入日期') or '')[:10]
-                if included and included!='NaT' and included>trade_date:
+                included = str(r.get('计入日期') or '')[:10]
+                if included and included != 'NaT' and included > trade_date:
                     continue
-                _assign_membership(stock_map,duplicate_assignments,code,{
-                    'industry_code':idx,
-                    'industry_name':name,
-                    'included_date':included if included and included!='NaT' else None,
-                    'industry_score':industries.get(idx,{}).get('industry_score'),
+                _assign_membership(stock_map, duplicate_assignments, code, {
+                    'industry_code': idx,
+                    'industry_name': name,
+                    'included_date': included if included and included != 'NaT' else None,
+                    'industry_score': industries.get(idx, {}).get('industry_score', 50.0),
                 })
         except Exception as exc:
-            failures.append({'industry_code':idx,'industry_name':name,'error':f'{type(exc).__name__}: {exc}'})
+            component_failures.append({
+                'industry_code': idx, 'industry_name': name, 'error': f'{type(exc).__name__}: {exc}'
+            })
 
-    duplicate_limit=max(10,int(max(1,len(stock_map))*0.005))
-    if len(stock_map)<2500 or len(failures)>2 or len(duplicate_assignments)>duplicate_limit:
+    duplicate_limit = max(10, int(max(1, len(stock_map)) * 0.005))
+    if len(stock_map) < 2500 or len(component_failures) > 2 or len(duplicate_assignments) > duplicate_limit:
         raise RuntimeError(
             f'Shenwan industry snapshot incomplete industries={len(industries)} stocks={len(stock_map)} '
-            f'failures={len(failures)} cross_industry_duplicates={len(duplicate_assignments)}'
+            f'component_failures={len(component_failures)} history_failures={len(history_failures)} '
+            f'cross_industry_duplicates={len(duplicate_assignments)}'
         )
+
     return {
-        'trade_date':trade_date,
-        'taxonomy':'Shenwan L1',
-        'industries':industries,
-        'stock_map':stock_map,
-        'counts':{
-            'industries':len(industries),
-            'mainboard_stocks':len(stock_map),
-            'component_rows_mainboard':component_rows_mainboard,
-            'duplicate_cross_industry_stocks':len(duplicate_assignments),
-            'component_failures':len(failures),
+        'trade_date': trade_date,
+        'taxonomy': 'Shenwan L1',
+        'industries': industries,
+        'stock_map': stock_map,
+        'counts': {
+            'industries': len(industries),
+            'mainboard_stocks': len(stock_map),
+            'component_rows_mainboard': component_rows_mainboard,
+            'duplicate_cross_industry_stocks': len(duplicate_assignments),
+            'component_failures': len(component_failures),
+            'history_failures': len(history_failures),
         },
-        'source':{
-            'catalog':catalog_meta,
-            'analysis':'sws-index-analysis-daily-chunked-backward-140d-35d',
-            'components':'sws-index-component',
-            'successful_declared_components':successful_declared,
-            'unique_vs_declared_ratio':round(len(stock_map)/successful_declared,4) if successful_declared else None,
-            'duplicate_sample':list(duplicate_assignments.values())[:10],
-            'failure_sample':failures[:2],
+        'source': {
+            'catalog': catalog_meta,
+            'analysis': 'sws-per-index-history-day; r20/r60/day + relative-20d-amount activity',
+            'components': 'sws-index-component',
+            'successful_declared_components': successful_declared,
+            'unique_vs_declared_ratio': round(len(stock_map) / successful_declared, 4) if successful_declared else None,
+            'history_failure_sample': history_failures[:2],
+            'duplicate_sample': list(duplicate_assignments.values())[:10],
+            'failure_sample': component_failures[:2],
         },
     }
