@@ -45,7 +45,6 @@ jobs:
           git fetch origin main
           git checkout origin/main -- web/d/data.json web/e/data.json
 
-      # V2 shadow sync explicitly dispatches this workflow after updating main/web/v2/data.json.
       - name: 准备 GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -55,4 +54,33 @@ jobs:
           path: web
 
       - name: 发布网页
+        id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: 公网验收 V2 数据与本次发布完全一致
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected"
+          for i in $(seq 1 12); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
+              actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
+              echo "attempt=$i actual_sha256=$actual"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
+          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
+          for fund_id in 'ABCDL':
+              m=live['funds'][fund_id]['metrics']
+              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "公网 V2 数据与本次发布文件不一致，禁止把本次部署判定为成功。"
+          exit 1
