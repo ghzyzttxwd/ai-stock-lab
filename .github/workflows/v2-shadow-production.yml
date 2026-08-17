@@ -15,8 +15,10 @@ on:
 permissions:
   contents: write
 
+# Production no longer waits behind the old diagnostic/smoke workflows. It only fetches
+# the small execution-bar set before attempting the heavier decision snapshot.
 concurrency:
-  group: v2-snapshot-smoke
+  group: v2-shadow-production
   cancel-in-progress: false
 
 jobs:
@@ -56,12 +58,24 @@ jobs:
           echo "date=$TD" >> "$GITHUB_OUTPUT"
           echo "trade_date=$TD"
 
-      - name: Skip provider calls when session is already audited
+      - name: Skip provider calls when full session is already audited
         id: guard
         run: |
           python -m engine_v2.shadow_guard \
             --state-root shadow_state/v2 \
             --trade-date "${{ steps.td.outputs.date }}" \
+            --report /tmp/v2-shadow-run.json
+
+      - name: Assert isolated branch checkout
+        shell: bash
+        run: test "$(git branch --show-current)" = "v2-shadow"
+
+      - name: Execute previous-session pending targets first
+        if: steps.guard.outputs.done != 'true'
+        run: |
+          python -m engine_v2.execution_catchup \
+            --date "${{ steps.td.outputs.date }}" \
+            --state-root shadow_state/v2 \
             --report /tmp/v2-shadow-run.json
 
       - name: Restore bounded Tencent history cache
@@ -73,11 +87,7 @@ jobs:
           restore-keys: |
             v2-history-${{ runner.os }}-
 
-      - name: Assert isolated branch checkout
-        shell: bash
-        run: test "$(git branch --show-current)" = "v2-shadow"
-
-      - name: Build resilient market snapshot
+      - name: Build resilient market snapshot for new decisions
         id: snapshot
         if: steps.guard.outputs.done != 'true'
         continue-on-error: true
@@ -90,20 +100,12 @@ jobs:
           V2_HISTORY_WORKERS: '3'
         run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
 
-      - name: Advance five isolated shadow ledgers
+      - name: Complete close valuation and build next-session targets
         if: steps.guard.outputs.done != 'true' && steps.snapshot.outcome == 'success'
         run: |
           python -m engine_v2.shadow_run \
             --snapshot /tmp/v2-normalized-snapshot.json \
             --enriched /tmp/v2-enriched-candidates.json \
-            --state-root shadow_state/v2 \
-            --report /tmp/v2-shadow-run.json
-
-      - name: Catch up previous-session executions if decision snapshot failed
-        if: steps.guard.outputs.done != 'true' && steps.snapshot.outcome == 'failure'
-        run: |
-          python -m engine_v2.execution_catchup \
-            --date "${{ steps.td.outputs.date }}" \
             --state-root shadow_state/v2 \
             --report /tmp/v2-shadow-run.json
 
