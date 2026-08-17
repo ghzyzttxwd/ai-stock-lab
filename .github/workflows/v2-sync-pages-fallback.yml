@@ -1,0 +1,63 @@
+name: Sync V2 Pages fallback
+
+on:
+  push:
+    branches:
+      - v2-shadow
+    paths:
+      - 'web/v2/data.json'
+      - '.github/workflows/v2-sync-pages-fallback.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v2-sync-pages-fallback
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout V2 shadow branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+
+      - name: Validate V2 fallback source
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('web/v2/data.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data.get('summary_version') == 'v2-shadow-summary-1.1'
+          assert data.get('mode') == 'FORWARD_SHADOW_ONLY'
+          assert set(data.get('funds', {})) == {'A', 'B', 'C', 'D', 'L'}
+          print('updated_at=', data.get('updated_at'))
+          for fund_id in 'ABCDL':
+              metrics = data['funds'][fund_id].get('metrics', {})
+              print(fund_id, 'equity=', metrics.get('equity'), 'return_pct=', metrics.get('return_pct'), 'positions=', metrics.get('positions'))
+          PY
+
+      - name: Sync exact V2 data into Pages fallback
+        shell: bash
+        run: |
+          cp web/v2/data.json /tmp/v2-data.json
+          git fetch origin main
+          git checkout -B main origin/main
+          cp /tmp/v2-data.json web/v2/data.json
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add web/v2/data.json
+          if git diff --cached --quiet; then
+            echo "Pages fallback already matches V2 shadow data."
+            exit 0
+          fi
+          git commit -m "v2-data: sync Pages fallback"
+          git pull --rebase origin main
+          git push origin HEAD:main
