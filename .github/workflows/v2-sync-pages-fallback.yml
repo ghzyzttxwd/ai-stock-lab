@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: v2-sync-pages-fallback
@@ -56,8 +57,13 @@ jobs:
           git add web/v2/data.json
           if git diff --cached --quiet; then
             echo "Pages fallback already matches V2 shadow data."
-            exit 0
+          else
+            git commit -m "v2-data: sync Pages fallback"
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi
-          git commit -m "v2-data: sync Pages fallback"
-          git pull --rebase origin main
-          git push origin HEAD:main
+
+      - name: Explicitly publish latest main to GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run auto-deploy.yml --ref main
