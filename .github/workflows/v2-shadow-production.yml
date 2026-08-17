@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 # Catch-up is persisted before slow providers, so a newer production run may safely replace stale snapshot work.
 concurrency:
@@ -152,6 +153,9 @@ jobs:
                   state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
                   if state.get('initial_cash') != 1_000_000 or state.get('last_processed_date') != report.get('trade_date'):
                       raise SystemExit(f'{fund_id} daily state mismatch')
+                  pending=state.get('pending_decision') or {}
+                  if pending.get('decision_date') != report.get('trade_date') or not pending.get('targets'):
+                      raise SystemExit(f'{fund_id} next-session decision missing')
           elif status in ('execution_caught_up','already_execution_caught_up'):
               if safety.get('generates_new_targets'):
                   raise SystemExit('execution catch-up unexpectedly generated targets')
@@ -180,6 +184,33 @@ jobs:
           git diff --cached --quiet || git commit -m "v2-data: complete daily shadow run"
           git pull --rebase origin v2-shadow
           git push origin HEAD:v2-shadow
+
+      - name: Sync V2 snapshot to Pages and require terminal verification
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v2_sha="$(git rev-parse HEAD)"
+          echo "dispatching verified Pages sync for v2_sha=$v2_sha"
+          gh workflow run 336283049 --ref v2-shadow
+
+          run_id=""
+          for i in $(seq 1 30); do
+            run_id="$(gh run list --workflow 336283049 --branch v2-shadow --event workflow_dispatch --limit 20 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$v2_sha\") | .databaseId" | head -n 1)"
+            if [ -n "$run_id" ]; then
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$run_id" ]; then
+            echo "Could not locate verified Pages sync run for v2_sha=$v2_sha"
+            exit 1
+          fi
+          echo "v2_pages_sync_run_id=$run_id"
+          gh run watch "$run_id" --exit-status
+          echo "V2 Pages sync and public verification completed successfully."
 
       - name: Upload reproducibility artifacts
         if: always()
