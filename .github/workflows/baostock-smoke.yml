@@ -1,0 +1,82 @@
+name: Baostock full-market smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/baostock-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Verify Baostock universe and same-day daily bars
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, time
+          import baostock as bs
+          from pathlib import Path
+
+          trade_date = '2026-08-17'
+          lg = bs.login()
+          if lg.error_code != '0':
+              raise SystemExit(f'baostock login failed: {lg.error_code} {lg.error_msg}')
+          try:
+              rs = bs.query_all_stock(day=trade_date)
+              if rs.error_code != '0':
+                  raise SystemExit(f'query_all_stock failed: {rs.error_code} {rs.error_msg}')
+              universe=[]
+              while rs.next():
+                  row=rs.get_row_data()
+                  item=dict(zip(rs.fields,row))
+                  code=item.get('code','')
+                  if code.startswith(('sh.600','sh.601','sh.603','sh.605','sz.000','sz.001','sz.002','sz.003')):
+                      universe.append(code)
+              if len(universe) < 1500:
+                  raise SystemExit(f'suspiciously small main-board universe: {len(universe)}')
+
+              fields='date,code,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,peTTM,pbMRQ,isST'
+              rows=[]; errors=[]; t0=time.time()
+              for i, code in enumerate(universe,1):
+                  q=bs.query_history_k_data_plus(code, fields, start_date=trade_date, end_date=trade_date, frequency='d', adjustflag='3')
+                  if q.error_code != '0':
+                      errors.append((code,q.error_code,q.error_msg))
+                      continue
+                  while q.next():
+                      item=dict(zip(q.fields,q.get_row_data()))
+                      if item.get('date') == trade_date:
+                          rows.append(item)
+                  if i % 300 == 0:
+                      print(f'[baostock] progress={i}/{len(universe)} rows={len(rows)} errors={len(errors)} elapsed={time.time()-t0:.1f}s')
+
+              tradable=[r for r in rows if r.get('tradestatus') == '1' and r.get('close') not in ('','0','0.0')]
+              report={
+                  'trade_date':trade_date,
+                  'universe':len(universe),
+                  'daily_rows':len(rows),
+                  'tradable_rows':len(tradable),
+                  'errors':len(errors),
+                  'elapsed_sec':round(time.time()-t0,2),
+                  'sample':tradable[:3],
+              }
+              print(json.dumps(report,ensure_ascii=False,indent=2))
+              Path('/tmp/baostock-smoke.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+              if len(tradable) < 1400:
+                  raise SystemExit(f'Baostock same-day coverage too low: {len(tradable)}/{len(universe)}')
+              if len(errors) > 20:
+                  raise SystemExit(f'Baostock error count too high: {len(errors)}')
+          finally:
+              bs.logout()
+          PY
