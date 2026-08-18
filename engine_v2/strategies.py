@@ -26,7 +26,23 @@ def _drawdown_brake(exposure: float, fund_drawdown: float) -> float:
 
 
 def _exposure(regime: MarketRegime, table: dict[str, float], fund_drawdown: float) -> float:
-    return _drawdown_brake(table.get(regime.label, table.get("neutral", 0.5)), fund_drawdown)
+    """Map market regime to exposure without a hard neutral/risk-on cliff.
+
+    The regime classifier flips from neutral to risk_on at score 64. Previously that
+    single threshold could jump a fund from its neutral exposure straight to the full
+    risk-on exposure. Blend continuously between the two tables from score 58 to 70,
+    so a borderline strong market increases risk gradually instead of in one step.
+    Risk-off and panic-rebound behaviour is intentionally unchanged.
+    """
+    if regime.label in {"neutral", "risk_on"}:
+        neutral = float(table.get("neutral", 0.5))
+        risk_on = float(table.get("risk_on", neutral))
+        score = float(regime.score)
+        blend = max(0.0, min(1.0, (score - 58.0) / 12.0))
+        base = neutral + (risk_on - neutral) * blend
+    else:
+        base = float(table.get(regime.label, table.get("neutral", 0.5)))
+    return _drawdown_brake(base, fund_drawdown)
 
 
 def _decorate(candidate: dict, score: float, thesis: str, invalidation: str) -> dict:
