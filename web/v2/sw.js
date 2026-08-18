@@ -1,4 +1,4 @@
-const CACHE = 'v2-shadow-mobile-v1';
+const CACHE = 'v2-shadow-mobile-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -25,4 +25,3 @@ self.addEventListener('fetch', event => {
       .catch(() => caches.match(event.request)),
   );
 });
-
