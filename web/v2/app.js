@@ -157,6 +157,17 @@ function rankCards(data, activeId) {
     <div class="rank-card ${fund.fund_id === activeId ? 'active' : ''}"><button data-fund="${fund.fund_id}"><small>#${index + 1} · ${fund.fund_id}</small><b>${esc(FUND_SHORT[fund.fund_id])}</b><span class="${tone(fund.metrics.return_pct)}">${pct(fund.metrics.return_pct)}</span><div class="mini">${money(fund.metrics.equity)}</div></button></div>`).join('');
 }
 
+function benchmarkSection(data, metrics) {
+  const benchmark = data.benchmark || {};
+  if (benchmark.return_pct == null) {
+    return `<section class="section"><h2>沪深300对比</h2><div class="card"><b>基准暂不可用</b><div class="mini">本次沪深300指数数据未成功取得，不用旧数据冒充。</div></div></section>`;
+  }
+  const excess = metrics.excess_hs300_pct == null
+    ? Number(metrics.return_pct || 0) - Number(benchmark.return_pct)
+    : Number(metrics.excess_hs300_pct);
+  return `<section class="section"><h2>跑赢大盘了吗</h2><div class="market-grid"><div class="card"><span class="label">本基金累计</span><div class="market-score ${tone(metrics.return_pct)}">${pct(metrics.return_pct)}</div></div><div class="card"><span class="label">沪深300同期</span><div class="market-score ${tone(benchmark.return_pct)}">${pct(benchmark.return_pct)}</div></div></div><div class="card" style="margin-top:8px"><span class="label">跑赢沪深300</span><div class="market-score ${tone(excess)}">${pct(excess)}</div><div class="mini">同一统计区间 ${esc(benchmark.start_date || '')} → ${esc(benchmark.end_date || data.updated_at || '')}</div></div></section>`;
+}
+
 function render(data, sourceLabel, activeId) {
   const fund = data.funds[activeId] || data.funds.A;
   const metrics = fund.metrics || {};
@@ -180,6 +191,7 @@ function render(data, sourceLabel, activeId) {
           <div class="stat"><span class="label">交易日</span><b>${number(metrics.trading_days)}</b></div>
         </div>
       </section>
+      ${benchmarkSection(data, metrics)}
       <section class="section"><h2>市场与风控</h2><div class="market-grid"><div class="card"><span class="label">市场状态</span><div class="market-score">${esc(regime(data.regime?.label))}</div><div class="mini">强度 ${number(data.regime?.score)} · 置信 ${number(data.regime?.confidence)}</div></div><div class="card"><span class="label">执行统计</span><div class="market-score">${number(metrics.fills)} / ${number(metrics.rejected_orders)}</div><div class="mini">成交 / 拒单 · 费用 ${money(metrics.fees)}</div></div></div></section>
       <section class="section"><h2>行业集中</h2>${concentrationCard(fund)}</section>
       <section class="section"><h2>当前持仓 · ${number(metrics.positions)} 只</h2>${holdingRows(fund)}</section>
