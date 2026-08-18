@@ -72,18 +72,62 @@ function holdingRows(fund) {
     </div>`).join('');
 }
 
+function currentWeightPct(fund, holding) {
+  if (!holding) return 0;
+  if (holding.weight_pct != null && Number.isFinite(Number(holding.weight_pct))) return Number(holding.weight_pct);
+  const equity = Number(fund.metrics?.equity || 0);
+  return equity > 0 ? Number(holding.market_value || 0) / equity * 100 : 0;
+}
+
+function plannedAction(currentPct, targetPct) {
+  const epsilon = 0.05;
+  const delta = targetPct - currentPct;
+  if (currentPct > epsilon && targetPct <= epsilon) return { label: '卖出 · 清仓', tone: 'negative' };
+  if (currentPct <= epsilon && targetPct > epsilon) return { label: '买入 · 新开仓', tone: 'positive' };
+  if (delta > epsilon) return { label: '买入 · 加仓', tone: 'positive' };
+  if (delta < -epsilon) return { label: '卖出 · 减仓', tone: 'negative' };
+  return { label: '不变 · 持有', tone: '' };
+}
+
+function pendingPlanItems(fund) {
+  const targets = fund.pending_decision?.targets || [];
+  if (!targets.length) return [];
+  const holdings = fund.holdings || [];
+  const holdingBySymbol = new Map(holdings.map(item => [item.symbol, item]));
+  const targetSymbols = new Set(targets.map(item => item.symbol));
+  const plans = targets.map(item => {
+    const holding = holdingBySymbol.get(item.symbol);
+    const currentPct = currentWeightPct(fund, holding);
+    const targetPct = Number(item.target_weight || 0) * 100;
+    return { ...item, currentPct, targetPct, ...plannedAction(currentPct, targetPct), isExit: false };
+  });
+  holdings.filter(item => !targetSymbols.has(item.symbol)).forEach(item => {
+    const currentPct = currentWeightPct(fund, item);
+    plans.push({
+      ...item,
+      currentPct,
+      targetPct: 0,
+      v2_score: null,
+      label: '卖出 · 清仓',
+      tone: 'negative',
+      isExit: true,
+    });
+  });
+  return plans;
+}
+
 function pendingRows(fund) {
-  const pending = fund.pending_decision || {};
-  const targets = pending.targets || [];
-  if (!targets.length) return '<div class="card empty">下一交易日暂无待执行目标。</div>';
-  return targets.map(item => `
+  const plans = pendingPlanItems(fund);
+  if (!plans.length) return '<div class="card empty">下一交易日暂无待执行目标。</div>';
+  return plans.map(item => `
     <div class="card">
       <div class="row">
         <div class="row-main"><b>${esc(item.name || item.symbol)}</b><div class="mini">${esc(item.symbol)} · ${esc(item.industry || '未分类')}</div></div>
-        <div class="row-side"><span class="tag">目标 ${(Number(item.target_weight) * 100).toFixed(1)}%</span><div class="mini">评分 ${number(item.v2_score)}</div></div>
+        <div class="row-side"><b class="${item.tone}">${esc(item.label)}</b><div class="mini">当前 ${Number(item.currentPct || 0).toFixed(1)}% → 目标 ${Number(item.targetPct || 0).toFixed(1)}%</div></div>
       </div>
-      <div class="reason">${esc(item.thesis || '按 V2 规则生成的目标仓位')}</div>
-      ${item.invalidation ? `<div class="mini">失效条件：${esc(item.invalidation)}</div>` : ''}
+      <div class="reason">${esc(item.isExit ? '未进入本次目标组合，下一交易日计划将目标仓位降至 0%。' : (item.thesis || '按 V2 规则生成的目标仓位'))}</div>
+      ${item.v2_score == null ? '' : `<div class="mini">评分 ${number(item.v2_score)}</div>`}
+      ${item.invalidation && !item.isExit ? `<div class="mini">失效条件：${esc(item.invalidation)}</div>` : ''}
     </div>`).join('');
 }
 
@@ -118,6 +162,7 @@ function render(data, sourceLabel, activeId) {
   const metrics = fund.metrics || {};
   const positionPct = metrics.equity > 0 ? Number(metrics.position_market_value || 0) / Number(metrics.equity) * 100 : 0;
   const flags = fund.concentration_flags || [];
+  const pendingPlans = pendingPlanItems(fund);
   document.querySelector('#app').innerHTML = `
     <div class="shell">
       <header class="top"><div><div class="eyebrow">EXPERIMENTAL PORTFOLIO</div><div class="brand">V2 影子基金竞技场</div><div class="updated">更新 ${esc(data.updated_at)} · 行情 ${esc(marketSource(data))} · 每只初始 ${money(data.initial_cash_per_fund)}</div></div><span class="live-dot" aria-label="数据可用"></span></header>
@@ -138,7 +183,7 @@ function render(data, sourceLabel, activeId) {
       <section class="section"><h2>市场与风控</h2><div class="market-grid"><div class="card"><span class="label">市场状态</span><div class="market-score">${esc(regime(data.regime?.label))}</div><div class="mini">强度 ${number(data.regime?.score)} · 置信 ${number(data.regime?.confidence)}</div></div><div class="card"><span class="label">执行统计</span><div class="market-score">${number(metrics.fills)} / ${number(metrics.rejected_orders)}</div><div class="mini">成交 / 拒单 · 费用 ${money(metrics.fees)}</div></div></div></section>
       <section class="section"><h2>行业集中</h2>${concentrationCard(fund)}</section>
       <section class="section"><h2>当前持仓 · ${number(metrics.positions)} 只</h2>${holdingRows(fund)}</section>
-      <section class="section"><h2>待执行目标 · ${(fund.pending_decision?.targets || []).length} 只</h2><div class="card mini">决策日 ${esc(fund.pending_decision?.decision_date || '暂无')} · 仅在下一交易日开盘按规则模拟执行，不代表已经成交。</div>${pendingRows(fund)}</section>
+      <section class="section"><h2>待执行动作 · ${pendingPlans.length} 项</h2><div class="card mini">决策日 ${esc(fund.pending_decision?.decision_date || '暂无')} · 下面明确标注买入、卖出、加仓、减仓或清仓；仅在下一交易日开盘按规则模拟执行，不代表已经成交。</div>${pendingRows(fund)}</section>
       <section class="section"><h2>成交与拒单</h2><details class="card" ${metrics.fills ? 'open' : ''}><summary>最近成交 · ${number(metrics.fills)} 笔</summary><div class="detail-body">${eventRows(fund.recent_fills, 'fill')}</div></details><details class="card" ${flags.length || metrics.rejected_orders ? 'open' : ''}><summary>最近拒单 · ${number(metrics.rejected_orders)} 笔</summary><div class="detail-body">${eventRows(fund.recent_rejected_orders, 'reject')}</div></details></section>
       <div class="source-note">数据源：<b>${esc(sourceLabel)}</b>，固定读取 <code>v2-shadow/shadow_state/v2/summary.json</code>；备用文件为本目录 <code>data.json</code>。页面没有写入接口。</div>
     </div>
@@ -159,4 +204,3 @@ loadSummary().then(({ data, source }) => {
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-
