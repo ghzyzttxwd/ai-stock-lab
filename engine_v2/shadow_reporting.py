@@ -193,13 +193,60 @@ def build_summary(state_root: Path) -> dict:
     return summary
 
 
+def attach_hs300_benchmark(summary: dict) -> dict:
+    trade_date = str(summary.get('updated_at') or '')[:10]
+    starts = []
+    for fund in (summary.get('funds') or {}).values():
+        curve = list(fund.get('equity_curve') or [])
+        if curve:
+            start = str(curve[0].get('date') or '')[:10]
+            if start:
+                starts.append(start)
+    start_date = min(starts) if starts else trade_date
+    benchmark = {
+        'name': '沪深300',
+        'symbol': 'sh000300',
+        'start_date': start_date,
+        'end_date': trade_date,
+        'return_pct': None,
+        'source': 'tencent-index',
+        'status': 'UNAVAILABLE',
+    }
+    try:
+        from engine.real_market import AKShareMarket
+        rows = AKShareMarket().benchmarks(start_date, trade_date)
+        item = next((x for x in rows if x.get('symbol') == 'sh000300' or x.get('name') == '沪深300'), None)
+        if not item or item.get('return_pct') is None:
+            raise RuntimeError('沪深300同期收益未返回')
+        benchmark.update(item)
+        benchmark.update({
+            'start_date': start_date,
+            'end_date': trade_date,
+            'source': 'tencent-index',
+            'status': 'OK',
+        })
+    except Exception as exc:
+        benchmark['error'] = str(exc)[:240]
+
+    summary['benchmark'] = benchmark
+    benchmark_return = benchmark.get('return_pct')
+    for fund in (summary.get('funds') or {}).values():
+        metrics = fund.get('metrics') or {}
+        fund_return = metrics.get('return_pct')
+        metrics['excess_hs300_pct'] = (
+            round(float(fund_return) - float(benchmark_return), 4)
+            if fund_return is not None and benchmark_return is not None else None
+        )
+    return summary
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--state-root', default='shadow_state/v2')
     parser.add_argument('--output', default='shadow_state/v2/summary.json')
     parser.add_argument('--web-output', help='Optional same-origin fallback snapshot for the V2 page')
     args = parser.parse_args()
-    summary = build_summary(Path(args.state_root))
+    summary = attach_hs300_benchmark(build_summary(Path(args.state_root)))
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
@@ -211,6 +258,7 @@ def main() -> None:
     print(json.dumps({
         'updated_at': summary['updated_at'],
         'audit_head': summary['audit_head'],
+        'benchmark': summary.get('benchmark'),
         'fund_metrics': {key: value['metrics'] for key, value in summary['funds'].items()},
         'safety': summary['safety'],
     }, ensure_ascii=False, indent=2))
