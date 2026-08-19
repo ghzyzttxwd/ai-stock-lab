@@ -2,6 +2,10 @@ name: V2 15:10 conditional-plan settlement (isolated)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'shadow_state/v2/.evening-trigger'
   schedule:
     - cron: '10 7 * * 1-5'  # 15:10 Beijing primary
     - cron: '20 7 * * 1-5'  # 15:20 Beijing retry
@@ -96,7 +100,6 @@ jobs:
           git diff --quiet -- state web/d web/e
           python - <<'PY'
           import json
-          from pathlib import Path
           web=json.load(open('web/v2/data.json',encoding='utf-8'))
           if web.get('summary_version') != 'v2-shadow-summary-1.2':
               raise SystemExit('V2 web summary schema mismatch')
