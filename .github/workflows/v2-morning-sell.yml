@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: v2-morning-sell
@@ -21,7 +23,9 @@ concurrency:
 jobs:
   morning-sell:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,6 +64,7 @@ jobs:
       - name: Assert V2 isolation
         shell: bash
         run: |
+          set -euo pipefail
           git diff --quiet -- state web/d web/e
           python - <<'PY'
           import json
@@ -72,16 +77,101 @@ jobs:
       - name: Persist only isolated V2 morning state
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
           if git diff --cached --quiet; then
             echo "No V2 morning state change."
           else
-            git commit -m "v2-data: 09:40 sell and intraday valuation"
+            git commit -m "v2-data: morning sell and intraday valuation"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
+      - name: Sync latest V2 web data into main and verify hash
+        id: sync_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp web/v2/data.json /tmp/v2-data.json
+          expected="$(sha256sum /tmp/v2-data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
+          rm -rf /tmp/main-sync
+          git fetch origin main
+          git worktree add --detach /tmp/main-sync origin/main
+          cd /tmp/main-sync
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+
+          synced=0
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/v2-data.json web/v2/data.json
+            git add web/v2/data.json
+            if git diff --cached --quiet; then
+              echo "main already contains the latest V2 web data."
+              synced=1
+              break
+            fi
+            git commit -m "v2-data: sync morning web data to main"
+            if git push origin HEAD:main; then
+              synced=1
+              break
+            fi
+            echo "main advanced during sync; retrying from latest origin/main"
+          done
+          if [ "$synced" != "1" ]; then
+            echo "Failed to sync V2 web data into main after retries."
+            exit 1
+          fi
+
+          git fetch origin main
+          actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
+          echo "main_sha256=$actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "main V2 data hash mismatch; refusing to continue to Pages deployment."
+            exit 1
+          fi
+
+          git reset --hard origin/main
+          cp /tmp/v2-data.json web/v2/data.json
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Package current main web with latest V2 data
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/main-sync/web
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify public V2 data equals morning result
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ steps.sync_main.outputs.expected_sha256 }}"
+          echo "expected_sha256=$expected"
+          for i in $(seq 1 18); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
+              actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
+              echo "attempt=$i actual_sha256=$actual"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
+          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
+          for fund_id in 'ABCDL':
+              m=live['funds'][fund_id]['metrics']
+              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public V2 data still differs from the morning result; workflow must fail."
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
