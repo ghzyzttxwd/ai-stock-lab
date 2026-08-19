@@ -9,6 +9,7 @@ from engine_v2.shadow_reporting import build_summary
 ROOT = Path(__file__).resolve().parents[1]
 STATE_ROOT = ROOT / 'shadow_state' / 'v2'
 WEB_ROOT = ROOT / 'web' / 'v2'
+SUMMARY_PATH = STATE_ROOT / 'summary.json'
 
 
 class V2MobileWebTests(unittest.TestCase):
@@ -20,6 +21,13 @@ class V2MobileWebTests(unittest.TestCase):
         self.assertFalse(summary['safety']['calls_sol'])
         self.assertFalse(summary['safety']['reads_v1_ledger'])
         self.assertFalse(summary['safety']['writes_v1_ledger'])
+        if summary.get('audit_event_kind') == 'morning_sell':
+            source_ref = summary.get('source_ref') or {}
+            self.assertEqual(source_ref.get('scheduled_time'), '09:40')
+            self.assertIn(source_ref.get('timing_status'), {'RECORDED', 'LEGACY_ACTUAL_TIME_UNRECORDED'})
+            if source_ref.get('timing_status') == 'LEGACY_ACTUAL_TIME_UNRECORDED':
+                self.assertIsNone(source_ref.get('executed_at'))
+                self.assertIn('not a verified actual execution time', source_ref.get('note') or '')
         for fund_id, fund in summary['funds'].items():
             self.assertEqual(fund['fund_id'], fund_id)
             self.assertIn('equity', fund['metrics'])
@@ -40,8 +48,8 @@ class V2MobileWebTests(unittest.TestCase):
             else:
                 self.assertIn('targets', pending)
 
-    def test_committed_fallback_is_exactly_the_v2_summary(self):
-        expected = build_summary(STATE_ROOT)
+    def test_committed_fallback_is_exactly_the_persisted_v2_summary(self):
+        expected = json.loads(SUMMARY_PATH.read_text(encoding='utf-8'))
         actual = json.loads((WEB_ROOT / 'data.json').read_text(encoding='utf-8'))
         self.assertEqual(actual, expected)
 
