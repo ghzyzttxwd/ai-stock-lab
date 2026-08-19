@@ -46,7 +46,7 @@ jobs:
       - name: 发布前同步最新基金数据
         run: |
           git fetch origin main
-          git checkout origin/main -- web/d/data.json web/e/data.json
+          git checkout origin/main -- web/d/data.json web/e/data.json web/v2/data.json
 
       - name: 准备 GitHub Pages
         uses: actions/configure-pages@v5
@@ -60,60 +60,88 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: 公网验收 V2 数据与本次发布完全一致
-        id: verify_v2
+      - name: 公网验收 V1 与 V2 数据均与本次发布完全一致
+        id: verify_public
         shell: bash
         run: |
           set -euo pipefail
-          expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
-          export EXPECTED_SHA256="$expected"
-          echo "expected_sha256=$expected"
-          for i in $(seq 1 18); do
-            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}"
-            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
-              actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
-              echo "attempt=$i actual_sha256=$actual"
-              if [ "$actual" = "$expected" ]; then
+          expected_d="$(sha256sum web/d/data.json | awk '{print $1}')"
+          expected_v2="$(sha256sum web/v2/data.json | awk '{print $1}')"
+          export EXPECTED_D_SHA256="$expected_d"
+          export EXPECTED_V2_SHA256="$expected_v2"
+          echo "expected_d_sha256=$expected_d"
+          echo "expected_v2_sha256=$expected_v2"
+          for i in $(seq 1 24); do
+            ok=1
+            curl -fsS --connect-timeout 5 --max-time 20 \
+              "https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}" \
+              -o /tmp/live-d-data.json || ok=0
+            curl -fsS --connect-timeout 5 --max-time 20 \
+              "https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}" \
+              -o /tmp/live-v2-data.json || ok=0
+            if [ "$ok" = "1" ]; then
+              actual_d="$(sha256sum /tmp/live-d-data.json | awk '{print $1}')"
+              actual_v2="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
+              echo "attempt=$i d=$actual_d v2=$actual_v2"
+              if [ "$actual_d" = "$expected_d" ] && [ "$actual_v2" = "$expected_v2" ]; then
+                export ACTUAL_D_SHA256="$actual_d"
+                export ACTUAL_V2_SHA256="$actual_v2"
                 python - <<'PY'
-          import hashlib
           import json
           import os
           from datetime import datetime, timezone
 
-          live_path = '/tmp/live-v2-data.json'
-          live = json.load(open(live_path, encoding='utf-8'))
-          raw = open(live_path, 'rb').read()
-          actual = hashlib.sha256(raw).hexdigest()
-          expected = os.environ['EXPECTED_SHA256']
-          if actual != expected:
-              raise SystemExit('verification receipt hash mismatch')
-          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
-          for fund_id in 'ABCDL':
-              m=live['funds'][fund_id]['metrics']
-              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
-          receipt = {
-              'status': 'verified',
-              'source_commit': os.environ['GITHUB_SHA'],
-              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'expected_sha256': expected,
-              'public_sha256': actual,
-              'updated_at': live.get('updated_at'),
-              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-              'public_url': 'https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json',
+          d=json.load(open('/tmp/live-d-data.json',encoding='utf-8'))
+          v2=json.load(open('/tmp/live-v2-data.json',encoding='utf-8'))
+          if d.get('execution_model') != '09:40_SELL_15:10_OPEN_BUY':
+              raise SystemExit(f'public V1 execution model mismatch: {d.get("execution_model")}')
+
+          def walk(obj):
+              if isinstance(obj,dict):
+                  yield obj
+                  for value in obj.values():
+                      yield from walk(value)
+              elif isinstance(obj,list):
+                  for value in obj:
+                      yield from walk(value)
+
+          d_buys=[x for x in walk(d) if x.get('side')=='BUY' and str(x.get('trade_date') or '')[:10]=='2026-08-19']
+          v2_buys=[x for x in walk(v2) if x.get('side')=='BUY' and str(x.get('trade_date') or '')[:10]=='2026-08-19']
+          if any(x.get('execution_price_field') != 'open' for x in d_buys):
+              raise SystemExit('public V1 still exposes a 2026-08-19 BUY not based on open price')
+          if any(x.get('execution_price_field') not in (None,'open') for x in v2_buys):
+              raise SystemExit('public V2 still exposes a 2026-08-19 BUY based on close price')
+          source_ref=v2.get('source_ref') or {}
+          if source_ref.get('correct_buy_reference') != 'session_open':
+              raise SystemExit('public V2 correction marker missing')
+
+          receipt={
+              'status':'verified',
+              'source_commit':os.environ['GITHUB_SHA'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'updated_at':v2.get('updated_at'),
+              'execution_model':'09:40_SELL_15:10_OPEN_BUY',
+              'buy_reference':'session_open',
+              'd_expected_sha256':os.environ['EXPECTED_D_SHA256'],
+              'd_public_sha256':os.environ['ACTUAL_D_SHA256'],
+              'expected_sha256':os.environ['EXPECTED_V2_SHA256'],
+              'public_sha256':os.environ['ACTUAL_V2_SHA256'],
+              'v1_20260819_buy_fills_checked':len(d_buys),
+              'v2_20260819_buy_fills_exposed_checked':len(v2_buys),
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'public_url':'https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json',
           }
-          open('/tmp/v2-pages-verification.json', 'w', encoding='utf-8').write(
-              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
-          )
+          open('/tmp/v2-pages-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
           PY
-                echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
-                echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
+                echo "d_sha256=$actual_d" >> "$GITHUB_OUTPUT"
+                echo "v2_sha256=$actual_v2" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
             sleep 5
           done
-          echo "公网 V2 数据与本次发布文件不一致，禁止把本次部署判定为成功。"
+          echo "公网 V1/V2 数据与本次发布文件不一致，禁止判定成功。"
           exit 1
 
       - name: 持久化公网验收回执
@@ -130,6 +158,6 @@ jobs:
             echo "Verification receipt unchanged."
             exit 0
           fi
-          git commit -m "ops: persist V2 Pages verification receipt"
+          git commit -m "ops: persist V1/V2 Pages verification receipt"
           git pull --rebase origin main
           git push origin HEAD:main
