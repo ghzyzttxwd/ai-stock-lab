@@ -150,6 +150,7 @@ jobs:
             exit 1
           fi
       - name: Verify public V2 data equals morning result
+        id: verify_public
         shell: bash
         run: |
           set -euo pipefail
@@ -169,6 +170,7 @@ jobs:
               m=live['funds'][fund_id]['metrics']
               print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
           PY
+                echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -176,6 +178,65 @@ jobs:
           done
           echo "Public V2 data still differs from the morning result; workflow must fail."
           exit 1
+      - name: Persist V2 morning end-to-end verification receipt
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
+          PUBLIC_SHA256: ${{ steps.verify_public.outputs.actual_sha256 }}
+          TRADE_DATE: ${{ steps.td.outputs.date }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          report=json.load(open('/tmp/v2-morning-sell.json', encoding='utf-8'))
+          expected=os.environ['EXPECTED_SHA256']
+          public=os.environ['PUBLIC_SHA256']
+          if not expected or expected != public:
+              raise SystemExit('morning chain receipt refused: public hash mismatch')
+          receipt={
+              'status': 'verified',
+              'trade_date': os.environ['TRADE_DATE'],
+              'morning_execution_status': report.get('status'),
+              'morning_event_hash': report.get('event_hash'),
+              'scheduled_time': report.get('scheduled_time'),
+              'executed_at': report.get('executed_at'),
+              'expected_sha256': expected,
+              'public_sha256': public,
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-morning-chain-verification.json','w',encoding='utf-8').write(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
+          )
+          PY
+
+          cd /tmp/main-sync
+          pushed=0
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-morning-chain-verification.json state/v2_morning_chain_verification.json
+            git add state/v2_morning_chain_verification.json
+            if git diff --cached --quiet; then
+              echo "Morning verification receipt unchanged."
+              pushed=1
+              break
+            fi
+            git commit -m "ops: persist V2 morning end-to-end receipt"
+            if git push origin HEAD:main; then
+              pushed=1
+              break
+            fi
+          done
+          if [ "$pushed" != "1" ]; then
+            echo "Failed to persist V2 morning verification receipt."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
