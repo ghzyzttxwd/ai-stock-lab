@@ -1,11 +1,11 @@
-name: V2 evening close buy + next decision (isolated)
+name: V2 15:10 open-price buy + next decision (isolated)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '35 10 * * 1-5'  # 18:35 Beijing primary
-    - cron: '5 11 * * 1-5'   # 19:05 Beijing retry
-    - cron: '35 11 * * 1-5'  # 19:35 Beijing final retry
+    - cron: '10 7 * * 1-5'  # 15:10 Beijing primary
+    - cron: '20 7 * * 1-5'  # 15:20 Beijing retry
+    - cron: '30 7 * * 1-5'  # 15:30 Beijing final retry
 
 permissions:
   contents: write
@@ -30,19 +30,18 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run V2 regression tests before accounting
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Resolve latest completed A-share session safely
+      - name: Resolve Beijing trade date for completed session
         id: td
         run: |
           TD=$(python - <<'PY'
           from datetime import datetime
           from zoneinfo import ZoneInfo
-          from engine_v2.data_validation import _safe_requested_date
-          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
+          print(datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat())
           PY
           )
           echo "date=$TD" >> "$GITHUB_OUTPUT"
           echo "trade_date=$TD"
-      - name: Skip provider calls when the daily close is already audited
+      - name: Skip provider calls when the daily session is already audited
         id: guard
         run: |
           python -m engine_v2.shadow_guard \
@@ -66,7 +65,7 @@ jobs:
           V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
           V2_HISTORY_WORKERS: '3'
         run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
-      - name: Settle close BUY/add and build tomorrow targets
+      - name: Settle 15:10 BUY/add at today's open and build tomorrow targets
         if: steps.guard.outputs.done != 'true'
         run: |
           python -m engine_v2.shadow_run_split \
@@ -89,11 +88,11 @@ jobs:
           r=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 evening isolation invariant violated')
+              raise SystemExit('V2 15:10 isolation invariant violated')
           web=json.load(open('web/v2/data.json',encoding='utf-8'))
           if web.get('summary_version') != 'v2-shadow-summary-1.1':
               raise SystemExit('V2 web summary schema mismatch')
-          print('[V2 EVENING]',r.get('status'),r.get('trade_date'),r.get('fills'))
+          print('[V2 15:10]',r.get('status'),r.get('trade_date'),r.get('fills'))
           PY
       - name: Persist only V2 shadow state
         shell: bash
@@ -102,16 +101,16 @@ jobs:
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
           if git diff --cached --quiet; then
-            echo "V2 close already processed or summary unchanged."
+            echo "V2 session already processed or summary unchanged."
           else
-            git commit -m "v2-data: close buy and next-session targets"
+            git commit -m "v2-data: 15:10 open-price buy and next-session targets"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v2-evening-split-${{ steps.td.outputs.date }}
+          name: v2-1510-buy-${{ steps.td.outputs.date }}
           path: |
             /tmp/v2-normalized-snapshot.json
             /tmp/v2-enriched-candidates.json
