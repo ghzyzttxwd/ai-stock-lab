@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from .board_policy import BOARD_POLICY_VERSION, filter_mainboard_candidates, is_retail_buyable_symbol
 from .regime import MarketRegime
 from .strategies import (
     strategy_a_v2,
@@ -101,6 +102,8 @@ def _validate_one(label: str, targets: list[dict], regime: MarketRegime) -> list
         w = float(x.get('target_weight') or 0.0)
         if w <= 0 or w > p['max_weight'] + 1e-6:
             errors.append(f'{_code(x)} weight {w:.4f} outside policy')
+        if not is_retail_buyable_symbol(x.get('symbol') or x.get('code') or x.get('raw_code')):
+            errors.append(f'{_code(x)} violates retail mainboard-only policy')
         if not str(x.get('thesis') or '').strip():
             errors.append(f'{_code(x)} missing thesis')
         if not str(x.get('invalidation') or '').strip():
@@ -143,9 +146,13 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
             'V2 target generation blocked by upstream safety: '
             + str(safety.get('decision_block_reason') or 'not ready')
         )
-    candidates = list(enriched.get('candidates') or [])
+    raw_candidates = list(enriched.get('candidates') or [])
+    candidates, excluded_non_mainboard = filter_mainboard_candidates(raw_candidates)
     if len(candidates) < 100:
-        raise RuntimeError(f'V2 target generation requires >=100 candidates, got {len(candidates)}')
+        raise RuntimeError(
+            f'V2 target generation requires >=100 retail-mainboard candidates, got {len(candidates)} '
+            f'after excluding {len(excluded_non_mainboard)} non-mainboard symbols'
+        )
     regime = _regime(enriched)
     dds = dict(fund_drawdowns or {})
 
@@ -179,6 +186,15 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
             'confidence': regime.confidence,
             'reasons': list(regime.reasons),
         },
+        'board_policy': {
+            'version': BOARD_POLICY_VERSION,
+            'scope': 'SH_SZ_MAINBOARD_ONLY',
+            'excludes': ['CHINEXT_300_301', 'STAR_688_689', 'BSE', 'B_SHARES'],
+            'input_candidates': len(raw_candidates),
+            'eligible_candidates': len(candidates),
+            'excluded_non_mainboard_count': len(excluded_non_mainboard),
+            'excluded_non_mainboard_symbols': excluded_non_mainboard[:50],
+        },
         'fund_drawdowns_used': {k: float(dds.get(k) or 0.0) for k in labels},
         'targets': targets,
         'stats': stats,
@@ -193,6 +209,7 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
             'ready_for_shadow_accounting': False,
             'targets_valid': not bool(all_errors),
             'd_mode': 'deterministic_fallback_only',
+            'board_policy_version': BOARD_POLICY_VERSION,
             'next_required_stage': (
                 'review live target distinctness and execution feasibility; then build separate V2 shadow ledgers'
             ),
@@ -211,6 +228,7 @@ def main() -> None:
     print(json.dumps({
         'trade_date': result['trade_date'],
         'regime': result['regime'],
+        'board_policy': result['board_policy'],
         'stats': result['stats'],
         'overlap_jaccard': result['overlap_jaccard'],
         'high_overlap_pairs': result['high_overlap_pairs'],
