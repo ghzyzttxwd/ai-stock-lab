@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import os
 from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
@@ -8,6 +10,9 @@ from .broker import execute_conditional_sells
 from .daily_run import FUNDS, ROOT, STATE_ROOT
 from .state import load_state, save_state
 from .trading_plan import EXECUTION_MODEL, PLAN_VERSION
+
+
+CHECKPOINTS = {'09:40', '10:30', '11:20', '13:30', '14:30', '14:55'}
 
 
 def _symbol(code: str) -> str:
@@ -28,6 +33,14 @@ def _critical_symbols(states: dict[str, dict]) -> dict[str, str]:
     return out
 
 
+def _positive_quote(value, fallback: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    return number if math.isfinite(number) and number > 0 else fallback
+
+
 def _eastmoney_live_bars(market, critical: dict[str, str]) -> dict[str, dict]:
     frame = market.ak.stock_zh_a_spot_em()
     bars: dict[str, dict] = {}
@@ -42,14 +55,20 @@ def _eastmoney_live_bars(market, critical: dict[str, str]) -> dict[str, dict]:
             previous = float(row.get('昨收') or 0)
         except (TypeError, ValueError):
             continue
-        if last <= 0:
+        if not math.isfinite(last) or last <= 0:
             continue
+        opening = _positive_quote(opening, last)
+        previous = _positive_quote(previous, last)
+        high = max(_positive_quote(row.get('最高'), last), last, opening)
+        low = min(_positive_quote(row.get('最低'), last), last, opening)
         bars[symbol] = {
             'code': symbol,
             'name': str(row.get('名称') or critical.get(symbol) or symbol),
-            'open': opening or last,
+            'open': opening,
+            'high': high,
+            'low': low,
             'close': last,
-            'preclose': previous or last,
+            'preclose': previous,
             'tradestatus': '1',
             'source': 'eastmoney-intraday',
         }
@@ -73,14 +92,20 @@ def _sina_live_bars(market, critical: dict[str, str]) -> dict[str, dict]:
             previous = float(row.get('昨收') or 0)
         except (TypeError, ValueError):
             continue
-        if last <= 0:
+        if not math.isfinite(last) or last <= 0:
             continue
+        opening = _positive_quote(opening, last)
+        previous = _positive_quote(previous, last)
+        high = max(_positive_quote(row.get('最高'), last), last, opening)
+        low = min(_positive_quote(row.get('最低'), last), last, opening)
         bars[symbol] = {
             'code': symbol,
             'name': str(row.get('名称') or critical.get(symbol) or symbol),
-            'open': opening or last,
+            'open': opening,
+            'high': high,
+            'low': low,
             'close': last,
-            'preclose': previous or last,
+            'preclose': previous,
             'tradestatus': '1',
             'source': 'sina-intraday',
         }
@@ -223,12 +248,16 @@ def main() -> None:
     from .real_market import AKShareMarket
 
     now = datetime.now(ZoneInfo('Asia/Shanghai'))
-    if not (dt_time(9, 30) <= now.time() <= dt_time(15, 0)):
+    slot = os.getenv('CONDITIONAL_SCAN_SLOT', '').strip()
+    if slot not in CHECKPOINTS:
+        slot = now.strftime('%H:%M')
+    in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+    final_slot_grace = slot == '14:55' and dt_time(15, 0) < now.time() <= dt_time(15, 5)
+    if not (in_session or final_slot_grace):
         print(f'[conditional-scan] outside A-share session at {now.strftime("%H:%M:%S")}; skip')
         return
     trade_date = now.date().isoformat()
-    clock = now.strftime('%H:%M')
-    scan_key = f'{trade_date}T{clock}'
+    scan_key = f'{trade_date}T{slot}'
     market = AKShareMarket()
     sessions = _calendar_sessions(market)
     if trade_date not in set(sessions):
@@ -246,21 +275,21 @@ def main() -> None:
         if state.get('last_conditional_scan_key') == scan_key:
             print(f'[conditional-scan] {fid} already checked {scan_key}')
             continue
-        fills, checks = execute_conditional_sells(state, bars, trade_date, clock=clock)
+        fills, checks = execute_conditional_sells(state, bars, trade_date, clock=slot)
         state.setdefault('fills', []).extend(fills)
         state['last_conditional_scan_key'] = scan_key
         state['last_conditional_scan_at'] = now.isoformat(timespec='seconds')
         state['execution_model'] = EXECUTION_MODEL
         log=state.setdefault('conditional_scan_log',[])
-        log.append({'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})
+        log.append({'slot':slot,'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})
         if len(log)>30:
             del log[:-30]
         _portfolio_snapshot(state,bars)
         save_state(STATE_ROOT / f'{fid}.json', state)
-        print(f'[conditional-scan] {fid} fills={len(fills)} checks={len(checks)}')
+        print(f'[conditional-scan] {fid} slot={slot} fills={len(fills)} checks={len(checks)}')
 
-    _refresh_public_snapshots(states, bars, source, trade_date, clock)
-    print(f'[conditional-scan] completed {trade_date} {clock} source={source} holdings={len(critical)} bars={len(bars)}')
+    _refresh_public_snapshots(states, bars, source, trade_date, slot)
+    print(f'[conditional-scan] completed {trade_date} slot={slot} actual={now.strftime("%H:%M:%S")} source={source} holdings={len(critical)} bars={len(bars)}')
 
 
 if __name__ == '__main__':
