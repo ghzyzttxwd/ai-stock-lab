@@ -95,6 +95,40 @@ class V2SplitExecutionTests(unittest.TestCase):
         self.assertIn('sh.600000', state['positions'])
         self.assertIn('sh.600001', state['positions'])
 
+    def test_close_buy_hard_blocks_chinext_and_star_even_if_pending_is_injected(self):
+        state = {
+            'fund_id': 'A',
+            'cash': 100000.0,
+            'positions': {},
+            'fills': [],
+            'rejected_orders': [],
+        }
+        symbols = ('sz.300001', 'sz.301001', 'sh.688001', 'sh.689001')
+        pending = {
+            'decision_date': '2026-08-18',
+            'targets': [
+                {'symbol': symbol, 'name': symbol, 'target_weight': 0.2}
+                for symbol in symbols
+            ],
+        }
+        bars = {
+            symbol: {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'}
+            for symbol in symbols
+        }
+        result = execute_pending_side(
+            state, pending, bars, '2026-08-19',
+            side='BUY', price_field='close',
+        )
+        self.assertEqual(result['fills'], [])
+        self.assertEqual(state['positions'], {})
+        self.assertEqual(state['cash'], 100000.0)
+        blocked = [
+            x for x in result['policy_adjustments']
+            if x.get('reason') == 'retail_mainboard_only'
+        ]
+        self.assertEqual({x['symbol'] for x in blocked}, set(symbols))
+        self.assertTrue(all(x['applied_weight'] == 0.0 for x in blocked))
+
     def test_phase_combiner_keeps_both_sides_and_fees(self):
         combined = combine_phase_executions(
             {'phase': 'sell', 'decision_date': '2026-08-18', 'trade_date': '2026-08-19',
