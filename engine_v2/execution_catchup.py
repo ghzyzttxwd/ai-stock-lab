@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .board_policy import sanitize_pending_for_retail
 from .shadow_ledger import (
     AUDIT_SCHEMA_VERSION,
     EXECUTION_POLICY_VERSION,
@@ -119,7 +120,9 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
         pending = state.get('pending_decision')
         if pending:
             if previous_trade_date and str(pending.get('decision_date') or '')[:10] == previous_trade_date:
-                execution = execute_pending(state, pending, bars, trade_date)
+                safe_pending, retail_adjustments = sanitize_pending_for_retail(pending)
+                execution = execute_pending(state, safe_pending, bars, trade_date)
+                execution.setdefault('policy_adjustments', []).extend(retail_adjustments)
             else:
                 execution = expire_pending(state, pending, trade_date, previous_trade_date)
             state['pending_decision'] = None
