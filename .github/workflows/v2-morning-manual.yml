@@ -1,0 +1,52 @@
+name: V2 manual intraday sell now
+
+on:
+  push:
+    branches: [v2-shadow]
+    paths:
+      - 'shadow_state/v2/.morning-manual-trigger'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v2-morning-manual
+  cancel-in-progress: false
+
+jobs:
+  sell-now:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Run split-execution safety tests
+        run: python -m unittest tests.test_v2_split_execution tests.test_v2_shadow_ledger -v
+      - name: Execute current-session SELL/reduce intents now
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          print(datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat())
+          PY
+          )
+          python -m engine_v2.morning_sell_run --date "$TD" --state-root shadow_state/v2 --report /tmp/v2-morning-sell.json
+      - name: Refresh V2 summary
+        run: python -m engine_v2.shadow_reporting --state-root shadow_state/v2 --output shadow_state/v2/summary.json --web-output web/v2/data.json
+      - name: Persist isolated V2 state
+        run: |
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "v2-data: manual intraday sell and valuation"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
