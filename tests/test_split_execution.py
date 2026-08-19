@@ -110,6 +110,22 @@ class SplitExecutionTests(unittest.TestCase):
         self.assertEqual(fills[0]['exit_reason'],'hard_stop')
         self.assertEqual(state['positions'],{})
 
+    def test_trailing_stop_uses_intraday_high_not_only_checkpoint_price(self):
+        state={
+            'fund_id':'A','cash':0.0,
+            'positions':{'sh.600000':{'name':'持仓','qty':1000,'avg_cost':100.0,'acquired_date':'2026-08-18','last_price':100.0}},
+            'exit_plans':{'sh.600000':{
+                'plan_version':PLAN_VERSION,'hard_stop_price':90.0,'take_profit_price':120.0,
+                'trailing_activation_price':103.0,'trailing_drawdown_pct':0.025,'highest_price':100.0,
+                'partial_taken':False,'max_hold_days':3,'sessions_held':0,'rotation_exit':False,
+            }},
+        }
+        bars={'sh.600000':{'close':105.0,'high':110.0,'preclose':100.0,'tradestatus':'1'}}
+        fills,_=execute_conditional_sells(state,bars,'2026-08-19',clock='10:30')
+        self.assertEqual(len(fills),1)
+        self.assertEqual(fills[0]['exit_reason'],'trailing_stop')
+        self.assertEqual(state['positions'],{})
+
     def test_take_profit_is_partial_then_trailing_can_manage_remainder(self):
         state={
             'fund_id':'A','cash':0.0,
