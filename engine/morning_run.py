@@ -10,6 +10,9 @@ from .daily_run import FUNDS, ROOT, STATE_ROOT, _pending_decision_date
 from .state import load_state, save_state
 
 
+EXECUTION_MODEL = '09:40_SELL_15:10_OPEN_BUY'
+
+
 def _symbol(code: str) -> str:
     code = ''.join(ch for ch in str(code) if ch.isdigit())[-6:]
     return ('sh.' if code.startswith(('600', '601', '603', '605')) else 'sz.') + code
@@ -173,7 +176,7 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
             })
         data['updated_at'] = trade_date
         data['updated_time'] = clock
-        data['session_phase'] = '09:40盘中卖出后'
+        data['session_phase'] = '09:40盘中卖出后，等待15:10买入结算'
         data['market_source'] = source
         data.setdefault('fund', {}).update({
             'equity': snap['equity'],
@@ -188,7 +191,7 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
         data['activity'] = _today_activity(state, trade_date)
         data['holdings'] = holdings
         data['recent_fills'] = list(state.get('fills') or [])[-10:]
-        data['execution_model'] = '09:40_SELL_CLOSE_BUY'
+        data['execution_model'] = EXECUTION_MODEL
         d_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
     if e_path.exists():
@@ -211,9 +214,9 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
             item['recent_fills'] = list(state.get('fills') or [])[-8:]
         data['updated_at'] = trade_date
         data['updated_time'] = clock
-        data['session_phase'] = '09:40盘中卖出后'
+        data['session_phase'] = '09:40盘中卖出后，等待15:10买入结算'
         data['market_source'] = source
-        data['execution_model'] = '09:40_SELL_CLOSE_BUY'
+        data['execution_model'] = EXECUTION_MODEL
         e_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
@@ -256,6 +259,7 @@ def main() -> None:
         state['morning_sell_date'] = trade_date
         state['morning_sell_at'] = now.isoformat(timespec='seconds')
         state['morning_quote_source'] = source
+        state['execution_model'] = EXECUTION_MODEL
         _portfolio_snapshot(state, bars)
         save_state(STATE_ROOT / f'{fid}.json', state)
 
