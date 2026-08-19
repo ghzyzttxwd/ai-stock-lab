@@ -332,7 +332,10 @@ def execute_conditional_sells(
             # Fail closed: never invent a discretionary sell price for an unmigrated position.
             checks.append({'symbol':sym,'action':'WAIT','reason':'missing_conditional_exit_plan'})
             continue
-        plan['highest_price']=round(max(float(plan.get('highest_price') or ref),ref),4)
+        session_high=float(bar.get('high') or ref)
+        if not math.isfinite(session_high) or session_high < ref:
+            session_high=ref
+        plan['highest_price']=round(max(float(plan.get('highest_price') or ref),ref,session_high),4)
         if str(p.get('acquired_date') or '')[:10] == trade_date:
             checks.append({'symbol':sym,'action':'WAIT','reason':'t_plus_one_locked'})
             continue
@@ -356,7 +359,7 @@ def execute_conditional_sells(
         sell_all=True
         if hard_stop>0 and ref<=hard_stop:
             action='SELL'; reason='hard_stop'
-        elif (ref>=trail_activation or plan.get('partial_taken')) and ref<=trailing_stop:
+        elif (highest>=trail_activation or plan.get('partial_taken')) and ref<=trailing_stop:
             action='SELL'; reason='trailing_stop'
         elif rotation and rotation_min>0 and ref>=rotation_min:
             action='SELL'; reason='rotation_exit_price_reached'
