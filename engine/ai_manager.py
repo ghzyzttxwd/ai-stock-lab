@@ -5,9 +5,12 @@ import time
 import requests
 
 SYSTEM = '''你是A股虚拟基金的组合经理。你没有真实证券账户权限，也不能突破风控。
-只允许从传入候选股票中选择目标仓位。输出严格JSON，不要输出解释性前缀。
+目标不是把仓位填满，而是寻找未来1到3个交易日具有相对优势、且没有明显过热的机会；没有合格机会时允许targets为空并保留现金。
+只允许从传入候选股票中选择目标仓位。重点参考opportunity_score、market_relative_1/3/5、r1/r3/r5、close_position、amount_ratio_3_20、overheat_score、risk、valuation等实际字段，不要因为过去20/60日涨得多就机械追高。
+价格触发、止损止盈由后续确定性条件计划引擎负责，你只决定候选和最大目标仓位。
+输出严格JSON，不要输出解释性前缀。
 格式：{"targets":[{"symbol":"sh.600000","name":"...","target_weight":0.10,"reason":"..."}],"diary":"一句话总结"}
-允许targets为空。target_weight必须在0到0.15之间。'''
+target_weight必须在0到0.15之间。'''
 
 
 class TransientAIError(RuntimeError):
@@ -19,7 +22,7 @@ def _headers(key: str) -> dict:
         'Authorization': f'Bearer {key}',
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream, application/json',
-        'User-Agent': 'ai-stock-lab/0.6',
+        'User-Agent': 'ai-stock-lab/0.7',
     }
 
 
@@ -35,7 +38,6 @@ def _request_json(base: str, key: str, payload: dict) -> dict:
 
 
 def _stream_chat(base: str, key: str, payload: dict) -> str:
-    """Standard OpenAI-compatible SSE stream. Keeps the gateway connection active while Sol generates."""
     started = time.monotonic()
     body = {**payload, 'stream': True}
     body_bytes = len(json.dumps(body, ensure_ascii=False).encode('utf-8'))
@@ -47,8 +49,6 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
         stream=True,
         timeout=(15, 180),
     ) as r:
-        # Some OpenAI-compatible relays omit charset on text/event-stream.
-        # SSE is UTF-8; force it so Chinese diary/reasons do not become mojibake.
         r.encoding = 'utf-8'
         if r.status_code >= 400:
             preview = r.text[:300].replace('\n', ' ')
@@ -97,7 +97,6 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
                 elif choice.get('message', {}).get('content'):
                     sse_parts.append(str(choice['message']['content']))
                 else:
-                    # Some Sol-compatible relays stream reasoning separately before final content.
                     reasoning = delta.get('reasoning_content') or delta.get('reasoning')
                     if reasoning:
                         reasoning_chars += len(str(reasoning))
@@ -115,7 +114,6 @@ def _stream_chat(base: str, key: str, payload: dict) -> str:
                 raise TransientAIError('AI stream completed but returned no final content')
             return text
 
-        # Some relays ignore stream=true and return one normal JSON response.
         raw_text = '\n'.join(plain_lines).strip()
         if not raw_text:
             raise TransientAIError('AI response was empty')
@@ -143,18 +141,24 @@ def decide_with_api(candidates: list[dict], current: dict, market_score: float) 
     if not key or not model:
         return None
 
+    compact=[]
+    keys=(
+        'symbol','name','score_d','opportunity_score','market_relative_1','market_relative_3','market_relative_5',
+        'r1','r3','r5','trend','momentum','risk','quality','valuation','close_position','amount_ratio_3_20',
+        'overheat_score','atr14_pct','close','peTTM','pbMRQ',
+    )
+    for row in candidates[:24]:
+        compact.append({k:row.get(k) for k in keys if k in row})
     messages = [
         {'role': 'system', 'content': SYSTEM},
         {'role': 'user', 'content': json.dumps({
             'market_score': market_score,
             'current': current,
-            'candidates': candidates[:20],
+            'candidates': compact,
         }, ensure_ascii=False)},
     ]
-    # Keep the formal request close to the most widely supported Chat Completions shape.
     payload = {'model': model, 'messages': messages}
 
-    # At most two network attempts. Covers transient gateway errors and empty SSE streams without runaway spend.
     for attempt in (1, 2):
         try:
             content = _stream_chat(base, key, payload)
@@ -185,7 +189,6 @@ def decide_with_api(candidates: list[dict], current: dict, market_score: float) 
 
 
 def smoke_test_api() -> str:
-    """Small paid call used only by the manual connectivity workflow."""
     key = os.getenv('AI_API_KEY')
     model = os.getenv('AI_MODEL')
     base = os.getenv('AI_BASE_URL', '').rstrip('/')
