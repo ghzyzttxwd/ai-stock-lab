@@ -1,6 +1,7 @@
 import unittest
 
 from engine.broker import execute_target_weights
+from engine.pipeline import targets_for
 import engine.morning_run  # noqa: F401 - import is a syntax/regression check
 import engine.evening_split_run  # noqa: F401 - import is a syntax/regression check
 
@@ -53,6 +54,26 @@ class SplitExecutionTests(unittest.TestCase):
         self.assertTrue(all(x['side'] == 'BUY' for x in fills))
         self.assertIn('sh.600000', state['positions'])
         self.assertIn('sh.600001', state['positions'])
+
+    def test_target_layer_removes_chinext_and_star_before_strategy(self):
+        candidates=[]
+        for i in range(10):
+            candidates.append({
+                'symbol': f'sh.600{i:03d}', 'name': f'M{i}',
+                'risk': 50, 'trend': 50, 'liquidity': 50,
+                'momentum': 50, 'quality': 50, 'valuation': 50, 'score_d': 50,
+            })
+        for symbol in ('sz.300001', 'sz.301001', 'sh.688001', 'sh.689001'):
+            candidates.append({
+                'symbol': symbol, 'name': symbol,
+                'risk': 100, 'trend': 100, 'liquidity': 100,
+                'momentum': 100, 'quality': 100, 'valuation': 100, 'score_d': 100,
+            })
+        targets, _ = targets_for('A', candidates, 80.0, {'positions': {}}, use_ai=False)
+        selected={x['symbol'] for x in targets}
+        self.assertTrue(selected)
+        self.assertTrue(all(x.startswith('sh.600') for x in selected))
+        self.assertFalse(selected & {'sz.300001', 'sz.301001', 'sh.688001', 'sh.689001'})
 
     def test_retail_policy_hard_blocks_chinext_and_star_buys(self):
         state = {'fund_id': 'A', 'cash': 100000.0, 'positions': {}}
