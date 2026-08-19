@@ -10,7 +10,8 @@ def _normalize(cands: list[dict], n: int, max_weight: float, total_weight: float
 
 
 def _opp(x: dict) -> float:
-    return float(x.get('opportunity_score') or 0.0)
+    value=x.get('opportunity_score')
+    return 50.0 if value is None else float(value)
 
 
 def strategy_a(candidates: list[dict], market_score: float) -> list[dict]:
