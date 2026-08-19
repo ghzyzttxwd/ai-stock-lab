@@ -7,7 +7,9 @@ on:
     paths:
       - 'state/.morning-trigger'
   schedule:
-    - cron: '40 1 * * 1-5'  # 09:40 Beijing, Monday-Friday
+    - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
+    - cron: '50 1 * * 1-5'  # 09:50 Beijing retry
+    - cron: '0 2 * * 1-5'   # 10:00 Beijing final retry
 
 permissions:
   contents: write
@@ -33,7 +35,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
-      - name: Execute prior-session sell/reduce intents at current 09:40 quotes
+      - name: Execute prior-session sell/reduce intents at current intraday quotes
         run: python -m engine.morning_run
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
