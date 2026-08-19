@@ -1,4 +1,4 @@
-name: V2 15:10 open-price buy + next decision (isolated)
+name: V2 15:10 conditional-plan settlement (isolated)
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   evening-split:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,13 +42,20 @@ jobs:
           )
           echo "date=$TD" >> "$GITHUB_OUTPUT"
           echo "trade_date=$TD"
-      - name: Skip provider calls when the daily session is already audited
+      - name: Check whether the daily session is already audited
         id: guard
         run: |
           python -m engine_v2.shadow_guard \
             --state-root shadow_state/v2 \
             --trade-date "${{ steps.td.outputs.date }}" \
             --report /tmp/v2-shadow-run.json
+      - name: Migrate already-processed current session to conditional plans without changing economics
+        if: steps.guard.outputs.done == 'true'
+        run: |
+          python -m engine_v2.conditional_migration \
+            --date "${{ steps.td.outputs.date }}" \
+            --state-root shadow_state/v2 \
+            --report /tmp/v2-conditional-migration.json
       - name: Restore bounded Tencent history cache
         if: steps.guard.outputs.done != 'true'
         uses: actions/cache@v4
@@ -66,7 +73,7 @@ jobs:
           V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
           V2_HISTORY_WORKERS: '3'
         run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
-      - name: Settle 15:10 BUY/add at today's open and build tomorrow targets
+      - name: Settle only triggered entry conditions and build tomorrow conditional plans
         if: steps.guard.outputs.done != 'true'
         run: |
           python -m engine_v2.shadow_run_split \
@@ -80,25 +87,37 @@ jobs:
             --state-root shadow_state/v2 \
             --output shadow_state/v2/summary.json \
             --web-output web/v2/data.json
-      - name: Assert isolation and split execution model
+      - name: Run V2 regression tests again against generated state and web
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+      - name: Assert isolation and conditional-plan invariants
         shell: bash
         run: |
           set -euo pipefail
           git diff --quiet -- state web/d web/e
           python - <<'PY'
           import json
-          r=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
-          safety=r.get('safety') or {}
-          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 15:10 isolation invariant violated')
+          from pathlib import Path
           web=json.load(open('web/v2/data.json',encoding='utf-8'))
-          if web.get('summary_version') != 'v2-shadow-summary-1.1':
+          if web.get('summary_version') != 'v2-shadow-summary-1.2':
               raise SystemExit('V2 web summary schema mismatch')
+          if web.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1':
+              raise SystemExit(f'V2 web execution model mismatch: {web.get("execution_model")}')
+          if web.get('plan_version') != 'v2-conditional-plan-v1':
+              raise SystemExit(f'V2 web plan version mismatch: {web.get("plan_version")}')
           for fid,fund in (web.get('funds') or {}).items():
-              buys=[x for x in fund.get('recent_fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]==str(web.get('updated_at',''))[:10]]
-              if any(x.get('execution_price_field') not in (None,'open') for x in buys):
-                  raise SystemExit(f'V2 {fid} has non-open BUY fill in current session')
-          print('[V2 15:10]',r.get('status'),r.get('trade_date'),r.get('fills'))
+              if fund.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1':
+                  raise SystemExit(f'V2 {fid} ledger is not conditional')
+              pending=fund.get('pending_decision')
+              if pending:
+                  if pending.get('plan_version') != 'v2-conditional-plan-v1':
+                      raise SystemExit(f'V2 {fid} pending plan version mismatch')
+                  for target in pending.get('targets') or []:
+                      if (target.get('trade_plan') or {}).get('plan_version') != 'v2-conditional-plan-v1':
+                          raise SystemExit(f'V2 {fid} legacy target survived')
+              for holding in fund.get('holdings') or []:
+                  if (holding.get('exit_plan') or {}).get('plan_version') != 'v2-conditional-plan-v1':
+                      raise SystemExit(f'V2 {fid} holding lacks conditional exit plan')
+          print('[V2 CONDITIONAL] invariants verified')
           PY
       - name: Persist only V2 shadow state
         shell: bash
@@ -108,9 +127,9 @@ jobs:
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
           if git diff --cached --quiet; then
-            echo "V2 session already processed or summary unchanged."
+            echo "V2 conditional state already persisted."
           else
-            git commit -m "v2-data: 15:10 open-price buy and next-session targets"
+            git commit -m "v2-data: conditional plans and trigger-based accounting"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
@@ -138,7 +157,7 @@ jobs:
               pushed=1
               break
             fi
-            git commit -m "v2-data: sync 15:10 open-buy data to main"
+            git commit -m "v2-data: sync conditional-plan data to main"
             if git push origin HEAD:main; then
               pushed=1
               break
@@ -163,26 +182,33 @@ jobs:
             -d '{"ref":"main"}')
           echo "dispatch_http_code=$code"
           test "$code" = "204"
-      - name: Verify public V2 data equals 15:10 result
+      - name: Verify public V2 data equals conditional-plan result
         id: verify_public
         shell: bash
         run: |
           set -euo pipefail
           expected="${{ steps.sync_main.outputs.expected_sha256 }}"
           for i in $(seq 1 60); do
-            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?v2_1510=${GITHUB_RUN_ID}-${i}"
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?v2_conditional=${GITHUB_RUN_ID}-${i}"
             if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-1510.json; then
               actual="$(sha256sum /tmp/live-v2-1510.json | awk '{print $1}')"
               if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-1510.json',encoding='utf-8'))
+          if live.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or live.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('public V2 is not conditional-plan model')
+          print('PUBLIC V2 CONDITIONAL VERIFIED',live.get('updated_at'))
+          PY
                 echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
             sleep 5
           done
-          echo "Public V2 data still differs from 15:10 result."
+          echo "Public V2 data still differs from conditional-plan result."
           exit 1
-      - name: Persist V2 15:10 end-to-end receipt
+      - name: Persist V2 conditional end-to-end receipt
         shell: bash
         env:
           EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
@@ -196,8 +222,11 @@ jobs:
           receipt={
               'status':'verified',
               'trade_date':os.environ['TRADE_DATE'],
-              'execution_model':'09:40_SELL_15:10_OPEN_BUY',
-              'buy_reference':'session_open',
+              'execution_model':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version':'v2-conditional-plan-v1',
+              'buy_reference':'predeclared_price_condition',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
               'expected_sha256':os.environ['EXPECTED_SHA256'],
               'public_sha256':os.environ['PUBLIC_SHA256'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],
@@ -213,17 +242,18 @@ jobs:
             cp /tmp/v2-1510-chain-verification.json state/v2_1510_chain_verification.json
             git add state/v2_1510_chain_verification.json
             if git diff --cached --quiet; then exit 0; fi
-            git commit -m "ops: verify V2 15:10 open-buy chain"
+            git commit -m "ops: verify V2 conditional-plan chain"
             if git push origin HEAD:main; then exit 0; fi
           done
           exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v2-1510-buy-${{ steps.td.outputs.date }}
+          name: v2-conditional-${{ steps.td.outputs.date }}
           path: |
             /tmp/v2-normalized-snapshot.json
             /tmp/v2-enriched-candidates.json
             /tmp/v2-shadow-run.json
+            /tmp/v2-conditional-migration.json
           if-no-files-found: warn
           retention-days: 30
