@@ -1,4 +1,4 @@
-name: V2 09:40 conditional exit check (isolated)
+name: V2 intraday conditional exit checks (isolated)
 
 on:
   workflow_dispatch:
@@ -8,8 +8,13 @@ on:
       - 'shadow_state/v2/.morning-trigger'
   schedule:
     - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
-    - cron: '50 1 * * 1-5'  # 09:50 retry only if primary failed
-    - cron: '0 2 * * 1-5'   # 10:00 final retry only if prior attempts failed
+    - cron: '50 1 * * 1-5'  # 09:50 retry for 09:40 only
+    - cron: '0 2 * * 1-5'   # 10:00 final retry for 09:40 only
+    - cron: '30 2 * * 1-5'  # 10:30 checkpoint
+    - cron: '20 3 * * 1-5'  # 11:20 checkpoint
+    - cron: '30 5 * * 1-5'  # 13:30 checkpoint
+    - cron: '30 6 * * 1-5'  # 14:30 checkpoint
+    - cron: '55 6 * * 1-5'  # 14:55 checkpoint / max-hold exit
 
 permissions:
   contents: write
@@ -28,14 +33,39 @@ jobs:
         with:
           ref: v2-shadow
           fetch-depth: 0
+      - name: Resolve Beijing date and logical checkpoint
+        id: td
+        shell: bash
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          print(datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat())
+          PY
+          )
+          case "${{ github.event.schedule }}" in
+            '40 1 * * 1-5'|'50 1 * * 1-5'|'0 2 * * 1-5') slot='09:40' ;;
+            '30 2 * * 1-5') slot='10:30' ;;
+            '20 3 * * 1-5') slot='11:20' ;;
+            '30 5 * * 1-5') slot='13:30' ;;
+            '30 6 * * 1-5') slot='14:30' ;;
+            '55 6 * * 1-5') slot='14:55' ;;
+            *) slot="$(TZ=Asia/Shanghai date +%H:%M)" ;;
+          esac
+          echo "date=$TD" >> "$GITHUB_OUTPUT"
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "slot_key=${slot/:/}" >> "$GITHUB_OUTPUT"
+          echo "trade_date=$TD checkpoint=$slot"
       - name: Record V2 conditional-exit run start
         shell: bash
+        env:
+          CHECKPOINT: ${{ steps.td.outputs.slot }}
         run: |
           set -euo pipefail
           python - <<'PY'
           import json, os
           from datetime import datetime, timezone
-          status={'status':'started','workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'started_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
+          status={'status':'started','workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'scheduled_time':os.environ.get('CHECKPOINT'),'started_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
           open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
           PY
           rm -rf /tmp/main-status
@@ -63,20 +93,11 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run V2 regression tests before mutation
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Resolve Beijing date
-        id: td
-        run: |
-          TD=$(python - <<'PY'
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
-          print(datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat())
-          PY
-          )
-          echo "date=$TD" >> "$GITHUB_OUTPUT"
       - name: Check protective and profit exit conditions at live quote
         run: |
           python -m engine_v2.morning_sell_run \
             --date "${{ steps.td.outputs.date }}" \
+            --scheduled-time "${{ steps.td.outputs.slot }}" \
             --state-root shadow_state/v2 \
             --report /tmp/v2-morning-sell.json
       - name: Build intraday V2 summary
@@ -98,11 +119,11 @@ jobs:
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 conditional-exit isolation invariant violated')
-          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}:
+          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session','outside_session_window'}:
               raise SystemExit(f'unexpected V2 conditional-exit status: {r.get("status")}')
           if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
-              raise SystemExit('V2 morning path is not conditional-plan model')
-          print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('fills'),r.get('executed_at'))
+              raise SystemExit('V2 intraday path is not conditional-plan model')
+          print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('scheduled_time'),r.get('fills'),r.get('executed_at'))
           PY
       - name: Persist only isolated V2 conditional-exit state
         shell: bash
@@ -114,7 +135,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No V2 conditional-exit state change."
           else
-            git commit -m "v2-data: 09:40 conditional exit check"
+            git commit -m "v2-data: conditional exit checkpoint"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
@@ -215,7 +236,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v2-conditional-exit-${{ steps.td.outputs.date }}
+          name: v2-conditional-exit-${{ steps.td.outputs.date }}-${{ steps.td.outputs.slot_key }}
           path: /tmp/v2-morning-sell.json
           if-no-files-found: warn
           retention-days: 30
@@ -224,12 +245,13 @@ jobs:
         shell: bash
         env:
           JOB_STATUS: ${{ job.status }}
+          CHECKPOINT: ${{ steps.td.outputs.slot }}
         run: |
           set -euo pipefail
           python - <<'PY'
           import json, os
           from datetime import datetime, timezone
-          status={'status':os.environ['JOB_STATUS'],'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
+          status={'status':os.environ['JOB_STATUS'],'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'scheduled_time':os.environ.get('CHECKPOINT'),'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
           open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
           PY
           if [ ! -d /tmp/main-status/.git ] && [ ! -f /tmp/main-status/.git ]; then
