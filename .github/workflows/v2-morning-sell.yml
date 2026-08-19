@@ -13,8 +13,7 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
+  actions: write
 
 concurrency:
   group: v2-morning-sell
@@ -24,8 +23,6 @@ jobs:
   morning-sell:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment:
-      name: github-pages
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +69,7 @@ jobs:
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 morning isolation invariant violated')
-          print('[V2 MORNING]',r.get('status'),r.get('trade_date'),r.get('fills'))
+          print('[V2 MORNING]',r.get('status'),r.get('trade_date'),r.get('fills'),r.get('executed_at'))
           PY
       - name: Persist only isolated V2 morning state
         shell: bash
@@ -130,28 +127,35 @@ jobs:
           actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
           echo "main_sha256=$actual"
           if [ "$actual" != "$expected" ]; then
-            echo "main V2 data hash mismatch; refusing to continue to Pages deployment."
+            echo "main V2 data hash mismatch; refusing to deploy."
             exit 1
           fi
-
-          git reset --hard origin/main
-          cp /tmp/v2-data.json web/v2/data.json
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Package current main web with latest V2 data
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: /tmp/main-sync/web
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Dispatch canonical Pages deployment from main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          payload='{"ref":"main"}'
+          code=$(curl -sS -o /tmp/dispatch-response.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
+            -d "$payload")
+          echo "dispatch_http_code=$code"
+          if [ "$code" != "204" ]; then
+            cat /tmp/dispatch-response.txt || true
+            exit 1
+          fi
       - name: Verify public V2 data equals morning result
         shell: bash
         run: |
           set -euo pipefail
           expected="${{ steps.sync_main.outputs.expected_sha256 }}"
           echo "expected_sha256=$expected"
-          for i in $(seq 1 18); do
+          for i in $(seq 1 60); do
             url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${i}"
             if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
               actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
