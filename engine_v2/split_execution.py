@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .board_policy import sanitize_pending_for_retail
 from .shadow_ledger import (
     DEFAULT_POLICY,
     ExecutionPolicy,
@@ -49,6 +50,10 @@ def execute_pending_side(
     side = str(side).upper()
     if side not in {'SELL', 'BUY'}:
         raise ValueError(f'unsupported split execution side: {side}')
+
+    # Final retail-account safety boundary. This is intentionally repeated at execution
+    # time so stale/manual targets cannot bypass the upstream main-board-only universe.
+    pending, retail_adjustments = sanitize_pending_for_retail(pending)
 
     positions = state.setdefault('positions', {})
     normalized_bars = {normalize_symbol(k): dict(v) for k, v in bars.items()}
@@ -201,7 +206,7 @@ def execute_pending_side(
         'reference_equity': round(reference_equity, 2),
         'fills': fills,
         'rejected_orders': rejected,
-        'policy_adjustments': adjustments,
+        'policy_adjustments': [*retail_adjustments, *adjustments],
         'valuation_fallback_symbols': valuation_fallbacks,
         'fees': round(sum(float(x['fees']) for x in fills), 2),
     }
