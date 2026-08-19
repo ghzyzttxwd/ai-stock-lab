@@ -1,4 +1,4 @@
-name: Daily 15:10 virtual-fund close rebalance
+name: Daily 15:10 virtual-fund buy settlement
 on:
   workflow_dispatch:
   # Safe recovery hook: changing only this marker can start a production catch-up/read-only refresh run.
@@ -7,7 +7,7 @@ on:
     paths:
       - 'state/.production-trigger'
   schedule:
-    # Beijing time, Monday-Friday. 15:10 is the primary settlement slot; later slots are retries.
+    # Beijing time, Monday-Friday. 15:10 is the primary buy-settlement slot; later slots are retries.
     - cron: '10 7 * * 1-5'  # 15:10 primary
     - cron: '20 7 * * 1-5'  # 15:20 retry
     - cron: '30 7 * * 1-5'  # 15:30 final retry
@@ -85,7 +85,7 @@ jobs:
         id: marketday
         if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
         run: python -m engine.schedule_guard production
-      - name: Settle previous target at 15:10 close rebalance, then build next decision
+      - name: Settle 15:10 BUY/add using today's open, then build next decision
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -100,7 +100,7 @@ jobs:
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
           git add state/ web/d/data.json web/e/data.json
-          git diff --cached --quiet || git commit -m "data: 15:10 close rebalance"
+          git diff --cached --quiet || git commit -m "data: 15:10 open-price buy settlement"
           git pull --rebase origin main
           git push
       - name: Refresh latest committed web before deploy
