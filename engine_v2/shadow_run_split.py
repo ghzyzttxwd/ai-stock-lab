@@ -31,6 +31,9 @@ from .split_execution import combine_phase_executions, execute_pending_side
 from .targets import build_shadow_targets
 
 
+EXECUTION_MODEL = '09:40_SELL_15:10_OPEN_BUY'
+
+
 def run_shadow_session_split(
     snapshot: dict,
     enriched: dict,
@@ -81,23 +84,25 @@ def run_shadow_session_split(
             decision_date = str(pending.get('decision_date') or '')[:10]
             if decision_date == previous_trade_date:
                 if str(state.get('morning_sell_date') or '')[:10] == trade_date:
-                    # Morning audit already contains the SELL/reduce phase. Finish only BUY/add at close.
+                    # Morning audit already contains SELL/reduce. At 15:10 account only BUY/add,
+                    # using today's opening price from the completed daily bar.
                     execution[fund_id] = execute_pending_side(
                         state, pending, bars, trade_date,
-                        side='BUY', price_field='close',
-                        note='V2 上一交易日决策 · 收盘价模拟买入/加仓',
+                        side='BUY', price_field='open',
+                        note='V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）',
                     )
                 else:
-                    # Morning provider/workflow failed: safely settle both sides at the completed close.
+                    # Morning provider/workflow failed: settle SELL from close as safety fallback,
+                    # then account BUY from the day's open. The fallback is explicitly audited.
                     sell_phase = execute_pending_side(
                         state, pending, bars, trade_date,
                         side='SELL', price_field='close',
-                        note='V2 09:40任务未完成 · 收盘价兜底卖出/减仓',
+                        note='V2 09:40任务未完成 · 15:10按收盘价兜底卖出/减仓',
                     )
                     buy_phase = execute_pending_side(
                         state, pending, bars, trade_date,
-                        side='BUY', price_field='close',
-                        note='V2 上一交易日决策 · 收盘价模拟买入/加仓',
+                        side='BUY', price_field='open',
+                        note='V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）',
                     )
                     execution[fund_id] = combine_phase_executions(sell_phase, buy_phase)
                     state['morning_sell_fallback'] = True
@@ -125,7 +130,7 @@ def run_shadow_session_split(
         'enrichment_version': enriched.get('enrichment_version'),
         'enrichment_sha256': sha256_json(enriched),
         'target_version': targets_payload.get('target_version'),
-        'execution_model': '09:40_SELL_CLOSE_BUY',
+        'execution_model': EXECUTION_MODEL,
         'board_policy': targets_payload.get('board_policy'),
         'data_quality': {
             'snapshot_source': (snapshot.get('source_notes') or {}).get('stock_snapshot'),
@@ -139,8 +144,8 @@ def run_shadow_session_split(
     fund_events = {}
     for fund_id, state in states.items():
         pending = build_pending_decision(fund_id, targets_payload, source_ref)
-        pending['execute_on'] = 'next_session_0940_sell_close_buy'
-        pending['execution_model'] = '09:40_SELL_CLOSE_BUY'
+        pending['execute_on'] = 'next_session_0940_sell_1510_open_buy'
+        pending['execution_model'] = EXECUTION_MODEL
         state['pending_decision'] = pending
         state.setdefault('decisions', []).append({
             'decision_date': trade_date,
@@ -150,12 +155,12 @@ def run_shadow_session_split(
             'portfolio_stats': pending['portfolio_stats'],
             'targets': pending['targets'],
             'source_ref': source_ref,
-            'execution_model': '09:40_SELL_CLOSE_BUY',
+            'execution_model': EXECUTION_MODEL,
             'calls_sol': False,
         })
         state['last_processed_date'] = trade_date
         state['last_execution_date'] = trade_date
-        state['execution_model'] = '09:40_SELL_CLOSE_BUY'
+        state['execution_model'] = EXECUTION_MODEL
         validate_ledger(state)
         fund_events[fund_id] = {
             'opening_state_sha256': opening_state_hashes[fund_id],
@@ -168,7 +173,7 @@ def run_shadow_session_split(
 
     event = {
         'schema_version': AUDIT_SCHEMA_VERSION,
-        'event_kind': 'close_buy_and_decision',
+        'event_kind': 'open_buy_and_decision',
         'trade_date': trade_date,
         'previous_trade_date': previous_trade_date,
         'execution_policy_version': EXECUTION_POLICY_VERSION,
