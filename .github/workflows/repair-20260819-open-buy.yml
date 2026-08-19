@@ -1,0 +1,252 @@
+name: Repair 2026-08-19 open-price buys
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'state/.repair-20260819-open-buy-trigger'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  REPAIR_DATE: '2026-08-19'
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: Preserve repair script for V2 worktree
+        run: cp tools/repair_20260819_open_buys.py /tmp/repair_20260819_open_buys.py
+
+      - name: Correct V1 2026-08-19 BUY fills from close to open
+        run: python tools/repair_20260819_open_buys.py --mode v1 --root .
+
+      - name: Verify V1 correction before persistence
+        run: |
+          python -m unittest discover -s tests -v
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for fid in ('D_MAIN','A','B','C','D','L'):
+              state=json.loads((Path('state')/f'{fid}.json').read_text(encoding='utf-8'))
+              buys=[x for x in state.get('fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+              if any(x.get('execution_price_field')!='open' for x in buys):
+                  raise SystemExit(f'{fid}: corrected BUY still not open-priced')
+              if state.get('execution_model')!='09:40_SELL_15:10_OPEN_BUY':
+                  raise SystemExit(f'{fid}: execution model mismatch')
+              print('[V1 CORRECTED]',fid,'buys=',len(buys),'cash=',state.get('cash'))
+          PY
+
+      - name: Refresh V1 web from corrected ledgers without retrading
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: python -m engine.evening_split_run
+
+      - name: Persist corrected V1 ledgers and web
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ai-stock-repair-bot"
+          git config user.email "ai-stock-repair-bot@users.noreply.github.com"
+          git add state/ web/d/data.json web/e/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "data: correct 2026-08-19 buys to open-price basis"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Correct V2 2026-08-19 BUY fills from close to open
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin v2-shadow
+          rm -rf /tmp/v2-repair
+          git worktree add --detach /tmp/v2-repair origin/v2-shadow
+          cd /tmp/v2-repair
+          PYTHONPATH=. python /tmp/repair_20260819_open_buys.py --mode v2 --root .
+          mv shadow_state/v2/audit/2026-08-19-buy-price-correction.json \
+             shadow_state/v2/audit/2026-08-19~buy-price-correction.json
+          python -m unittest discover -s tests -p 'test_v2*.py' -v
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('shadow_state/v2/20260819_open_buy_correction.json').read_text(encoding='utf-8'))
+          for fid in 'ABCDL':
+              state=json.loads((Path('shadow_state/v2/ledgers')/f'{fid}.json').read_text(encoding='utf-8'))
+              buys=[x for x in state.get('fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+              if any(x.get('execution_price_field')!='open' for x in buys):
+                  raise SystemExit(f'V2 {fid}: corrected BUY still not open-priced')
+              if state.get('execution_model')!='09:40_SELL_15:10_OPEN_BUY':
+                  raise SystemExit(f'V2 {fid}: execution model mismatch')
+              print('[V2 CORRECTED]',fid,'buys=',len(buys),'cash=',state.get('cash'))
+          if report.get('status')!='corrected':
+              raise SystemExit('V2 correction report status mismatch')
+          PY
+          git config user.name "v2-shadow-repair-bot"
+          git config user.email "v2-shadow-repair-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          git commit -m "v2-data: correct 2026-08-19 buys to open-price basis"
+          git pull --rebase origin v2-shadow
+          git push origin HEAD:v2-shadow
+
+      - name: Sync corrected V2 web to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/v2-repair/web/v2/data.json /tmp/corrected-v2-data.json
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/corrected-v2-data.json web/v2/data.json
+          git config user.name "v2-shadow-repair-bot"
+          git config user.email "v2-shadow-repair-bot@users.noreply.github.com"
+          git add web/v2/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "v2-data: publish corrected 2026-08-19 open-price buys"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Verify persisted repository state before deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main v2-shadow
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          for fid in ('D_MAIN','A','B','C','D','L'):
+              raw=subprocess.check_output(['git','show',f'origin/main:state/{fid}.json'])
+              state=json.loads(raw)
+              buys=[x for x in state.get('fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+              assert all(x.get('execution_price_field')=='open' for x in buys), (fid,buys)
+
+          for fid in 'ABCDL':
+              raw=subprocess.check_output(['git','show',f'origin/v2-shadow:shadow_state/v2/ledgers/{fid}.json'])
+              state=json.loads(raw)
+              buys=[x for x in state.get('fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+              assert all(x.get('execution_price_field')=='open' for x in buys), (fid,buys)
+              assert state.get('execution_model')=='09:40_SELL_15:10_OPEN_BUY'
+          print('REPOSITORY CORRECTION VERIFIED')
+          PY
+
+      - name: Deploy corrected Pages
+        shell: bash
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public V1 and V2 are corrected
+        id: public
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            ok=1
+            curl -fsS --connect-timeout 5 --max-time 20 \
+              "https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json?repair=${GITHUB_RUN_ID}-${i}" \
+              -o /tmp/live-d.json || ok=0
+            curl -fsS --connect-timeout 5 --max-time 20 \
+              "https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?repair=${GITHUB_RUN_ID}-${i}" \
+              -o /tmp/live-v2.json || ok=0
+            if [ "$ok" = "1" ] && python - <<'PY'
+          import json
+
+          def all_dicts(obj):
+              if isinstance(obj,dict):
+                  yield obj
+                  for v in obj.values():
+                      yield from all_dicts(v)
+              elif isinstance(obj,list):
+                  for v in obj:
+                      yield from all_dicts(v)
+
+          d=json.load(open('/tmp/live-d.json',encoding='utf-8'))
+          v2=json.load(open('/tmp/live-v2.json',encoding='utf-8'))
+          if d.get('execution_model')!='09:40_SELL_15:10_OPEN_BUY':
+              raise SystemExit(1)
+          d_buys=[x for x in all_dicts(d) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+          v2_buys=[x for x in all_dicts(v2) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
+          if d_buys and any(x.get('execution_price_field')!='open' for x in d_buys):
+              raise SystemExit(1)
+          if v2_buys and any(x.get('execution_price_field')!='open' for x in v2_buys):
+              raise SystemExit(1)
+          print('PUBLIC CORRECTION VERIFIED','v1_buys=',len(d_buys),'v2_buys=',len(v2_buys))
+          PY
+            then
+              dsha=$(sha256sum /tmp/live-d.json | awk '{print $1}')
+              v2sha=$(sha256sum /tmp/live-v2.json | awk '{print $1}')
+              echo "d_sha256=$dsha" >> "$GITHUB_OUTPUT"
+              echo "v2_sha256=$v2sha" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Public corrected data did not verify in time."
+          exit 1
+
+      - name: Persist terminal correction receipt
+        shell: bash
+        env:
+          D_SHA: ${{ steps.public.outputs.d_sha256 }}
+          V2_SHA: ${{ steps.public.outputs.v2_sha256 }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          receipt={
+              'status':'verified',
+              'trade_date':'2026-08-19',
+              'execution_model':'09:40_SELL_15:10_OPEN_BUY',
+              'buy_reference':'session_open',
+              'v1_repository_verified':True,
+              'v2_repository_verified':True,
+              'public_v1_sha256':os.environ['D_SHA'],
+              'public_v2_sha256':os.environ['V2_SHA'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          Path('state/20260819_open_buy_correction_verification.json').write_text(
+              json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'
+          )
+          PY
+          git config user.name "ai-stock-repair-bot"
+          git config user.email "ai-stock-repair-bot@users.noreply.github.com"
+          git add state/20260819_open_buy_correction_verification.json
+          git commit -m "ops: verify 2026-08-19 open-price buy correction"
+          git pull --rebase origin main
+          git push origin HEAD:main
