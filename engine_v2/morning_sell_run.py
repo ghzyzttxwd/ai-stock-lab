@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -109,6 +109,21 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
     existing = _already_done(state_root, trade_date, scheduled_time)
     if existing:
         return existing
+
+    in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+    final_slot_grace = scheduled_time == '14:55' and dt_time(15, 0) < now.time() <= dt_time(15, 5)
+    if not (in_session or final_slot_grace):
+        return {
+            'status': 'outside_session_window',
+            'trade_date': trade_date,
+            'scheduled_time': scheduled_time,
+            'executed_at': now.isoformat(timespec='seconds'),
+            'fills': {},
+            'rejected_orders': {},
+            'execution_model': EXECUTION_MODEL,
+            'plan_version': PLAN_VERSION,
+            'safety': {'writes_v1_ledger': False, 'calls_sol': False, 'forced_clock_sell': False},
+        }
 
     import akshare as ak
     if not is_exchange_session(ak, trade_date):
