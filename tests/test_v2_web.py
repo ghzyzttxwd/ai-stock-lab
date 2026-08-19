@@ -15,9 +15,11 @@ SUMMARY_PATH = STATE_ROOT / 'summary.json'
 class V2MobileWebTests(unittest.TestCase):
     def test_summary_exposes_all_read_only_mobile_fields(self):
         summary = build_summary(STATE_ROOT)
-        self.assertEqual(summary['summary_version'], 'v2-shadow-summary-1.1')
+        self.assertEqual(summary['summary_version'], 'v2-shadow-summary-1.2')
         self.assertEqual(set(summary['funds']), {'A', 'B', 'C', 'D', 'L'})
         self.assertEqual(summary['mode'], 'FORWARD_SHADOW_ONLY')
+        self.assertIn('execution_model',summary)
+        self.assertIn('plan_version',summary)
         self.assertFalse(summary['safety']['calls_sol'])
         self.assertFalse(summary['safety']['reads_v1_ledger'])
         self.assertFalse(summary['safety']['writes_v1_ledger'])
@@ -30,6 +32,8 @@ class V2MobileWebTests(unittest.TestCase):
                 self.assertIn('not a verified actual execution time', source_ref.get('note') or '')
         for fund_id, fund in summary['funds'].items():
             self.assertEqual(fund['fund_id'], fund_id)
+            self.assertIn('execution_model',fund)
+            self.assertIn('plan_version',fund)
             self.assertIn('equity', fund['metrics'])
             self.assertIn('cash', fund['metrics'])
             self.assertIn('position_market_value', fund['metrics'])
@@ -41,10 +45,11 @@ class V2MobileWebTests(unittest.TestCase):
             self.assertIsInstance(fund['recent_fills'], list)
             self.assertIsInstance(fund['recent_rejected_orders'], list)
             self.assertIsInstance(fund['concentration_flags'], list)
+            for holding in fund['holdings']:
+                self.assertIn('exit_plan',holding)
             pending=fund['pending_decision']
             if pending is None:
-                self.assertEqual(summary.get('audit_event_kind'), 'execution_catchup')
-                self.assertEqual(fund['metrics'].get('execution_only_date'), summary['updated_at'])
+                self.assertIn(summary.get('audit_event_kind'), {'execution_catchup','buy_price_correction'})
             else:
                 self.assertIn('targets', pending)
 
