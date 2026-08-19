@@ -26,6 +26,19 @@ def _critical_symbols(states: dict[str, dict]) -> dict[str, str]:
     return out
 
 
+def _close_bars(market, critical: dict[str, str], trade_date: str) -> dict[str, dict]:
+    """Use one full-market snapshot first; only fetch per-symbol bars for rare omissions."""
+    if not critical:
+        return {}
+    snapshot = market.snapshot()
+    bars = {x['code']: x for x in snapshot if x.get('code') in critical}
+    missing = {symbol: name for symbol, name in critical.items() if symbol not in bars}
+    if missing:
+        print(f'[close-settle] supplementing {len(missing)} critical symbols outside liquid snapshot')
+        bars.update(market.execution_bars(missing, trade_date))
+    return bars
+
+
 def settle_previous_decisions_at_close(requested_date: str) -> str:
     """Finish yesterday's target in two phases without look-ahead.
 
@@ -45,7 +58,7 @@ def settle_previous_decisions_at_close(requested_date: str) -> str:
         for fid, name in FUNDS.items()
     }
     critical = _critical_symbols(states)
-    bars = market.execution_bars(critical, trade_date) if critical else {}
+    bars = _close_bars(market, critical, trade_date)
 
     for fid, state in states.items():
         if str(state.get('last_processed_date') or '')[:10] == trade_date:
