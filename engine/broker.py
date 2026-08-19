@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 from .config import CONFIG
+from .universe import is_main_board
 
 
 def fee_for(side: str, gross: float) -> float:
@@ -32,7 +33,12 @@ def _locked_at_limit(side: str, bar: dict, price_field: str = 'open') -> bool:
 
 
 def _execution_target_map(state: dict, targets: list[dict]) -> dict[str,dict]:
-    """Final deterministic safety clamp before any simulated order is sized."""
+    """Final deterministic safety clamp before any simulated order is sized.
+
+    The retail account policy is main-board only. Any ChiNext/STAR/BSE/B-share target is
+    clamped to zero here even if an upstream cache/manual target somehow bypassed universe
+    filtering. Existing ineligible holdings can still be sold; they can never be increased.
+    """
     positions=state.get('positions') or {}
     d_fund=state.get('fund_id') in ('D_MAIN','D')
     out={}
@@ -40,7 +46,9 @@ def _execution_target_map(state: dict, targets: list[dict]) -> dict[str,dict]:
         sym=x['symbol']
         item={**x}
         weight=max(0.0,float(item.get('target_weight',0.0)))
-        if d_fund:
+        if not is_main_board(sym):
+            weight=0.0
+        elif d_fund:
             weight=min(weight,CONFIG.max_single_weight_d)
             if sym not in positions:
                 weight=min(weight,CONFIG.max_new_position_weight_d)
