@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from .board_policy import sanitize_pending_for_retail
 from .conditional_plan import PLAN_VERSION, build_exit_plan, ensure_exit_plans
 from .shadow_ledger import (
@@ -346,7 +348,10 @@ def execute_conditional_exit_scan(
             checks.append({'symbol':symbol,'action':'WAIT','reason':'no_live_quote'}); continue
         position['last_price']=reference
         plan=plans.get(symbol) or {}
-        plan['highest_price']=round(max(float(plan.get('highest_price') or reference),reference),4)
+        session_high=float(bar.get('high') or reference)
+        if not math.isfinite(session_high) or session_high < reference:
+            session_high=reference
+        plan['highest_price']=round(max(float(plan.get('highest_price') or reference),reference,session_high),4)
         if str(position.get('acquired_date') or '')[:10]==trade_date:
             checks.append({'symbol':symbol,'action':'WAIT','reason':'t_plus_one_locked'}); continue
         if _locked_at_price('SELL',bar,reference,policy):
@@ -363,7 +368,7 @@ def execute_conditional_exit_scan(
         reason=None; sell_all=True
         if hard>0 and reference<=hard:
             reason='hard_stop'
-        elif (reference>=activation or plan.get('partial_taken')) and reference<=trail_stop:
+        elif (highest>=activation or plan.get('partial_taken')) and reference<=trail_stop:
             reason='trailing_stop'
         elif rotation and rotation_min>0 and reference>=rotation_min:
             reason='rotation_exit_price_reached'
