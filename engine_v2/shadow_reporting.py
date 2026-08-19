@@ -6,6 +6,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
+from .conditional_plan import EXECUTION_MODEL, PLAN_VERSION
 from .shadow_ledger import FUND_NAMES, ledger_content_hash, sha256_json
 
 
@@ -55,8 +56,6 @@ def _summary_source_ref(current_audit: dict) -> dict | None:
         source_ref['timing_status'] = 'RECORDED'
         return source_ref
 
-    # Legacy morning events used "09:40" in prose even when a retry actually ran later.
-    # Preserve the immutable audit event, but never present that scheduled time as a verified fill time.
     source_ref['executed_at'] = None
     source_ref['timing_status'] = 'LEGACY_ACTUAL_TIME_UNRECORDED'
     source_ref['legacy_note'] = source_ref.get('note')
@@ -138,6 +137,7 @@ def ledger_metrics(state: dict) -> dict:
 
 def ledger_holdings(state: dict, equity: float) -> list[dict]:
     holdings = []
+    exits=state.get('exit_plans') or {}
     for symbol, position in (state.get('positions') or {}).items():
         quantity = int(position.get('qty') or 0)
         average_cost = float(position.get('avg_cost') or 0.0)
@@ -155,6 +155,9 @@ def ledger_holdings(state: dict, equity: float) -> list[dict]:
             'pnl_pct': round((last_price / average_cost - 1.0) * 100.0, 4) if average_cost > 0 else None,
             'thesis': position.get('thesis'),
             'invalidation': position.get('invalidation'),
+            'opportunity_score': position.get('opportunity_score'),
+            'setup': position.get('setup'),
+            'exit_plan': exits.get(symbol),
         })
     return sorted(holdings, key=lambda item: item['market_value'], reverse=True)
 
@@ -177,6 +180,8 @@ def build_summary(state_root: Path) -> dict:
             'fund_id': fund_id,
             'name': state.get('name'),
             'strategy_family': state.get('strategy_family'),
+            'execution_model': state.get('execution_model') or EXECUTION_MODEL,
+            'plan_version': state.get('plan_version'),
             'metrics': metrics,
             'holdings': ledger_holdings(state, float(metrics.get('equity') or 0.0)),
             'recent_fills': list(state.get('fills') or [])[-20:],
@@ -196,13 +201,16 @@ def build_summary(state_root: Path) -> dict:
     concentration_flags = ((latest_decision_audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
     for fund_id, fund in ledgers.items():
         fund['concentration_flags'] = list(concentration_flags.get(fund_id) or [])
+    current_source=_summary_source_ref(current_audit)
     summary = {
-        'summary_version': 'v2-shadow-summary-1.1',
+        'summary_version': 'v2-shadow-summary-1.2',
         'updated_at': trade_date,
         'initial_cash_per_fund': 1_000_000,
         'mode': 'FORWARD_SHADOW_ONLY',
+        'execution_model': (current_source or {}).get('execution_model') or next((f.get('execution_model') for f in ledgers.values() if f.get('execution_model')), None),
+        'plan_version': (current_source or {}).get('plan_version') or next((f.get('plan_version') for f in ledgers.values() if f.get('plan_version')), None),
         'regime': latest_decision_audit.get('regime'),
-        'source_ref': _summary_source_ref(current_audit),
+        'source_ref': current_source,
         'target_diagnostics': latest_decision_audit.get('target_diagnostics'),
         'funds': ledgers,
         'audit_head': head,
@@ -230,13 +238,8 @@ def attach_hs300_benchmark(summary: dict) -> dict:
                 starts.append(start)
     start_date = min(starts) if starts else trade_date
     benchmark = {
-        'name': '沪深300',
-        'symbol': 'sh000300',
-        'start_date': start_date,
-        'end_date': trade_date,
-        'return_pct': None,
-        'source': 'tencent-index',
-        'status': 'UNAVAILABLE',
+        'name': '沪深300', 'symbol': 'sh000300', 'start_date': start_date, 'end_date': trade_date,
+        'return_pct': None, 'source': 'tencent-index', 'status': 'UNAVAILABLE',
     }
     try:
         from engine.real_market import AKShareMarket
@@ -245,12 +248,7 @@ def attach_hs300_benchmark(summary: dict) -> dict:
         if not item or item.get('return_pct') is None:
             raise RuntimeError('沪深300同期收益未返回')
         benchmark.update(item)
-        benchmark.update({
-            'start_date': start_date,
-            'end_date': trade_date,
-            'source': 'tencent-index',
-            'status': 'OK',
-        })
+        benchmark.update({'start_date': start_date,'end_date': trade_date,'source': 'tencent-index','status': 'OK'})
     except Exception as exc:
         benchmark['error'] = str(exc)[:240]
 
@@ -282,8 +280,8 @@ def main() -> None:
         web_output.parent.mkdir(parents=True, exist_ok=True)
         web_output.write_text(serialized, encoding='utf-8')
     print(json.dumps({
-        'updated_at': summary['updated_at'],
-        'audit_head': summary['audit_head'],
+        'updated_at': summary['updated_at'], 'audit_head': summary['audit_head'],
+        'execution_model':summary.get('execution_model'),'plan_version':summary.get('plan_version'),
         'benchmark': summary.get('benchmark'),
         'fund_metrics': {key: value['metrics'] for key, value in summary['funds'].items()},
         'safety': summary['safety'],
