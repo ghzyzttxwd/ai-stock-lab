@@ -1,4 +1,4 @@
-name: V2 morning 09:40 sell (isolated)
+name: V2 09:40 conditional exit check (isolated)
 
 on:
   workflow_dispatch:
@@ -8,8 +8,8 @@ on:
       - 'shadow_state/v2/.morning-trigger'
   schedule:
     - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
-    - cron: '50 1 * * 1-5'  # 09:50 Beijing retry
-    - cron: '0 2 * * 1-5'   # 10:00 Beijing final retry
+    - cron: '50 1 * * 1-5'  # 09:50 retry only if primary failed
+    - cron: '0 2 * * 1-5'   # 10:00 final retry only if prior attempts failed
 
 permissions:
   contents: write
@@ -28,25 +28,15 @@ jobs:
         with:
           ref: v2-shadow
           fetch-depth: 0
-      - name: Record V2 morning run start
+      - name: Record V2 conditional-exit run start
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
+          import json, os
           from datetime import datetime, timezone
-          status={
-              'status': 'started',
-              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'event_name': os.environ.get('GITHUB_EVENT_NAME'),
-              'source_sha': os.environ.get('GITHUB_SHA'),
-              'started_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-          }
-          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(
-              json.dumps(status, ensure_ascii=False, indent=2) + '\n'
-          )
+          status={'status':'started','workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'started_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
+          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
           PY
           rm -rf /tmp/main-status
           git fetch origin main
@@ -61,15 +51,9 @@ jobs:
             mkdir -p state
             cp /tmp/v2-morning-job-status.json state/v2_morning_job_status.json
             git add state/v2_morning_job_status.json
-            if git diff --cached --quiet; then
-              pushed=1
-              break
-            fi
-            git commit -m "ops: V2 morning run started"
-            if git push origin HEAD:main; then
-              pushed=1
-              break
-            fi
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "ops: V2 conditional-exit run started"
+            if git push origin HEAD:main; then pushed=1; break; fi
           done
           test "$pushed" = "1"
       - uses: actions/setup-python@v5
@@ -89,8 +73,7 @@ jobs:
           PY
           )
           echo "date=$TD" >> "$GITHUB_OUTPUT"
-          echo "trade_date=$TD"
-      - name: Execute only prior-session SELL/reduce intents at live quote
+      - name: Check protective and profit exit conditions at live quote
         run: |
           python -m engine_v2.morning_sell_run \
             --date "${{ steps.td.outputs.date }}" \
@@ -102,9 +85,9 @@ jobs:
             --state-root shadow_state/v2 \
             --output shadow_state/v2/summary.json \
             --web-output web/v2/data.json
-      - name: Verify generated V2 web fallback after reporting
+      - name: Verify generated V2 web after reporting
         run: python -m unittest discover -s tests -p 'test_v2_web.py' -v
-      - name: Assert V2 isolation
+      - name: Assert V2 conditional-exit isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -114,10 +97,14 @@ jobs:
           r=json.load(open('/tmp/v2-morning-sell.json',encoding='utf-8'))
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 morning isolation invariant violated')
-          print('[V2 MORNING]',r.get('status'),r.get('trade_date'),r.get('fills'),r.get('executed_at'))
+              raise SystemExit('V2 conditional-exit isolation invariant violated')
+          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}:
+              raise SystemExit(f'unexpected V2 conditional-exit status: {r.get("status")}')
+          if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
+              raise SystemExit('V2 morning path is not conditional-plan model')
+          print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('fills'),r.get('executed_at'))
           PY
-      - name: Persist only isolated V2 morning state
+      - name: Persist only isolated V2 conditional-exit state
         shell: bash
         run: |
           set -euo pipefail
@@ -125,9 +112,9 @@ jobs:
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
           if git diff --cached --quiet; then
-            echo "No V2 morning state change."
+            echo "No V2 conditional-exit state change."
           else
-            git commit -m "v2-data: morning sell and intraday valuation"
+            git commit -m "v2-data: 09:40 conditional exit check"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
@@ -145,86 +132,49 @@ jobs:
           cd /tmp/main-sync
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
-
           synced=0
           for attempt in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/v2-data.json web/v2/data.json
             git add web/v2/data.json
-            if git diff --cached --quiet; then
-              echo "main already contains the latest V2 web data."
-              synced=1
-              break
-            fi
-            git commit -m "v2-data: sync morning web data to main"
-            if git push origin HEAD:main; then
-              synced=1
-              break
-            fi
-            echo "main advanced during sync; retrying from latest origin/main"
+            if git diff --cached --quiet; then synced=1; break; fi
+            git commit -m "v2-data: sync conditional-exit web data to main"
+            if git push origin HEAD:main; then synced=1; break; fi
           done
-          if [ "$synced" != "1" ]; then
-            echo "Failed to sync V2 web data into main after retries."
-            exit 1
-          fi
-
+          test "$synced" = "1"
           git fetch origin main
           actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
-          echo "main_sha256=$actual"
-          if [ "$actual" != "$expected" ]; then
-            echo "main V2 data hash mismatch; refusing to deploy."
-            exit 1
-          fi
+          test "$actual" = "$expected"
       - name: Dispatch canonical Pages deployment from main
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          payload='{"ref":"main"}'
-          code=$(curl -sS -o /tmp/dispatch-response.txt -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
-            -d "$payload")
+          code=$(curl -sS -o /tmp/dispatch-response.txt -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" -d '{"ref":"main"}')
           echo "dispatch_http_code=$code"
-          if [ "$code" != "204" ]; then
-            cat /tmp/dispatch-response.txt || true
-            exit 1
-          fi
-      - name: Verify public V2 data equals morning result
+          test "$code" = "204"
+      - name: Verify public V2 data equals conditional-exit result
         id: verify_public
         shell: bash
         run: |
           set -euo pipefail
           expected="${{ steps.sync_main.outputs.expected_sha256 }}"
-          echo "expected_sha256=$expected"
           for i in $(seq 1 60); do
             url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${i}"
             if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
               actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
-              echo "attempt=$i actual_sha256=$actual"
               if [ "$actual" = "$expected" ]; then
-                python - <<'PY'
-          import json
-          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
-          print('LIVE VERIFIED updated_at=', live.get('updated_at'))
-          for fund_id in 'ABCDL':
-              m=live['funds'][fund_id]['metrics']
-              print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
-          PY
                 echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
             sleep 5
           done
-          echo "Public V2 data still differs from the morning result; workflow must fail."
+          echo "Public V2 data still differs from conditional-exit result."
           exit 1
-      - name: Persist V2 morning end-to-end verification receipt
+      - name: Persist V2 conditional-exit end-to-end receipt
         shell: bash
         env:
           EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
@@ -233,33 +183,22 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
+          import json, os
           from datetime import datetime, timezone
-
-          report=json.load(open('/tmp/v2-morning-sell.json', encoding='utf-8'))
-          expected=os.environ['EXPECTED_SHA256']
-          public=os.environ['PUBLIC_SHA256']
-          if not expected or expected != public:
-              raise SystemExit('morning chain receipt refused: public hash mismatch')
+          report=json.load(open('/tmp/v2-morning-sell.json',encoding='utf-8'))
+          if os.environ['EXPECTED_SHA256']!=os.environ['PUBLIC_SHA256']:
+              raise SystemExit('conditional-exit public hash mismatch')
           receipt={
-              'status': 'verified',
-              'trade_date': os.environ['TRADE_DATE'],
-              'morning_execution_status': report.get('status'),
-              'morning_event_hash': report.get('event_hash'),
-              'scheduled_time': report.get('scheduled_time'),
-              'executed_at': report.get('executed_at'),
-              'expected_sha256': expected,
-              'public_sha256': public,
-              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'status':'verified','trade_date':os.environ['TRADE_DATE'],
+              'conditional_exit_status':report.get('status'),'event_hash':report.get('event_hash'),
+              'scheduled_time':report.get('scheduled_time'),'executed_at':report.get('executed_at'),
+              'execution_model':report.get('execution_model'),'plan_version':report.get('plan_version'),
+              'forced_clock_sell':False,'expected_sha256':os.environ['EXPECTED_SHA256'],'public_sha256':os.environ['PUBLIC_SHA256'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
-          open('/tmp/v2-morning-chain-verification.json','w',encoding='utf-8').write(
-              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
-          )
+          open('/tmp/v2-morning-chain-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
           PY
-
           cd /tmp/main-sync
           pushed=0
           for attempt in 1 2 3; do
@@ -268,29 +207,19 @@ jobs:
             mkdir -p state
             cp /tmp/v2-morning-chain-verification.json state/v2_morning_chain_verification.json
             git add state/v2_morning_chain_verification.json
-            if git diff --cached --quiet; then
-              echo "Morning verification receipt unchanged."
-              pushed=1
-              break
-            fi
-            git commit -m "ops: persist V2 morning end-to-end receipt"
-            if git push origin HEAD:main; then
-              pushed=1
-              break
-            fi
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "ops: persist V2 conditional-exit end-to-end receipt"
+            if git push origin HEAD:main; then pushed=1; break; fi
           done
-          if [ "$pushed" != "1" ]; then
-            echo "Failed to persist V2 morning verification receipt."
-            exit 1
-          fi
+          test "$pushed" = "1"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v2-morning-sell-${{ steps.td.outputs.date }}
+          name: v2-conditional-exit-${{ steps.td.outputs.date }}
           path: /tmp/v2-morning-sell.json
           if-no-files-found: warn
           retention-days: 30
-      - name: Persist final V2 morning job status
+      - name: Persist final V2 conditional-exit job status
         if: always()
         shell: bash
         env:
@@ -298,20 +227,10 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
+          import json, os
           from datetime import datetime, timezone
-          status={
-              'status': os.environ['JOB_STATUS'],
-              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'event_name': os.environ.get('GITHUB_EVENT_NAME'),
-              'source_sha': os.environ.get('GITHUB_SHA'),
-              'finished_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-          }
-          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(
-              json.dumps(status, ensure_ascii=False, indent=2) + '\n'
-          )
+          status={'status':os.environ['JOB_STATUS'],'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
+          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
           PY
           if [ ! -d /tmp/main-status/.git ] && [ ! -f /tmp/main-status/.git ]; then
             rm -rf /tmp/main-status
@@ -328,14 +247,8 @@ jobs:
             mkdir -p state
             cp /tmp/v2-morning-job-status.json state/v2_morning_job_status.json
             git add state/v2_morning_job_status.json
-            if git diff --cached --quiet; then
-              pushed=1
-              break
-            fi
-            git commit -m "ops: V2 morning run ${JOB_STATUS}"
-            if git push origin HEAD:main; then
-              pushed=1
-              break
-            fi
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "ops: V2 conditional-exit run ${JOB_STATUS}"
+            if git push origin HEAD:main; then pushed=1; break; fi
           done
           test "$pushed" = "1"
