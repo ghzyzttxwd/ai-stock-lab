@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from engine_v2.conditional_plan import PLAN_VERSION
 from engine_v2.split_execution import (
@@ -7,7 +8,7 @@ from engine_v2.split_execution import (
     execute_conditional_exit_scan,
     execute_pending_side,
 )
-from engine_v2.morning_sell_run import SCHEDULED_MORNING_TIME, _execution_snapshot
+from engine_v2.morning_sell_run import CHECKPOINTS, SCHEDULED_MORNING_TIME, _audit_path, _execution_snapshot
 from engine_v2.shadow_reporting import _summary_source_ref
 import engine_v2.shadow_run_split  # noqa: F401
 
@@ -49,6 +50,17 @@ class V2SplitExecutionTests(unittest.TestCase):
         self.assertEqual(snapshot['phase'], 'conditional_exit_scan')
         self.assertEqual(snapshot['scheduled_time'], '09:40')
         self.assertEqual(snapshot['executed_at'], executed_at)
+
+    def test_each_v2_checkpoint_has_distinct_audit_slot(self):
+        self.assertEqual(CHECKPOINTS, ('09:40','10:30','11:20','13:30','14:30','14:55'))
+        root=Path('/tmp/v2')
+        first=_audit_path(root,'2026-08-20','09:40')
+        second=_audit_path(root,'2026-08-20','10:30')
+        final=_audit_path(root,'2026-08-20','14:55')
+        self.assertEqual(first.name,'2026-08-20-execution-0940.json')
+        self.assertEqual(second.name,'2026-08-20-execution-1030.json')
+        self.assertEqual(final.name,'2026-08-20-execution-1455.json')
+        self.assertEqual(len({first,second,final}),3)
 
     def test_legacy_morning_audit_never_claims_scheduled_time_is_actual(self):
         legacy = {'event_kind':'morning_sell','source_ref':{'execution_bar_source':'sina-intraday','note':'Previous-session SELL/reduce intents executed at the 09:40 live quote.'}}
@@ -116,6 +128,38 @@ class V2SplitExecutionTests(unittest.TestCase):
         result=execute_conditional_exit_scan(state,bars,'2026-08-19',clock='09:40')
         self.assertEqual(len(result['fills']),1)
         self.assertEqual(result['fills'][0]['exit_reason'],'hard_stop')
+        self.assertEqual(state['positions'],{})
+
+    def test_trailing_stop_uses_intraday_high_not_only_checkpoint_price(self):
+        state={
+            'fund_id':'A','cash':0.0,'fills':[],'rejected_orders':[],
+            'positions':{'sh.600000':{'name':'持仓','qty':1000,'avg_cost':100.0,'acquired_date':'2026-08-18','last_price':100.0}},
+            'exit_plans':{'sh.600000':{
+                'plan_version':PLAN_VERSION,'hard_stop_price':90.0,'take_profit_price':120.0,
+                'trailing_activation_price':103.0,'trailing_drawdown_pct':0.025,'highest_price':100.0,
+                'partial_taken':False,'max_hold_days':3,'sessions_held':0,'rotation_exit':False,
+            }},
+        }
+        bars={'sh.600000':{'close':105.0,'high':110.0,'preclose':100.0,'tradestatus':'1'}}
+        result=execute_conditional_exit_scan(state,bars,'2026-08-19',clock='10:30')
+        self.assertEqual(len(result['fills']),1)
+        self.assertEqual(result['fills'][0]['exit_reason'],'trailing_stop')
+        self.assertEqual(state['positions'],{})
+
+    def test_1455_checkpoint_can_execute_max_hold_exit(self):
+        state={
+            'fund_id':'A','cash':0.0,'fills':[],'rejected_orders':[],
+            'positions':{'sh.600000':{'name':'持仓','qty':1000,'avg_cost':10.0,'acquired_date':'2026-08-17','last_price':10.0}},
+            'exit_plans':{'sh.600000':{
+                'plan_version':PLAN_VERSION,'hard_stop_price':8.0,'take_profit_price':12.0,
+                'trailing_activation_price':12.0,'trailing_drawdown_pct':0.025,'highest_price':10.0,
+                'partial_taken':False,'max_hold_days':3,'sessions_held':3,'rotation_exit':False,
+            }},
+        }
+        bars={'sh.600000':{'close':10.0,'high':10.0,'preclose':10.0,'tradestatus':'1'}}
+        result=execute_conditional_exit_scan(state,bars,'2026-08-20',clock='14:55')
+        self.assertEqual(len(result['fills']),1)
+        self.assertEqual(result['fills'][0]['exit_reason'],'max_hold_time_exit')
         self.assertEqual(state['positions'],{})
 
     def test_conditional_buy_still_hard_blocks_chinext_and_star(self):
