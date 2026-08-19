@@ -1,4 +1,4 @@
-name: Daily virtual-fund run
+name: Daily 15:10 virtual-fund close rebalance
 on:
   workflow_dispatch:
   # Safe recovery hook: changing only this marker can start a production catch-up/read-only refresh run.
@@ -7,10 +7,10 @@ on:
     paths:
       - 'state/.production-trigger'
   schedule:
-    # Beijing time, Monday-Friday. GitHub cron may be delayed, so use redundant catch-up slots.
-    - cron: '20 10 * * 1-5'  # 18:20 primary
-    - cron: '50 10 * * 1-5'  # 18:50 retry
-    - cron: '20 11 * * 1-5'  # 19:20 final retry
+    # Beijing time, Monday-Friday. 15:10 is the primary settlement slot; later slots are retries.
+    - cron: '10 7 * * 1-5'  # 15:10 primary
+    - cron: '20 7 * * 1-5'  # 15:20 retry
+    - cron: '30 7 * * 1-5'  # 15:30 final retry
 permissions:
   contents: write
   pages: write
@@ -61,9 +61,9 @@ jobs:
           except Exception:
               pass
 
-          # Scheduled retry slots can skip market/Sol once the ledger and cache are healthy.
+          # Scheduled retry slots can skip market/AI work once the ledger and cache are healthy.
           # An explicit production-trigger push intentionally rebuilds read-only web snapshots;
-          # run_all sees the same processed date and does not trade or call Sol again.
+          # run_all sees the same processed date and does not trade or call AI again.
           explicit_refresh = os.getenv('GITHUB_EVENT_NAME') == 'push'
           done = processed and cache_ok and not explicit_refresh
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
@@ -85,7 +85,7 @@ jobs:
         id: marketday
         if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
         run: python -m engine.schedule_guard production
-      - name: Settle prior target at close, then build next decision
+      - name: Settle previous target at 15:10 close rebalance, then build next decision
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -100,15 +100,15 @@ jobs:
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
           git add state/ web/d/data.json web/e/data.json
-          git diff --cached --quiet || git commit -m "data: daily virtual-fund run"
+          git diff --cached --quiet || git commit -m "data: 15:10 close rebalance"
           git pull --rebase origin main
           git push
       - name: Refresh latest committed web before deploy
         run: |
           git fetch origin main
           git reset --hard origin/main
-      # Pages deployment is intentionally still run on redundant retry slots and holidays.
-      # This repairs the case where the ledger was committed successfully but a prior Pages deploy failed.
+      # Pages deployment is still run on redundant retry slots and holidays.
+      # This repairs the case where ledger persistence succeeded but a prior deploy failed.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
