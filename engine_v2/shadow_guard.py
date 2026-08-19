@@ -9,7 +9,9 @@ from .shadow_ledger import FUND_NAMES, ledger_content_hash
 
 
 def _correction_for(state_root: Path, trade_date: str, daily_event_hash: str) -> dict | None:
-    path = state_root / 'audit' / f'{trade_date}-buy-price-correction.json'
+    # '~' sorts after '.json', so the correction remains the final event for that trade date
+    # while still sorting before the next calendar date.
+    path = state_root / 'audit' / f'{trade_date}~buy-price-correction.json'
     if not path.exists():
         return None
     try:
