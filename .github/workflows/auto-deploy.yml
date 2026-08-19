@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: 读取最新代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 准备 Python
         uses: actions/setup-python@v5
@@ -59,25 +61,50 @@ jobs:
         uses: actions/deploy-pages@v4
 
       - name: 公网验收 V2 数据与本次发布完全一致
+        id: verify_v2
         shell: bash
         run: |
           set -euo pipefail
           expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
           echo "expected_sha256=$expected"
-          for i in $(seq 1 12); do
-            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${i}"
+          for i in $(seq 1 18); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}"
             if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-data.json; then
               actual="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
               echo "attempt=$i actual_sha256=$actual"
               if [ "$actual" = "$expected" ]; then
                 python - <<'PY'
+          import hashlib
           import json
-          live=json.load(open('/tmp/live-v2-data.json', encoding='utf-8'))
+          import os
+          from datetime import datetime, timezone
+
+          live_path = '/tmp/live-v2-data.json'
+          live = json.load(open(live_path, encoding='utf-8'))
+          raw = open(live_path, 'rb').read()
+          actual = hashlib.sha256(raw).hexdigest()
+          expected = os.environ.get('EXPECTED_SHA256') or actual
           print('LIVE VERIFIED updated_at=', live.get('updated_at'))
           for fund_id in 'ABCDL':
               m=live['funds'][fund_id]['metrics']
               print(fund_id, 'return_pct=', m.get('return_pct'), 'equity=', m.get('equity'), 'positions=', m.get('positions'))
+          receipt = {
+              'status': 'verified',
+              'source_commit': os.environ['GITHUB_SHA'],
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'expected_sha256': expected,
+              'public_sha256': actual,
+              'updated_at': live.get('updated_at'),
+              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'public_url': 'https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json',
+          }
+          open('/tmp/v2-pages-verification.json', 'w', encoding='utf-8').write(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
+          )
           PY
+                echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
+                echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -85,3 +112,23 @@ jobs:
           done
           echo "公网 V2 数据与本次发布文件不一致，禁止把本次部署判定为成功。"
           exit 1
+        env:
+          EXPECTED_SHA256: ${{ hashFiles('web/v2/data.json') }}
+
+      - name: 持久化公网验收回执
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/v2-pages-verification.json
+          mkdir -p state
+          cp /tmp/v2-pages-verification.json state/v2_pages_verification.json
+          git config user.name "pages-verification-bot"
+          git config user.email "pages-verification-bot@users.noreply.github.com"
+          git add state/v2_pages_verification.json
+          if git diff --cached --quiet; then
+            echo "Verification receipt unchanged."
+            exit 0
+          fi
+          git commit -m "ops: persist V2 Pages verification receipt"
+          git pull --rebase origin main
+          git push origin HEAD:main
