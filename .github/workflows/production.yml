@@ -132,6 +132,7 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
       - name: Verify public D and E data match this deployment
+        id: verify_public
         shell: bash
         run: |
           set -euo pipefail
@@ -146,14 +147,33 @@ jobs:
               e_actual="$(sha256sum /tmp/live-e.json | awk '{print $1}')"
               echo "attempt=$i d=$d_actual e=$e_actual"
               if [ "$d_actual" = "$d_expected" ] && [ "$e_actual" = "$e_expected" ]; then
+                export D_EXPECTED="$d_expected" D_ACTUAL="$d_actual" E_EXPECTED="$e_expected" E_ACTUAL="$e_actual"
                 python - <<'PY'
-          import json
+          import json, os
+          from datetime import datetime, timezone
           for path in ('/tmp/live-d.json','/tmp/live-e.json'):
               x=json.load(open(path,encoding='utf-8'))
               if x.get('execution_model') != 'CONDITIONAL_PLAN_V1':
                   raise SystemExit(f'public {path} is not conditional-plan model')
+          receipt={
+              'status':'verified',
+              'execution_model':'CONDITIONAL_PLAN_V1',
+              'plan_version':'conditional-plan-v1',
+              'source_commit':os.environ['GITHUB_SHA'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'd_expected_sha256':os.environ['D_EXPECTED'],
+              'd_public_sha256':os.environ['D_ACTUAL'],
+              'e_expected_sha256':os.environ['E_EXPECTED'],
+              'e_public_sha256':os.environ['E_ACTUAL'],
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'public_d_url':'https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json',
+              'public_e_url':'https://ghzyzttxwd.github.io/ai-stock-lab/e/data.json',
+          }
+          open('/tmp/conditional-pages-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
           print('PUBLIC CONDITIONAL PLAN VERIFIED')
           PY
+                echo "d_sha256=$d_actual" >> "$GITHUB_OUTPUT"
+                echo "e_sha256=$e_actual" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -161,3 +181,21 @@ jobs:
           done
           echo "Public D/E data did not converge to committed deployment"
           exit 1
+      - name: Persist conditional-plan public verification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/conditional-pages-verification.json
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p state
+          cp /tmp/conditional-pages-verification.json state/conditional_pages_verification.json
+          git config user.name "conditional-plan-verification-bot"
+          git config user.email "conditional-plan-verification-bot@users.noreply.github.com"
+          git add state/conditional_pages_verification.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "ops: verify conditional-plan public pages"
+          git pull --rebase origin main
+          git push origin HEAD:main
