@@ -1,0 +1,58 @@
+name: Morning 09:40 virtual-fund sell refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 1 * * 1-5'  # 09:40 Beijing, Monday-Friday
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ai-stock-morning
+  cancel-in-progress: false
+
+jobs:
+  morning-sell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Execute prior-session sell/reduce intents at current 09:40 quotes
+        run: python -m engine.morning_run
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Persist morning ledger and intraday public snapshots
+        shell: bash
+        run: |
+          git config user.name "ai-stock-bot"
+          git config user.email "ai-stock-bot@users.noreply.github.com"
+          git add state/ web/d/data.json web/e/data.json
+          if git diff --cached --quiet; then
+            echo "No morning state change (holiday, no fresh decision, or already handled)."
+          else
+            git commit -m "data: 09:40 sell and intraday valuation"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - name: Refresh latest committed web before deploy
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
