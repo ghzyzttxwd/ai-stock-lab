@@ -15,6 +15,10 @@ permissions:
 env:
   REPAIR_DATE: '2026-08-19'
 
+concurrency:
+  group: repair-20260819-open-buy
+  cancel-in-progress: true
+
 jobs:
   repair:
     runs-on: ubuntu-latest
@@ -25,6 +29,41 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Record repair run start
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          status={
+              'status':'started',
+              'trade_date':'2026-08-19',
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'started_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/open-buy-repair-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
+          PY
+          rm -rf /tmp/repair-status-main
+          git fetch origin main
+          git worktree add --detach /tmp/repair-status-main origin/main
+          cd /tmp/repair-status-main
+          git config user.name "ai-stock-repair-bot"
+          git config user.email "ai-stock-repair-bot@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/open-buy-repair-status.json state/20260819_open_buy_repair_job_status.json
+            git add state/20260819_open_buy_repair_job_status.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: 2026-08-19 open-buy repair started"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
 
       - uses: actions/setup-python@v5
         with:
@@ -137,14 +176,12 @@ jobs:
           git fetch origin main v2-shadow
           python - <<'PY'
           import json, subprocess
-          from pathlib import Path
-
           for fid in ('D_MAIN','A','B','C','D','L'):
               raw=subprocess.check_output(['git','show',f'origin/main:state/{fid}.json'])
               state=json.loads(raw)
               buys=[x for x in state.get('fills',[]) if x.get('side')=='BUY' and str(x.get('trade_date',''))[:10]=='2026-08-19']
               assert all(x.get('execution_price_field')=='open' for x in buys), (fid,buys)
-
+              assert state.get('execution_model')=='09:40_SELL_15:10_OPEN_BUY'
           for fid in 'ABCDL':
               raw=subprocess.check_output(['git','show',f'origin/v2-shadow:shadow_state/v2/ledgers/{fid}.json'])
               state=json.loads(raw)
@@ -250,3 +287,41 @@ jobs:
           git commit -m "ops: verify 2026-08-19 open-price buy correction"
           git pull --rebase origin main
           git push origin HEAD:main
+
+      - name: Persist final repair run status
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          status={
+              'status':os.environ['JOB_STATUS'],
+              'trade_date':'2026-08-19',
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/open-buy-repair-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
+          PY
+          rm -rf /tmp/repair-final-status
+          git fetch origin main
+          git worktree add --detach /tmp/repair-final-status origin/main
+          cd /tmp/repair-final-status
+          git config user.name "ai-stock-repair-bot"
+          git config user.email "ai-stock-repair-bot@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/open-buy-repair-status.json state/20260819_open_buy_repair_job_status.json
+            git add state/20260819_open_buy_repair_job_status.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: 2026-08-19 open-buy repair ${JOB_STATUS}"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
