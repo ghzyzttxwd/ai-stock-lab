@@ -13,59 +13,12 @@
     ]
   },
   "source_ref": {
-    "snapshot_version": "v2-shadow-data-0.4",
-    "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
-    "enrichment_version": "v2-history-0.1",
-    "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
-    "target_version": "v2-shadow-targets-0.2",
-    "execution_model": "09:40_SELL_CLOSE_BUY",
-    "board_policy": {
-      "version": "retail-mainboard-only-2026-08-19",
-      "scope": "SH_SZ_MAINBOARD_ONLY",
-      "excludes": [
-        "CHINEXT_300_301",
-        "STAR_688_689",
-        "BSE",
-        "B_SHARES"
-      ],
-      "input_candidates": 180,
-      "eligible_candidates": 180,
-      "excluded_non_mainboard_count": 0,
-      "excluded_non_mainboard_symbols": []
-    },
-    "data_quality": {
-      "snapshot_source": "sina",
-      "snapshot_grade": null,
-      "industry_counts": {
-        "industries": 31,
-        "mainboard_stocks": 3193,
-        "component_rows_mainboard": 3193,
-        "duplicate_cross_industry_stocks": 0,
-        "component_failures": 0,
-        "history_failures": 0
-      },
-      "enrichment_coverage": {
-        "preselected": 180,
-        "tencent_current_histories": 180,
-        "eligible_technical_features": 180,
-        "history_ratio": 1.0,
-        "feature_ratio": 1.0,
-        "history_cache": {
-          "cache_version": "v2-tencent-qfq-1",
-          "workers": 3,
-          "selected": 180,
-          "current_histories": 180,
-          "cache_hits": 0,
-          "incremental_fetches": 129,
-          "adjustment_full_refreshes": 0,
-          "full_fetches": 51,
-          "failures": 0,
-          "elapsed_s": 135.48,
-          "sample_errors": []
-        }
-      },
-      "missing_critical_execution_bars": []
-    }
+    "reason": "2026-08-19 BUY legs were incorrectly settled from close prices",
+    "old_buy_reference": "session_close",
+    "correct_buy_reference": "session_open",
+    "accounting_time": "15:10 Asia/Shanghai",
+    "execution_model": "09:40_SELL_15:10_OPEN_BUY",
+    "bar_source": "tencent-execution"
   },
   "target_diagnostics": {
     "stats": {
@@ -188,42 +141,42 @@
       "strategy_family": "v2-shadow",
       "metrics": {
         "trading_days": 4,
-        "equity": 998354.87,
-        "cash": 456061.87,
-        "position_market_value": 542293.0,
-        "return_pct": -0.1645,
-        "max_drawdown_pct": -0.5697,
-        "daily_volatility_pct": 0.4241,
+        "equity": 996200.25,
+        "cash": 457650.25,
+        "position_market_value": 538550.0,
+        "return_pct": -0.38,
+        "max_drawdown_pct": -0.7843,
+        "daily_volatility_pct": 0.5137,
         "fills": 35,
-        "rejected_orders": 4,
-        "turnover_on_initial_capital": 1.424351,
-        "fees": 662.03,
-        "fees_pct_of_initial": 0.066203,
+        "rejected_orders": 2,
+        "turnover_on_initial_capital": 1.422764,
+        "fees": 661.55,
+        "fees_pct_of_initial": 0.066155,
         "positions": 10,
         "industry_weights": {
-          "银行": 0.378089,
-          "社会服务": 0.141018,
-          "农林牧渔": 0.107514,
-          "基础化工": 0.105895,
-          "非银金融": 0.101111,
-          "医药生物": 0.095417,
-          "传媒": 0.070956
+          "银行": 0.382904,
+          "社会服务": 0.138734,
+          "农林牧渔": 0.106569,
+          "基础化工": 0.102449,
+          "非银金融": 0.101814,
+          "医药生物": 0.09608,
+          "传媒": 0.071449
         },
-        "industry_hhi": 0.209973,
-        "effective_industries": 4.7625,
-        "excess_hs300_pct": 1.4855
+        "industry_hhi": 0.212418,
+        "effective_industries": 4.7077,
+        "excess_hs300_pct": 1.27
       },
       "holdings": [
         {
           "symbol": "sz.002033",
           "name": "丽江股份",
           "industry": "社会服务",
-          "qty": 8700,
-          "avg_cost": 8.7966,
+          "qty": 8500,
+          "avg_cost": 8.9567,
           "last_price": 8.79,
-          "market_value": 76473.0,
-          "weight_pct": 7.6599,
-          "pnl_pct": -0.075,
+          "market_value": 74715.0,
+          "weight_pct": 7.5,
+          "pnl_pct": -1.8612,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
         },
@@ -231,12 +184,12 @@
           "symbol": "sz.002215",
           "name": "诺 普 信",
           "industry": "农林牧渔",
-          "qty": 6400,
-          "avg_cost": 9.1177,
+          "qty": 6300,
+          "avg_cost": 9.2078,
           "last_price": 9.11,
-          "market_value": 58304.0,
-          "weight_pct": 5.84,
-          "pnl_pct": -0.0845,
+          "market_value": 57393.0,
+          "weight_pct": 5.7612,
+          "pnl_pct": -1.0621,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
         },
@@ -244,12 +197,12 @@
           "symbol": "sz.002170",
           "name": "芭田股份",
           "industry": "基础化工",
-          "qty": 5100,
-          "avg_cost": 11.2694,
+          "qty": 4900,
+          "avg_cost": 11.5295,
           "last_price": 11.26,
-          "market_value": 57426.0,
-          "weight_pct": 5.7521,
-          "pnl_pct": -0.0834,
+          "market_value": 55174.0,
+          "weight_pct": 5.5384,
+          "pnl_pct": -2.3375,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
         },
@@ -261,7 +214,7 @@
           "avg_cost": 6.1005,
           "last_price": 5.96,
           "market_value": 54832.0,
-          "weight_pct": 5.4922,
+          "weight_pct": 5.5041,
           "pnl_pct": -2.3031,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -274,7 +227,7 @@
           "avg_cost": 11.1894,
           "last_price": 11.76,
           "market_value": 52920.0,
-          "weight_pct": 5.3007,
+          "weight_pct": 5.3122,
           "pnl_pct": 5.0995,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -287,7 +240,7 @@
           "avg_cost": 11.6695,
           "last_price": 11.95,
           "market_value": 52580.0,
-          "weight_pct": 5.2667,
+          "weight_pct": 5.2781,
           "pnl_pct": 2.4037,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -300,7 +253,7 @@
           "avg_cost": 9.5105,
           "last_price": 9.24,
           "market_value": 51744.0,
-          "weight_pct": 5.1829,
+          "weight_pct": 5.1941,
           "pnl_pct": -2.8442,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -309,12 +262,12 @@
           "symbol": "sz.002948",
           "name": "青岛银行",
           "industry": "银行",
-          "qty": 8500,
-          "avg_cost": 5.8948,
+          "qty": 8700,
+          "avg_cost": 5.7747,
           "last_price": 5.89,
-          "market_value": 50065.0,
-          "weight_pct": 5.0147,
-          "pnl_pct": -0.0814,
+          "market_value": 51243.0,
+          "weight_pct": 5.1438,
+          "pnl_pct": 1.9966,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
         },
@@ -326,7 +279,7 @@
           "avg_cost": 32.3017,
           "last_price": 32.98,
           "market_value": 49470.0,
-          "weight_pct": 4.9552,
+          "weight_pct": 4.9659,
           "pnl_pct": 2.0999,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -339,7 +292,7 @@
           "avg_cost": 389.0807,
           "last_price": 384.79,
           "market_value": 38479.0,
-          "weight_pct": 3.8542,
+          "weight_pct": 3.8626,
           "pnl_pct": -1.1028,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
@@ -619,15 +572,15 @@
           "symbol": "sz.002033",
           "name": "丽江股份",
           "side": "BUY",
-          "reference_price": 8.79,
-          "execution_price_field": "close",
-          "price": 8.794,
-          "qty": 8700,
-          "gross": 76507.8,
-          "fees": 22.95,
-          "net_cash_change": -76530.75,
+          "reference_price": 8.95,
+          "execution_price_field": "open",
+          "price": 8.954,
+          "qty": 8500,
+          "gross": 76109.0,
+          "fees": 22.83,
+          "net_cash_change": -76131.83,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "A",
@@ -636,15 +589,15 @@
           "symbol": "sz.002215",
           "name": "诺 普 信",
           "side": "BUY",
-          "reference_price": 9.11,
-          "execution_price_field": "close",
-          "price": 9.115,
-          "qty": 6400,
-          "gross": 58336.0,
-          "fees": 17.5,
-          "net_cash_change": -58353.5,
+          "reference_price": 9.2,
+          "execution_price_field": "open",
+          "price": 9.205,
+          "qty": 6300,
+          "gross": 57991.5,
+          "fees": 17.4,
+          "net_cash_change": -58008.9,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "A",
@@ -653,15 +606,15 @@
           "symbol": "sz.002170",
           "name": "芭田股份",
           "side": "BUY",
-          "reference_price": 11.26,
-          "execution_price_field": "close",
-          "price": 11.266,
-          "qty": 5100,
-          "gross": 57456.6,
-          "fees": 17.24,
-          "net_cash_change": -57473.84,
+          "reference_price": 11.52,
+          "execution_price_field": "open",
+          "price": 11.526,
+          "qty": 4900,
+          "gross": 56477.4,
+          "fees": 16.94,
+          "net_cash_change": -56494.34,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "A",
@@ -670,15 +623,15 @@
           "symbol": "sz.002948",
           "name": "青岛银行",
           "side": "BUY",
-          "reference_price": 5.89,
-          "execution_price_field": "close",
-          "price": 5.893,
-          "qty": 8500,
-          "gross": 50090.5,
-          "fees": 15.03,
-          "net_cash_change": -50105.53,
+          "reference_price": 5.77,
+          "execution_price_field": "open",
+          "price": 5.773,
+          "qty": 8700,
+          "gross": 50225.1,
+          "fees": 15.07,
+          "net_cash_change": -50240.17,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         }
       ],
       "recent_rejected_orders": [
@@ -705,35 +658,7 @@
           "target_weight": 0.0493,
           "reason": "below_board_lot",
           "details": {
-            "cash": 456061.87,
-            "phase": "close_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-18",
-          "trade_date": "2026-08-19",
-          "symbol": "sz.000567",
-          "name": "海德股份",
-          "side": "BUY",
-          "target_weight": 0.055456,
-          "reason": "below_board_lot",
-          "details": {
-            "cash": 456061.87,
-            "phase": "close_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-18",
-          "trade_date": "2026-08-19",
-          "symbol": "sz.000989",
-          "name": "九芝堂",
-          "side": "BUY",
-          "target_weight": 0.051969,
-          "reason": "below_board_lot",
-          "details": {
-            "cash": 456061.87,
+            "cash": 457650.25,
             "phase": "close_buy"
           }
         }
@@ -762,15 +687,15 @@
         },
         {
           "date": "2026-08-19",
-          "equity": 998354.87,
-          "cash": 456061.87,
-          "market_value": 542293.0,
-          "fees": 72.72
+          "equity": 996200.25,
+          "cash": 457650.25,
+          "market_value": 538550.0,
+          "fees": 72.24
         }
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_close_buy",
+        "execute_on": "next_session_0940_sell_1510_open_buy",
         "strategy_version": "v2-a-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -938,7 +863,7 @@
           "enrichment_version": "v2-history-0.1",
           "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
           "target_version": "v2-shadow-targets-0.2",
-          "execution_model": "09:40_SELL_CLOSE_BUY",
+          "execution_model": "09:40_SELL_15:10_OPEN_BUY",
           "board_policy": {
             "version": "retail-mainboard-only-2026-08-19",
             "scope": "SH_SZ_MAINBOARD_ONLY",
@@ -988,9 +913,9 @@
           }
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_CLOSE_BUY"
+        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
       },
-      "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
       "concentration_flags": []
     },
     "B": {
@@ -999,39 +924,39 @@
       "strategy_family": "v2-shadow",
       "metrics": {
         "trading_days": 4,
-        "equity": 991163.5,
-        "cash": 354806.5,
-        "position_market_value": 636357.0,
-        "return_pct": -0.8837,
-        "max_drawdown_pct": -1.3062,
-        "daily_volatility_pct": 0.7005,
+        "equity": 991850.63,
+        "cash": 353880.63,
+        "position_market_value": 637970.0,
+        "return_pct": -0.8149,
+        "max_drawdown_pct": -1.2378,
+        "daily_volatility_pct": 0.6696,
         "fills": 29,
         "rejected_orders": 0,
-        "turnover_on_initial_capital": 1.664653,
-        "fees": 758.7,
-        "fees_pct_of_initial": 0.07587,
+        "turnover_on_initial_capital": 1.665579,
+        "fees": 758.97,
+        "fees_pct_of_initial": 0.075897,
         "positions": 6,
         "industry_weights": {
-          "有色金属": 0.313296,
-          "基础化工": 0.240665,
-          "石油石化": 0.239865,
-          "医药生物": 0.206174
+          "有色金属": 0.306566,
+          "石油石化": 0.260194,
+          "基础化工": 0.227588,
+          "医药生物": 0.205652
         },
-        "industry_hhi": 0.256117,
-        "effective_industries": 3.9045,
-        "excess_hs300_pct": 0.7663
+        "industry_hhi": 0.255773,
+        "effective_industries": 3.9097,
+        "excess_hs300_pct": 0.8351
       },
       "holdings": [
         {
           "symbol": "sz.000703",
           "name": "恒逸石化",
           "industry": "石油石化",
-          "qty": 8000,
-          "avg_cost": 19.0957,
+          "qty": 8700,
+          "avg_cost": 17.5243,
           "last_price": 19.08,
-          "market_value": 152640.0,
-          "weight_pct": 15.4001,
-          "pnl_pct": -0.0822,
+          "market_value": 165996.0,
+          "weight_pct": 16.736,
+          "pnl_pct": 8.8774,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         },
@@ -1040,11 +965,11 @@
           "name": "药明康德",
           "industry": "医药生物",
           "qty": 800,
-          "avg_cost": 164.1312,
+          "avg_cost": 167.1331,
           "last_price": 164.0,
           "market_value": 131200.0,
-          "weight_pct": 13.237,
-          "pnl_pct": -0.0799,
+          "weight_pct": 13.2278,
+          "pnl_pct": -1.8746,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         },
@@ -1052,12 +977,12 @@
           "symbol": "sz.002842",
           "name": "翔鹭钨业",
           "industry": "有色金属",
-          "qty": 2700,
-          "avg_cost": 37.9104,
+          "qty": 2600,
+          "avg_cost": 39.4318,
           "last_price": 37.88,
-          "market_value": 102276.0,
-          "weight_pct": 10.3188,
-          "pnl_pct": -0.0802,
+          "market_value": 98488.0,
+          "weight_pct": 9.9297,
+          "pnl_pct": -3.9354,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         },
@@ -1066,11 +991,11 @@
           "name": "兴业银锡",
           "industry": "有色金属",
           "qty": 2700,
-          "avg_cost": 36.1059,
+          "avg_cost": 37.0307,
           "last_price": 35.96,
           "market_value": 97092.0,
-          "weight_pct": 9.7958,
-          "pnl_pct": -0.4041,
+          "weight_pct": 9.789,
+          "pnl_pct": -2.8914,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         },
@@ -1078,12 +1003,12 @@
           "symbol": "sh.600227",
           "name": "赤天化",
           "industry": "基础化工",
-          "qty": 25500,
-          "avg_cost": 3.7231,
+          "qty": 25600,
+          "avg_cost": 3.7031,
           "last_price": 3.72,
-          "market_value": 94860.0,
-          "weight_pct": 9.5706,
-          "pnl_pct": -0.0833,
+          "market_value": 95232.0,
+          "weight_pct": 9.6014,
+          "pnl_pct": 0.4564,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         },
@@ -1091,12 +1016,12 @@
           "symbol": "sh.603823",
           "name": "百合花",
           "industry": "基础化工",
-          "qty": 700,
-          "avg_cost": 83.337,
+          "qty": 600,
+          "avg_cost": 91.0723,
           "last_price": 83.27,
-          "market_value": 58289.0,
-          "weight_pct": 5.8809,
-          "pnl_pct": -0.0804,
+          "market_value": 49962.0,
+          "weight_pct": 5.0373,
+          "pnl_pct": -8.5671,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
           "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
         }
@@ -1339,15 +1264,15 @@
           "symbol": "sz.000703",
           "name": "恒逸石化",
           "side": "BUY",
-          "reference_price": 19.08,
-          "execution_price_field": "close",
-          "price": 19.09,
-          "qty": 8000,
-          "gross": 152720.0,
-          "fees": 45.82,
-          "net_cash_change": -152765.82,
+          "reference_price": 17.51,
+          "execution_price_field": "open",
+          "price": 17.519,
+          "qty": 8700,
+          "gross": 152415.3,
+          "fees": 45.72,
+          "net_cash_change": -152461.02,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "B",
@@ -1356,15 +1281,15 @@
           "symbol": "sh.603259",
           "name": "药明康德",
           "side": "BUY",
-          "reference_price": 164.0,
-          "execution_price_field": "close",
-          "price": 164.082,
+          "reference_price": 167.0,
+          "execution_price_field": "open",
+          "price": 167.083,
           "qty": 800,
-          "gross": 131265.6,
-          "fees": 39.38,
-          "net_cash_change": -131304.98,
+          "gross": 133666.4,
+          "fees": 40.1,
+          "net_cash_change": -133706.5,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "B",
@@ -1373,15 +1298,15 @@
           "symbol": "sz.002842",
           "name": "翔鹭钨业",
           "side": "BUY",
-          "reference_price": 37.88,
-          "execution_price_field": "close",
-          "price": 37.899,
-          "qty": 2700,
-          "gross": 102327.3,
-          "fees": 30.7,
-          "net_cash_change": -102358.0,
+          "reference_price": 39.4,
+          "execution_price_field": "open",
+          "price": 39.42,
+          "qty": 2600,
+          "gross": 102492.0,
+          "fees": 30.75,
+          "net_cash_change": -102522.75,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "B",
@@ -1390,15 +1315,15 @@
           "symbol": "sz.000426",
           "name": "兴业银锡",
           "side": "BUY",
-          "reference_price": 35.96,
-          "execution_price_field": "close",
-          "price": 35.978,
+          "reference_price": 36.92,
+          "execution_price_field": "open",
+          "price": 36.938,
           "qty": 2600,
-          "gross": 93542.8,
-          "fees": 28.06,
-          "net_cash_change": -93570.86,
+          "gross": 96038.8,
+          "fees": 28.81,
+          "net_cash_change": -96067.61,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "B",
@@ -1407,15 +1332,15 @@
           "symbol": "sh.600227",
           "name": "赤天化",
           "side": "BUY",
-          "reference_price": 3.72,
-          "execution_price_field": "close",
-          "price": 3.722,
-          "qty": 25500,
-          "gross": 94911.0,
-          "fees": 28.47,
-          "net_cash_change": -94939.47,
+          "reference_price": 3.7,
+          "execution_price_field": "open",
+          "price": 3.702,
+          "qty": 25600,
+          "gross": 94771.2,
+          "fees": 28.43,
+          "net_cash_change": -94799.63,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "B",
@@ -1424,15 +1349,15 @@
           "symbol": "sh.603823",
           "name": "百合花",
           "side": "BUY",
-          "reference_price": 83.27,
-          "execution_price_field": "close",
-          "price": 83.312,
-          "qty": 700,
-          "gross": 58318.4,
-          "fees": 17.5,
-          "net_cash_change": -58335.9,
+          "reference_price": 91.0,
+          "execution_price_field": "open",
+          "price": 91.045,
+          "qty": 600,
+          "gross": 54627.0,
+          "fees": 16.39,
+          "net_cash_change": -54643.39,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         }
       ],
       "recent_rejected_orders": [],
@@ -1460,15 +1385,15 @@
         },
         {
           "date": "2026-08-19",
-          "equity": 991163.5,
-          "cash": 354806.5,
-          "market_value": 636357.0,
-          "fees": 189.93
+          "equity": 991850.63,
+          "cash": 353880.63,
+          "market_value": 637970.0,
+          "fees": 190.2
         }
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_close_buy",
+        "execute_on": "next_session_0940_sell_1510_open_buy",
         "strategy_version": "v2-b-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -1582,7 +1507,7 @@
           "enrichment_version": "v2-history-0.1",
           "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
           "target_version": "v2-shadow-targets-0.2",
-          "execution_model": "09:40_SELL_CLOSE_BUY",
+          "execution_model": "09:40_SELL_15:10_OPEN_BUY",
           "board_policy": {
             "version": "retail-mainboard-only-2026-08-19",
             "scope": "SH_SZ_MAINBOARD_ONLY",
@@ -1632,9 +1557,9 @@
           }
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_CLOSE_BUY"
+        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
       },
-      "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
       "concentration_flags": []
     },
     "C": {
@@ -1643,50 +1568,37 @@
       "strategy_family": "v2-shadow",
       "metrics": {
         "trading_days": 4,
-        "equity": 998486.38,
-        "cash": 560362.38,
-        "position_market_value": 438124.0,
-        "return_pct": -0.1514,
-        "max_drawdown_pct": -1.3247,
-        "daily_volatility_pct": 0.8845,
+        "equity": 993787.08,
+        "cash": 560386.08,
+        "position_market_value": 433401.0,
+        "return_pct": -0.6213,
+        "max_drawdown_pct": -1.7891,
+        "daily_volatility_pct": 1.0371,
         "fills": 17,
         "rejected_orders": 1,
-        "turnover_on_initial_capital": 1.676411,
+        "turnover_on_initial_capital": 1.676388,
         "fees": 814.92,
         "fees_pct_of_initial": 0.081492,
         "positions": 4,
         "industry_weights": {
-          "基础化工": 0.608113,
-          "农林牧渔": 0.391887
+          "基础化工": 0.614177,
+          "农林牧渔": 0.385823
         },
-        "industry_hhi": 0.523377,
-        "effective_industries": 1.9107,
-        "excess_hs300_pct": 1.4986
+        "industry_hhi": 0.526073,
+        "effective_industries": 1.9009,
+        "excess_hs300_pct": 1.0287
       },
       "holdings": [
         {
           "symbol": "sh.600737",
           "name": "中粮糖业",
           "industry": "农林牧渔",
-          "qty": 11500,
-          "avg_cost": 14.9415,
+          "qty": 11200,
+          "avg_cost": 15.3726,
           "last_price": 14.93,
-          "market_value": 171695.0,
-          "weight_pct": 17.1955,
-          "pnl_pct": -0.077,
-          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
-        },
-        {
-          "symbol": "sh.600722",
-          "name": "金牛化工",
-          "industry": "基础化工",
-          "qty": 7500,
-          "avg_cost": 12.8499,
-          "last_price": 12.84,
-          "market_value": 96300.0,
-          "weight_pct": 9.6446,
-          "pnl_pct": -0.077,
+          "market_value": 167216.0,
+          "weight_pct": 16.8261,
+          "pnl_pct": -2.8791,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
           "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
         },
@@ -1694,12 +1606,25 @@
           "symbol": "sh.603580",
           "name": "艾艾精工",
           "industry": "基础化工",
-          "qty": 1400,
-          "avg_cost": 68.0444,
+          "qty": 1500,
+          "avg_cost": 65.0515,
           "last_price": 67.99,
-          "market_value": 95186.0,
-          "weight_pct": 9.533,
-          "pnl_pct": -0.0799,
+          "market_value": 101985.0,
+          "weight_pct": 10.2623,
+          "pnl_pct": 4.5172,
+          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+        },
+        {
+          "symbol": "sh.600722",
+          "name": "金牛化工",
+          "industry": "基础化工",
+          "qty": 7600,
+          "avg_cost": 12.6098,
+          "last_price": 12.84,
+          "market_value": 97584.0,
+          "weight_pct": 9.8194,
+          "pnl_pct": 1.8256,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
           "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
         },
@@ -1707,12 +1632,12 @@
           "symbol": "sh.603823",
           "name": "百合花",
           "industry": "基础化工",
-          "qty": 900,
-          "avg_cost": 83.337,
+          "qty": 800,
+          "avg_cost": 91.0723,
           "last_price": 83.27,
-          "market_value": 74943.0,
-          "weight_pct": 7.5057,
-          "pnl_pct": -0.0804,
+          "market_value": 66616.0,
+          "weight_pct": 6.7032,
+          "pnl_pct": -8.5671,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
           "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
         }
@@ -1937,15 +1862,15 @@
           "symbol": "sh.600737",
           "name": "中粮糖业",
           "side": "BUY",
-          "reference_price": 14.93,
-          "execution_price_field": "close",
-          "price": 14.937,
-          "qty": 11500,
-          "gross": 171775.5,
-          "fees": 51.53,
-          "net_cash_change": -171827.03,
+          "reference_price": 15.36,
+          "execution_price_field": "open",
+          "price": 15.368,
+          "qty": 11200,
+          "gross": 172121.6,
+          "fees": 51.64,
+          "net_cash_change": -172173.24,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "C",
@@ -1954,15 +1879,15 @@
           "symbol": "sh.603580",
           "name": "艾艾精工",
           "side": "BUY",
-          "reference_price": 67.99,
-          "execution_price_field": "close",
-          "price": 68.024,
-          "qty": 1400,
-          "gross": 95233.6,
-          "fees": 28.57,
-          "net_cash_change": -95262.17,
+          "reference_price": 65.0,
+          "execution_price_field": "open",
+          "price": 65.032,
+          "qty": 1500,
+          "gross": 97548.0,
+          "fees": 29.26,
+          "net_cash_change": -97577.26,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "C",
@@ -1971,15 +1896,15 @@
           "symbol": "sh.600722",
           "name": "金牛化工",
           "side": "BUY",
-          "reference_price": 12.84,
-          "execution_price_field": "close",
-          "price": 12.846,
-          "qty": 7500,
-          "gross": 96345.0,
-          "fees": 28.9,
-          "net_cash_change": -96373.9,
+          "reference_price": 12.6,
+          "execution_price_field": "open",
+          "price": 12.606,
+          "qty": 7600,
+          "gross": 95805.6,
+          "fees": 28.74,
+          "net_cash_change": -95834.34,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "C",
@@ -1988,15 +1913,15 @@
           "symbol": "sh.603823",
           "name": "百合花",
           "side": "BUY",
-          "reference_price": 83.27,
-          "execution_price_field": "close",
-          "price": 83.312,
-          "qty": 900,
-          "gross": 74980.8,
-          "fees": 22.49,
-          "net_cash_change": -75003.29,
+          "reference_price": 91.0,
+          "execution_price_field": "open",
+          "price": 91.045,
+          "qty": 800,
+          "gross": 72836.0,
+          "fees": 21.85,
+          "net_cash_change": -72857.85,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         }
       ],
       "recent_rejected_orders": [
@@ -2038,15 +1963,15 @@
         },
         {
           "date": "2026-08-19",
-          "equity": 998486.38,
-          "cash": 560362.38,
-          "market_value": 438124.0,
+          "equity": 993787.08,
+          "cash": 560386.08,
+          "market_value": 433401.0,
           "fees": 131.49
         }
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_close_buy",
+        "execute_on": "next_session_0940_sell_1510_open_buy",
         "strategy_version": "v2-c-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -2076,7 +2001,7 @@
           "enrichment_version": "v2-history-0.1",
           "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
           "target_version": "v2-shadow-targets-0.2",
-          "execution_model": "09:40_SELL_CLOSE_BUY",
+          "execution_model": "09:40_SELL_15:10_OPEN_BUY",
           "board_policy": {
             "version": "retail-mainboard-only-2026-08-19",
             "scope": "SH_SZ_MAINBOARD_ONLY",
@@ -2126,9 +2051,9 @@
           }
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_CLOSE_BUY"
+        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
       },
-      "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
       "concentration_flags": []
     },
     "D": {
@@ -2137,27 +2062,27 @@
       "strategy_family": "v2-shadow",
       "metrics": {
         "trading_days": 4,
-        "equity": 989361.86,
-        "cash": 400945.86,
-        "position_market_value": 588416.0,
-        "return_pct": -1.0638,
-        "max_drawdown_pct": -2.2928,
-        "daily_volatility_pct": 1.3839,
+        "equity": 976651.22,
+        "cash": 395485.22,
+        "position_market_value": 581166.0,
+        "return_pct": -2.3349,
+        "max_drawdown_pct": -3.5481,
+        "daily_volatility_pct": 1.9734,
         "fills": 31,
-        "rejected_orders": 1,
-        "turnover_on_initial_capital": 1.572321,
-        "fees": 729.74,
-        "fees_pct_of_initial": 0.072974,
+        "rejected_orders": 0,
+        "turnover_on_initial_capital": 1.57778,
+        "fees": 731.38,
+        "fees_pct_of_initial": 0.073138,
         "positions": 8,
         "industry_weights": {
-          "农林牧渔": 0.465783,
-          "医药生物": 0.1951,
-          "食品饮料": 0.178007,
-          "基础化工": 0.161111
+          "农林牧渔": 0.459118,
+          "医药生物": 0.197534,
+          "食品饮料": 0.180227,
+          "基础化工": 0.16312
         },
-        "industry_hhi": 0.312661,
-        "effective_industries": 3.1984,
-        "excess_hs300_pct": 0.5862
+        "industry_hhi": 0.308899,
+        "effective_industries": 3.2373,
+        "excess_hs300_pct": -0.6849
       },
       "holdings": [
         {
@@ -2168,7 +2093,7 @@
           "avg_cost": 161.162,
           "last_price": 164.0,
           "market_value": 114800.0,
-          "weight_pct": 11.6034,
+          "weight_pct": 11.7545,
           "pnl_pct": 1.761,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
@@ -2181,7 +2106,7 @@
           "avg_cost": 11.1953,
           "last_price": 10.58,
           "market_value": 104742.0,
-          "weight_pct": 10.5868,
+          "weight_pct": 10.7246,
           "pnl_pct": -5.4961,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
@@ -2191,11 +2116,11 @@
           "name": "国恩股份",
           "industry": "基础化工",
           "qty": 1500,
-          "avg_cost": 63.251,
+          "avg_cost": 65.0515,
           "last_price": 63.2,
           "market_value": 94800.0,
-          "weight_pct": 9.5819,
-          "pnl_pct": -0.0806,
+          "weight_pct": 9.7066,
+          "pnl_pct": -2.8462,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
         },
@@ -2203,25 +2128,12 @@
           "symbol": "sh.600251",
           "name": "冠农股份",
           "industry": "农林牧渔",
-          "qty": 7500,
-          "avg_cost": 9.998,
+          "qty": 7300,
+          "avg_cost": 10.4581,
           "last_price": 9.99,
-          "market_value": 74925.0,
-          "weight_pct": 7.5731,
-          "pnl_pct": -0.08,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
-        },
-        {
-          "symbol": "sz.002772",
-          "name": "众兴菌业",
-          "industry": "农林牧渔",
-          "qty": 5300,
-          "avg_cost": 10.6682,
-          "last_price": 10.66,
-          "market_value": 56498.0,
-          "weight_pct": 5.7105,
-          "pnl_pct": -0.0769,
+          "market_value": 72927.0,
+          "weight_pct": 7.467,
+          "pnl_pct": -4.476,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
         },
@@ -2229,12 +2141,25 @@
           "symbol": "sh.601952",
           "name": "苏垦农发",
           "industry": "农林牧渔",
-          "qty": 6400,
-          "avg_cost": 8.7966,
+          "qty": 6200,
+          "avg_cost": 9.0477,
           "last_price": 8.79,
-          "market_value": 56256.0,
-          "weight_pct": 5.6861,
-          "pnl_pct": -0.075,
+          "market_value": 54498.0,
+          "weight_pct": 5.5801,
+          "pnl_pct": -2.8482,
+          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+        },
+        {
+          "symbol": "sz.002772",
+          "name": "众兴菌业",
+          "industry": "农林牧渔",
+          "qty": 5100,
+          "avg_cost": 11.2794,
+          "last_price": 10.66,
+          "market_value": 54366.0,
+          "weight_pct": 5.5666,
+          "pnl_pct": -5.4914,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
         },
@@ -2242,12 +2167,12 @@
           "symbol": "sz.000019",
           "name": "深粮控股",
           "industry": "农林牧渔",
-          "qty": 7500,
-          "avg_cost": 6.775,
+          "qty": 7400,
+          "avg_cost": 6.9251,
           "last_price": 6.77,
-          "market_value": 50775.0,
-          "weight_pct": 5.1321,
-          "pnl_pct": -0.0738,
+          "market_value": 50098.0,
+          "weight_pct": 5.1296,
+          "pnl_pct": -2.2397,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
         },
@@ -2255,12 +2180,12 @@
           "symbol": "sh.600354",
           "name": "敦煌种业",
           "industry": "农林牧渔",
-          "qty": 5200,
-          "avg_cost": 6.8551,
+          "qty": 5100,
+          "avg_cost": 7.0261,
           "last_price": 6.85,
-          "market_value": 35620.0,
-          "weight_pct": 3.6003,
-          "pnl_pct": -0.0744,
+          "market_value": 34935.0,
+          "weight_pct": 3.577,
+          "pnl_pct": -2.5064,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
         }
@@ -2505,15 +2430,15 @@
           "symbol": "sz.002768",
           "name": "国恩股份",
           "side": "BUY",
-          "reference_price": 63.2,
-          "execution_price_field": "close",
-          "price": 63.232,
+          "reference_price": 65.0,
+          "execution_price_field": "open",
+          "price": 65.032,
           "qty": 1500,
-          "gross": 94848.0,
-          "fees": 28.45,
-          "net_cash_change": -94876.45,
+          "gross": 97548.0,
+          "fees": 29.26,
+          "net_cash_change": -97577.26,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "D",
@@ -2522,15 +2447,15 @@
           "symbol": "sh.600251",
           "name": "冠农股份",
           "side": "BUY",
-          "reference_price": 9.99,
-          "execution_price_field": "close",
-          "price": 9.995,
-          "qty": 7500,
-          "gross": 74962.5,
-          "fees": 22.49,
-          "net_cash_change": -74984.99,
+          "reference_price": 10.45,
+          "execution_price_field": "open",
+          "price": 10.455,
+          "qty": 7300,
+          "gross": 76321.5,
+          "fees": 22.9,
+          "net_cash_change": -76344.4,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "D",
@@ -2539,15 +2464,15 @@
           "symbol": "sz.002772",
           "name": "众兴菌业",
           "side": "BUY",
-          "reference_price": 10.66,
-          "execution_price_field": "close",
-          "price": 10.665,
-          "qty": 5300,
-          "gross": 56524.5,
-          "fees": 16.96,
-          "net_cash_change": -56541.46,
+          "reference_price": 11.27,
+          "execution_price_field": "open",
+          "price": 11.276,
+          "qty": 5100,
+          "gross": 57507.6,
+          "fees": 17.25,
+          "net_cash_change": -57524.85,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "D",
@@ -2556,15 +2481,15 @@
           "symbol": "sh.601952",
           "name": "苏垦农发",
           "side": "BUY",
-          "reference_price": 8.79,
-          "execution_price_field": "close",
-          "price": 8.794,
-          "qty": 6400,
-          "gross": 56281.6,
-          "fees": 16.88,
-          "net_cash_change": -56298.48,
+          "reference_price": 9.04,
+          "execution_price_field": "open",
+          "price": 9.045,
+          "qty": 6200,
+          "gross": 56079.0,
+          "fees": 16.82,
+          "net_cash_change": -56095.82,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "D",
@@ -2573,15 +2498,15 @@
           "symbol": "sz.000019",
           "name": "深粮控股",
           "side": "BUY",
-          "reference_price": 6.77,
-          "execution_price_field": "close",
-          "price": 6.773,
-          "qty": 7500,
-          "gross": 50797.5,
-          "fees": 15.24,
-          "net_cash_change": -50812.74,
+          "reference_price": 6.92,
+          "execution_price_field": "open",
+          "price": 6.923,
+          "qty": 7400,
+          "gross": 51230.2,
+          "fees": 15.37,
+          "net_cash_change": -51245.57,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "D",
@@ -2590,33 +2515,18 @@
           "symbol": "sh.600354",
           "name": "敦煌种业",
           "side": "BUY",
-          "reference_price": 6.85,
-          "execution_price_field": "close",
-          "price": 6.853,
-          "qty": 5200,
-          "gross": 35635.6,
-          "fees": 10.69,
-          "net_cash_change": -35646.29,
+          "reference_price": 7.02,
+          "execution_price_field": "open",
+          "price": 7.024,
+          "qty": 5100,
+          "gross": 35822.4,
+          "fees": 10.75,
+          "net_cash_change": -35833.15,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         }
       ],
-      "recent_rejected_orders": [
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-18",
-          "trade_date": "2026-08-19",
-          "symbol": "sz.002582",
-          "name": "好想你",
-          "side": "BUY",
-          "target_weight": 0.106442,
-          "reason": "below_board_lot",
-          "details": {
-            "cash": 400945.86,
-            "phase": "close_buy"
-          }
-        }
-      ],
+      "recent_rejected_orders": [],
       "equity_curve": [
         {
           "date": "2026-08-14",
@@ -2641,15 +2551,15 @@
         },
         {
           "date": "2026-08-19",
-          "equity": 989361.86,
-          "cash": 400945.86,
-          "market_value": 588416.0,
-          "fees": 110.71
+          "equity": 976651.22,
+          "cash": 395485.22,
+          "market_value": 581166.0,
+          "fees": 112.35
         }
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_close_buy",
+        "execute_on": "next_session_0940_sell_1510_open_buy",
         "strategy_version": "v2-d-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -2791,7 +2701,7 @@
           "enrichment_version": "v2-history-0.1",
           "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
           "target_version": "v2-shadow-targets-0.2",
-          "execution_model": "09:40_SELL_CLOSE_BUY",
+          "execution_model": "09:40_SELL_15:10_OPEN_BUY",
           "board_policy": {
             "version": "retail-mainboard-only-2026-08-19",
             "scope": "SH_SZ_MAINBOARD_ONLY",
@@ -2841,9 +2751,9 @@
           }
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_CLOSE_BUY"
+        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
       },
-      "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
       "concentration_flags": []
     },
     "L": {
@@ -2852,40 +2762,40 @@
       "strategy_family": "v2-shadow",
       "metrics": {
         "trading_days": 4,
-        "equity": 1002234.03,
-        "cash": 351269.03,
-        "position_market_value": 650965.0,
-        "return_pct": 0.2234,
-        "max_drawdown_pct": -1.0403,
-        "daily_volatility_pct": 0.8417,
+        "equity": 1000235.41,
+        "cash": 351850.41,
+        "position_market_value": 648385.0,
+        "return_pct": 0.0235,
+        "max_drawdown_pct": -1.2376,
+        "daily_volatility_pct": 0.9297,
         "fills": 27,
         "rejected_orders": 2,
-        "turnover_on_initial_capital": 1.559592,
-        "fees": 714.47,
-        "fees_pct_of_initial": 0.071447,
+        "turnover_on_initial_capital": 1.559011,
+        "fees": 714.99,
+        "fees_pct_of_initial": 0.071499,
         "positions": 8,
         "industry_weights": {
-          "银行": 0.373321,
-          "农林牧渔": 0.247102,
-          "社会服务": 0.17689,
-          "煤炭": 0.108421,
-          "食品饮料": 0.094266
+          "银行": 0.378434,
+          "农林牧渔": 0.248086,
+          "社会服务": 0.174882,
+          "煤炭": 0.108852,
+          "食品饮料": 0.089746
         },
-        "industry_hhi": 0.252359,
-        "effective_industries": 3.9626,
-        "excess_hs300_pct": 1.8734
+        "industry_hhi": 0.255246,
+        "effective_industries": 3.9178,
+        "excess_hs300_pct": 1.6735
       },
       "holdings": [
         {
           "symbol": "sz.002033",
           "name": "丽江股份",
           "industry": "社会服务",
-          "qty": 13100,
-          "avg_cost": 8.7966,
+          "qty": 12900,
+          "avg_cost": 8.9567,
           "last_price": 8.79,
-          "market_value": 115149.0,
-          "weight_pct": 11.4892,
-          "pnl_pct": -0.075,
+          "market_value": 113391.0,
+          "weight_pct": 11.3364,
+          "pnl_pct": -1.8612,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
         },
@@ -2894,11 +2804,11 @@
           "name": "诺 普 信",
           "industry": "农林牧渔",
           "qty": 9700,
-          "avg_cost": 9.1177,
+          "avg_cost": 9.2078,
           "last_price": 9.11,
           "market_value": 88367.0,
-          "weight_pct": 8.817,
-          "pnl_pct": -0.0845,
+          "weight_pct": 8.8346,
+          "pnl_pct": -1.0621,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
         },
@@ -2910,7 +2820,7 @@
           "avg_cost": 11.6575,
           "last_price": 11.95,
           "market_value": 84845.0,
-          "weight_pct": 8.4656,
+          "weight_pct": 8.4825,
           "pnl_pct": 2.5091,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
@@ -2919,12 +2829,12 @@
           "symbol": "sh.601009",
           "name": "南京银行",
           "industry": "银行",
-          "qty": 7000,
-          "avg_cost": 11.7695,
+          "qty": 7200,
+          "avg_cost": 11.5195,
           "last_price": 11.76,
-          "market_value": 82320.0,
-          "weight_pct": 8.2137,
-          "pnl_pct": -0.0807,
+          "market_value": 84672.0,
+          "weight_pct": 8.4652,
+          "pnl_pct": 2.0878,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
         },
@@ -2936,7 +2846,7 @@
           "avg_cost": 32.2724,
           "last_price": 32.98,
           "market_value": 75854.0,
-          "weight_pct": 7.5685,
+          "weight_pct": 7.5836,
           "pnl_pct": 2.1926,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
@@ -2949,7 +2859,7 @@
           "avg_cost": 10.8182,
           "last_price": 10.66,
           "market_value": 72488.0,
-          "weight_pct": 7.2326,
+          "weight_pct": 7.2471,
           "pnl_pct": -1.4624,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
@@ -2959,11 +2869,11 @@
           "name": "山煤国际",
           "industry": "煤炭",
           "qty": 5400,
-          "avg_cost": 12.9673,
+          "avg_cost": 12.9801,
           "last_price": 13.07,
           "market_value": 70578.0,
-          "weight_pct": 7.0421,
-          "pnl_pct": 0.792,
+          "weight_pct": 7.0561,
+          "pnl_pct": 0.6926,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
         },
@@ -2971,12 +2881,12 @@
           "symbol": "sz.002582",
           "name": "好想你",
           "industry": "食品饮料",
-          "qty": 5800,
-          "avg_cost": 11.0636,
+          "qty": 5500,
+          "avg_cost": 11.2339,
           "last_price": 10.58,
-          "market_value": 61364.0,
-          "weight_pct": 6.1227,
-          "pnl_pct": -4.3711,
+          "market_value": 58190.0,
+          "weight_pct": 5.8176,
+          "pnl_pct": -5.8208,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
         }
@@ -3235,15 +3145,15 @@
           "symbol": "sz.002033",
           "name": "丽江股份",
           "side": "BUY",
-          "reference_price": 8.79,
-          "execution_price_field": "close",
-          "price": 8.794,
-          "qty": 13100,
-          "gross": 115201.4,
-          "fees": 34.56,
-          "net_cash_change": -115235.96,
+          "reference_price": 8.95,
+          "execution_price_field": "open",
+          "price": 8.954,
+          "qty": 12900,
+          "gross": 115506.6,
+          "fees": 34.65,
+          "net_cash_change": -115541.25,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "L",
@@ -3252,15 +3162,15 @@
           "symbol": "sz.002215",
           "name": "诺 普 信",
           "side": "BUY",
-          "reference_price": 9.11,
-          "execution_price_field": "close",
-          "price": 9.115,
+          "reference_price": 9.2,
+          "execution_price_field": "open",
+          "price": 9.205,
           "qty": 9700,
-          "gross": 88415.5,
-          "fees": 26.52,
-          "net_cash_change": -88442.02,
+          "gross": 89288.5,
+          "fees": 26.79,
+          "net_cash_change": -89315.29,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "L",
@@ -3269,15 +3179,15 @@
           "symbol": "sh.601009",
           "name": "南京银行",
           "side": "BUY",
-          "reference_price": 11.76,
-          "execution_price_field": "close",
-          "price": 11.766,
-          "qty": 7000,
-          "gross": 82362.0,
-          "fees": 24.71,
-          "net_cash_change": -82386.71,
+          "reference_price": 11.51,
+          "execution_price_field": "open",
+          "price": 11.516,
+          "qty": 7200,
+          "gross": 82915.2,
+          "fees": 24.87,
+          "net_cash_change": -82940.07,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "L",
@@ -3286,15 +3196,15 @@
           "symbol": "sz.002582",
           "name": "好想你",
           "side": "BUY",
-          "reference_price": 10.58,
-          "execution_price_field": "close",
-          "price": 10.585,
-          "qty": 1500,
-          "gross": 15877.5,
+          "reference_price": 11.24,
+          "execution_price_field": "open",
+          "price": 11.246,
+          "qty": 1200,
+          "gross": 13495.2,
           "fees": 5.0,
-          "net_cash_change": -15882.5,
+          "net_cash_change": -13500.2,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         },
         {
           "fund_id": "L",
@@ -3303,15 +3213,15 @@
           "symbol": "sh.600546",
           "name": "山煤国际",
           "side": "BUY",
-          "reference_price": 13.07,
-          "execution_price_field": "close",
-          "price": 13.077,
+          "reference_price": 13.3,
+          "execution_price_field": "open",
+          "price": 13.307,
           "qty": 300,
-          "gross": 3923.1,
+          "gross": 3992.1,
           "fees": 5.0,
-          "net_cash_change": -3928.1,
+          "net_cash_change": -3997.1,
           "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 收盘价模拟买入/加仓"
+          "note": "V2 上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）"
         }
       ],
       "recent_rejected_orders": [
@@ -3332,13 +3242,13 @@
           "fund_id": "L",
           "decision_date": "2026-08-18",
           "trade_date": "2026-08-19",
-          "symbol": "sz.002772",
-          "name": "众兴菌业",
+          "symbol": "sz.002142",
+          "name": "宁波银行",
           "side": "BUY",
-          "target_weight": 0.073054,
+          "target_weight": 0.075059,
           "reason": "below_board_lot",
           "details": {
-            "cash": 351269.03,
+            "cash": 351850.41,
             "phase": "close_buy"
           }
         }
@@ -3367,15 +3277,15 @@
         },
         {
           "date": "2026-08-19",
-          "equity": 1002234.03,
-          "cash": 351269.03,
-          "market_value": 650965.0,
-          "fees": 95.79
+          "equity": 1000235.41,
+          "cash": 351850.41,
+          "market_value": 648385.0,
+          "fees": 96.31
         }
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_close_buy",
+        "execute_on": "next_session_0940_sell_1510_open_buy",
         "strategy_version": "v2-l-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -3515,7 +3425,7 @@
           "enrichment_version": "v2-history-0.1",
           "enrichment_sha256": "2518fdc5da31dcc652590b818c6aec64ba6eb772f9a13844c1e6db57a2523713",
           "target_version": "v2-shadow-targets-0.2",
-          "execution_model": "09:40_SELL_CLOSE_BUY",
+          "execution_model": "09:40_SELL_15:10_OPEN_BUY",
           "board_policy": {
             "version": "retail-mainboard-only-2026-08-19",
             "scope": "SH_SZ_MAINBOARD_ONLY",
@@ -3565,19 +3475,19 @@
           }
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_CLOSE_BUY"
+        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
       },
-      "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
       "concentration_flags": []
     }
   },
-  "audit_head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+  "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
   "audit_verification": {
     "status": "PASS",
-    "events": 7,
-    "head": "44fdc72b4aedcca3abf2b90e4b43b4bd6938958aafede7d11c728f40c8019049",
+    "events": 8,
+    "head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-19"
+    "last_date": "2026-08-19~buy-price-correction"
   },
   "safety": {
     "calls_sol": false,
@@ -3585,7 +3495,7 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "close_buy_and_decision",
+  "audit_event_kind": "buy_price_correction",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
