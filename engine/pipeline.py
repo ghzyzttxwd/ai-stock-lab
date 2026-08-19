@@ -3,12 +3,17 @@ from .indicators import score_history
 from .risk import clamp_d_targets
 from .strategies import strategy_a, strategy_b, strategy_c, strategy_d, strategy_l
 from .ai_manager import decide_with_api
+from .universe import is_main_board
 
 
 def build_candidates(histories: dict[str, list[dict]], names: dict[str,str] | None=None) -> list[dict]:
     names = names or {}
     out=[]
     for sym, rows in histories.items():
+        # Recovery mode can overlay old holdings/pending symbols outside the normal universe.
+        # Never let those symbols re-enter strategy selection for this retail account.
+        if not is_main_board(sym):
+            continue
         sc=score_history(rows)
         if not sc.get('eligible'):
             continue
@@ -33,6 +38,9 @@ def market_temperature(candidates: list[dict]) -> float:
 
 
 def targets_for(fund_id: str, candidates: list[dict], market_score: float, state: dict, use_ai=True):
+    # Defense in depth: callers/tests/manual recovery data cannot feed ChiNext/STAR names into
+    # any target generator even if they bypass build_candidates().
+    candidates=[x for x in candidates if is_main_board(str(x.get('symbol') or ''))]
     if fund_id == 'A':
         return strategy_a(candidates,market_score), '稳健规则策略A'
     if fund_id == 'B':
