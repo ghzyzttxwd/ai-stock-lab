@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from .intraday_quotes import is_exchange_session, live_execution_bars, previous_exchange_session
 from .shadow_ledger import (
@@ -21,7 +23,16 @@ from .shadow_run import critical_symbols
 from .split_execution import execute_pending_side
 
 
-def _execution_snapshot(state: dict, bars: dict[str, dict], trade_date: str, fees: float) -> dict:
+SCHEDULED_MORNING_TIME = '09:40'
+
+
+def _execution_snapshot(
+    state: dict,
+    bars: dict[str, dict],
+    trade_date: str,
+    fees: float,
+    executed_at: str,
+) -> dict:
     normalized = {normalize_symbol(k): dict(v) for k, v in bars.items()}
     cash = float(state.get('cash') or 0.0)
     market_value = 0.0
@@ -35,7 +46,9 @@ def _execution_snapshot(state: dict, bars: dict[str, dict], trade_date: str, fee
         market_value += int(position.get('qty') or 0) * price
     return {
         'date': trade_date,
-        'phase': '09:40_morning_sell',
+        'phase': 'morning_sell',
+        'scheduled_time': SCHEDULED_MORNING_TIME,
+        'executed_at': executed_at,
         'equity': round(cash + market_value, 2),
         'cash': round(cash, 2),
         'market_value': round(market_value, 2),
@@ -48,9 +61,12 @@ def _already_done(state_root: Path, trade_date: str) -> dict | None:
     daily = state_root / 'audit' / f'{trade_date}.json'
     if daily.exists():
         event = json.loads(daily.read_text(encoding='utf-8'))
+        source_ref = event.get('source_ref') or {}
         return {
             'status': 'already_processed', 'trade_date': trade_date,
             'event_hash': event.get('event_hash'), 'audit_path': str(daily),
+            'scheduled_time': source_ref.get('scheduled_time'),
+            'executed_at': source_ref.get('executed_at'),
         }
     path = state_root / 'audit' / f'{trade_date}-execution.json'
     if not path.exists():
@@ -66,9 +82,12 @@ def _already_done(state_root: Path, trade_date: str) -> dict | None:
         expected = ((event.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
         if expected != ledger_content_hash(state):
             raise RuntimeError(f'V2 morning ledger content mismatch for {fund_id}')
+    source_ref = event.get('source_ref') or {}
     return {
         'status': 'already_morning_sell', 'trade_date': trade_date,
         'event_hash': event_hash, 'audit_path': str(path),
+        'scheduled_time': source_ref.get('scheduled_time'),
+        'executed_at': source_ref.get('executed_at'),
     }
 
 
@@ -96,6 +115,8 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
 
     critical = critical_symbols(states)
     bars, quote_source = live_execution_bars(ak, critical)
+    executed_at = datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(timespec='seconds')
+    execution_clock = executed_at.split('T', 1)[1][:5]
     bars = {normalize_symbol(k): v for k, v in bars.items()}
     missing_critical = sorted(set(critical) - set(bars))
 
@@ -111,10 +132,13 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
             execution = execute_pending_side(
                 state, pending, bars, trade_date,
                 side='SELL', price_field='close',
-                note='V2 上一交易日决策 · 09:40盘中卖出/减仓',
+                note=(
+                    f'V2 上一交易日决策 · 实际{execution_clock}盘中卖出/减仓'
+                    f'（计划{SCHEDULED_MORNING_TIME}）'
+                ),
             )
         elif pending:
-            # Stale decisions are not silently executed at 09:40. Evening processing will expire them.
+            # Stale decisions are not silently executed in the morning window. Evening processing will expire them.
             execution = {
                 'phase': 'sell', 'decision_date': pending.get('decision_date'), 'trade_date': trade_date,
                 'reference_price_field': 'close', 'fills': [], 'rejected_orders': [],
@@ -128,7 +152,13 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
                 'policy_adjustments': [], 'valuation_fallback_symbols': [], 'fees': 0.0,
             }
 
-        snapshot = _execution_snapshot(state, bars, trade_date, execution.get('fees', 0.0))
+        snapshot = _execution_snapshot(
+            state,
+            bars,
+            trade_date,
+            execution.get('fees', 0.0),
+            executed_at,
+        )
         state['morning_sell_date'] = trade_date
         state['last_execution_date'] = trade_date
         state['last_execution_snapshot'] = snapshot
@@ -151,7 +181,13 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
         'source_ref': {
             'execution_bar_source': quote_source,
             'missing_critical_execution_bars': missing_critical,
-            'note': 'Previous-session SELL/reduce intents executed at the 09:40 live quote; BUY intents remain pending for close settlement.',
+            'scheduled_time': SCHEDULED_MORNING_TIME,
+            'executed_at': executed_at,
+            'note': (
+                'Previous-session SELL/reduce intents executed using the live quote captured at '
+                f'{execution_clock} Asia/Shanghai; scheduled target was {SCHEDULED_MORNING_TIME}. '
+                'BUY intents remain pending for close settlement.'
+            ),
         },
         'regime': None,
         'target_diagnostics': None,
@@ -187,6 +223,8 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
         'status': 'morning_sell_processed',
         'trade_date': trade_date,
         'previous_trade_date': previous_trade_date,
+        'scheduled_time': SCHEDULED_MORNING_TIME,
+        'executed_at': executed_at,
         'event_hash': event_hash,
         'audit_path': str(audit_path),
         'fills': fill_counts,
