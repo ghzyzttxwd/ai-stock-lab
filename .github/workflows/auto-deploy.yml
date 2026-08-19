@@ -66,6 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           expected="$(sha256sum web/v2/data.json | awk '{print $1}')"
+          export EXPECTED_SHA256="$expected"
           echo "expected_sha256=$expected"
           for i in $(seq 1 18); do
             url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}"
@@ -83,7 +84,9 @@ jobs:
           live = json.load(open(live_path, encoding='utf-8'))
           raw = open(live_path, 'rb').read()
           actual = hashlib.sha256(raw).hexdigest()
-          expected = os.environ.get('EXPECTED_SHA256') or actual
+          expected = os.environ['EXPECTED_SHA256']
+          if actual != expected:
+              raise SystemExit('verification receipt hash mismatch')
           print('LIVE VERIFIED updated_at=', live.get('updated_at'))
           for fund_id in 'ABCDL':
               m=live['funds'][fund_id]['metrics']
@@ -112,8 +115,6 @@ jobs:
           done
           echo "公网 V2 数据与本次发布文件不一致，禁止把本次部署判定为成功。"
           exit 1
-        env:
-          EXPECTED_SHA256: ${{ hashFiles('web/v2/data.json') }}
 
       - name: 持久化公网验收回执
         shell: bash
