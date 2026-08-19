@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
-from .broker import execute_target_weights
-from .daily_run import FUNDS, ROOT, STATE_ROOT, _pending_decision_date
+from .broker import execute_conditional_sells
+from .daily_run import FUNDS, ROOT, STATE_ROOT
 from .state import load_state, save_state
-
-
-EXECUTION_MODEL = '09:40_SELL_15:10_OPEN_BUY'
+from .trading_plan import EXECUTION_MODEL, PLAN_VERSION
 
 
 def _symbol(code: str) -> str:
@@ -28,10 +25,6 @@ def _critical_symbols(states: dict[str, dict]) -> dict[str, str]:
     for state in states.values():
         for symbol, pos in (state.get('positions') or {}).items():
             out[symbol] = pos.get('name', symbol)
-        for target in state.get('pending_targets') or []:
-            symbol = target.get('symbol')
-            if symbol:
-                out[symbol] = target.get('name', out.get(symbol, symbol))
     return out
 
 
@@ -102,10 +95,10 @@ def _live_bars(market, critical: dict[str, str]) -> tuple[dict[str, dict], str]:
         if bars:
             return bars, 'eastmoney'
     except Exception as exc:
-        print(f'[morning] eastmoney intraday failed: {exc}')
+        print(f'[conditional-scan] eastmoney intraday failed: {exc}')
     bars = _sina_live_bars(market, critical)
     if not bars:
-        raise RuntimeError('09:40 intraday quote snapshot returned no critical symbols')
+        raise RuntimeError('conditional intraday quote snapshot returned no held symbols')
     return bars, 'sina'
 
 
@@ -113,6 +106,7 @@ def _portfolio_snapshot(state: dict, bars: dict[str, dict]) -> dict:
     cash = float(state.get('cash') or 0.0)
     equity = cash
     holdings = []
+    exits = state.get('exit_plans') or {}
     for symbol, pos in (state.get('positions') or {}).items():
         bar = bars.get(symbol) or {}
         price = float(bar.get('close') or pos.get('last_price') or pos.get('avg_cost') or 0.0)
@@ -129,6 +123,7 @@ def _portfolio_snapshot(state: dict, bars: dict[str, dict]) -> dict:
             'last_price': round(price, 4),
             'market_value': round(value, 2),
             'pnl_pct': round((price / avg - 1.0) * 100.0, 2) if avg > 0 else 0.0,
+            'exit_plan': exits.get(symbol),
         })
     equity = round(equity, 2)
     return {'equity': equity, 'cash': round(cash, 2), 'holdings': holdings}
@@ -166,17 +161,19 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
         state = states['D_MAIN']
         snap = _portfolio_snapshot(state, bars)
         cumulative, today = _intraday_return(snap, state)
-        old_scores = {x.get('symbol'): x.get('score', 0) for x in data.get('holdings') or []}
+        old_scores = {x.get('symbol'): x for x in data.get('holdings') or []}
         holdings = []
         for item in snap['holdings']:
+            old=old_scores.get(item['symbol']) or {}
             holdings.append({
                 **item,
                 'weight': round(item['market_value'] / snap['equity'] * 100.0, 1) if snap['equity'] else 0.0,
-                'score': old_scores.get(item['symbol'], 0),
+                'score': old.get('score', 0),
+                'opportunity_score': old.get('opportunity_score'),
             })
         data['updated_at'] = trade_date
         data['updated_time'] = clock
-        data['session_phase'] = '09:40盘中卖出后，等待15:10买入结算'
+        data['session_phase'] = f'{clock}条件卖出检查完成；15:10结算当天触发的买入条件'
         data['market_source'] = source
         data.setdefault('fund', {}).update({
             'equity': snap['equity'],
@@ -192,6 +189,7 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
         data['holdings'] = holdings
         data['recent_fills'] = list(state.get('fills') or [])[-10:]
         data['execution_model'] = EXECUTION_MODEL
+        data['plan_version'] = PLAN_VERSION
         d_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
     if e_path.exists():
@@ -214,9 +212,10 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
             item['recent_fills'] = list(state.get('fills') or [])[-8:]
         data['updated_at'] = trade_date
         data['updated_time'] = clock
-        data['session_phase'] = '09:40盘中卖出后，等待15:10买入结算'
+        data['session_phase'] = f'{clock}条件卖出检查完成；15:10结算当天触发的买入条件'
         data['market_source'] = source
         data['execution_model'] = EXECUTION_MODEL
+        data['plan_version'] = PLAN_VERSION
         e_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
@@ -224,15 +223,17 @@ def main() -> None:
     from .real_market import AKShareMarket
 
     now = datetime.now(ZoneInfo('Asia/Shanghai'))
+    if not (dt_time(9, 30) <= now.time() <= dt_time(15, 0)):
+        print(f'[conditional-scan] outside A-share session at {now.strftime("%H:%M:%S")}; skip')
+        return
     trade_date = now.date().isoformat()
+    clock = now.strftime('%H:%M')
+    scan_key = f'{trade_date}T{clock}'
     market = AKShareMarket()
     sessions = _calendar_sessions(market)
     if trade_date not in set(sessions):
-        print(f'[morning] {trade_date} is not an exchange session; skip')
+        print(f'[conditional-scan] {trade_date} is not an exchange session; skip')
         return
-    previous = max((x for x in sessions if x < trade_date), default=None)
-    if not previous:
-        raise RuntimeError(f'cannot resolve previous exchange session before {trade_date}')
 
     states = {
         fid: load_state(STATE_ROOT / f'{fid}.json', fid, name)
@@ -242,29 +243,24 @@ def main() -> None:
     bars, source = _live_bars(market, critical)
 
     for fid, state in states.items():
-        if str(state.get('morning_sell_date') or '')[:10] == trade_date:
-            print(f'[morning] {fid} already handled {trade_date}')
+        if state.get('last_conditional_scan_key') == scan_key:
+            print(f'[conditional-scan] {fid} already checked {scan_key}')
             continue
-        pending = list(state.get('pending_targets') or [])
-        if pending and _pending_decision_date(state) == previous:
-            fills = execute_target_weights(
-                state, pending, bars, trade_date,
-                sides=('SELL',), price_field='close',
-                note='上一交易日决策 · 09:40盘中卖出/减仓',
-            )
-            state.setdefault('fills', []).extend(fills)
-            print(f'[morning] {fid} sell fills={len(fills)}')
-        else:
-            print(f'[morning] {fid} no fresh sell decision; decision={_pending_decision_date(state)} previous={previous}')
-        state['morning_sell_date'] = trade_date
-        state['morning_sell_at'] = now.isoformat(timespec='seconds')
-        state['morning_quote_source'] = source
+        fills, checks = execute_conditional_sells(state, bars, trade_date, clock=clock)
+        state.setdefault('fills', []).extend(fills)
+        state['last_conditional_scan_key'] = scan_key
+        state['last_conditional_scan_at'] = now.isoformat(timespec='seconds')
         state['execution_model'] = EXECUTION_MODEL
-        _portfolio_snapshot(state, bars)
+        log=state.setdefault('conditional_scan_log',[])
+        log.append({'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})
+        if len(log)>30:
+            del log[:-30]
+        _portfolio_snapshot(state,bars)
         save_state(STATE_ROOT / f'{fid}.json', state)
+        print(f'[conditional-scan] {fid} fills={len(fills)} checks={len(checks)}')
 
-    _refresh_public_snapshots(states, bars, source, trade_date, now.strftime('%H:%M'))
-    print(f'[morning] completed {trade_date} at {now.strftime("%H:%M:%S")} source={source} critical={len(critical)} bars={len(bars)}')
+    _refresh_public_snapshots(states, bars, source, trade_date, clock)
+    print(f'[conditional-scan] completed {trade_date} {clock} source={source} holdings={len(critical)} bars={len(bars)}')
 
 
 if __name__ == '__main__':
