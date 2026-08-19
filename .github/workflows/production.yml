@@ -85,13 +85,13 @@ jobs:
         id: marketday
         if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
         run: python -m engine.schedule_guard production
-      - name: Run real-market virtual portfolios
+      - name: Settle prior target at close, then build next decision
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
-        run: python -m engine.daily_run --real
+        run: python -m engine.evening_split_run
       - run: python -m unittest discover -s tests -v
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
       - name: Persist portfolio ledger and public snapshots
