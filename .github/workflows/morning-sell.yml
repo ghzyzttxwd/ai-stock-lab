@@ -38,7 +38,24 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
+      - name: Resolve scheduled checkpoint
+        id: slot
+        shell: bash
+        run: |
+          case "${{ github.event.schedule }}" in
+            '40 1 * * 1-5') slot='09:40' ;;
+            '30 2 * * 1-5') slot='10:30' ;;
+            '20 3 * * 1-5') slot='11:20' ;;
+            '30 5 * * 1-5') slot='13:30' ;;
+            '30 6 * * 1-5') slot='14:30' ;;
+            '55 6 * * 1-5') slot='14:55' ;;
+            *) slot="$(TZ=Asia/Shanghai date +%H:%M)" ;;
+          esac
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "conditional checkpoint=$slot"
       - name: Check hard-stop take-profit trailing rotation and time exits
+        env:
+          CONDITIONAL_SCAN_SLOT: ${{ steps.slot.outputs.slot }}
         run: python -m engine.morning_run
       - name: Run regression tests before persistence
         run: python -m unittest discover -s tests -v
