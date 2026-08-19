@@ -1,218 +1,25 @@
-const LIVE_SUMMARY = 'https://raw.githubusercontent.com/ghzyzttxwd/ai-stock-lab/v2-shadow/shadow_state/v2/summary.json';
-const FUND_ORDER = ['A', 'B', 'C', 'D', 'L'];
-const FUND_SHORT = { A: '保守稳健', B: '趋势追强', C: '短线快攻', D: '综合判断', L: '长线价值' };
-const FLAG_LABELS = {
-  effective_industries_below_2: '有效行业不足 2 个',
-  single_industry_at_least_60pct_of_invested: '单一行业超过已投资仓位 60%',
-  top2_industries_at_least_85pct_of_invested: '前两大行业超过已投资仓位 85%',
-};
-const REJECTION_LABELS = {
-  limit_up_locked: '涨停无法买入',
-  limit_down_locked: '跌停无法卖出',
-  t_plus_one_locked: 'T+1 当日不可卖',
-  insufficient_cash: '现金不足',
-  below_board_lot: '不足一手',
-  missing_execution_bar: '缺少执行行情',
-  invalid_open_price: '开盘价无效',
-  suspended: '停牌',
-  stale_pending_decision: '待执行目标已过期',
-};
-
-const esc = value => String(value ?? '')
-  .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-const money = value => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 }).format(Number(value) || 0);
-const pct = value => value == null ? '样本不足' : `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}%`;
-const number = value => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(Number(value) || 0);
-const tone = value => Number(value) >= 0 ? 'positive' : 'negative';
-const regime = value => ({ bullish: '偏强', neutral: '中性', defensive: '防守', bearish: '偏弱' })[value] || value || '未知';
-const marketSource = summary => summary?.source_ref?.data_quality?.snapshot_source || '未知';
-
-function assertSummary(data) {
-  if (!data || data.summary_version !== 'v2-shadow-summary-1.1') throw new Error('V2 网页汇总版本不匹配');
-  if (data.mode !== 'FORWARD_SHADOW_ONLY') throw new Error('V2 模式标记不正确');
-  if (FUND_ORDER.some(id => !data.funds?.[id])) throw new Error('五只 V2 基金数据不完整');
-  const safety = data.safety || {};
-  if (safety.calls_sol || safety.reads_v1_ledger || safety.writes_v1_ledger) throw new Error('V2 隔离标记未通过');
-  return data;
-}
-
-async function fetchJson(url, timeoutMs = 6000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function loadSummary() {
-  try {
-    return { data: assertSummary(await fetchJson(LIVE_SUMMARY)), source: 'V2 分支实时汇总' };
-  } catch (liveError) {
-    const fallback = assertSummary(await fetchJson('data.json', 3000));
-    return { data: fallback, source: `同源备用快照（实时源暂不可用：${liveError.message}）` };
-  }
-}
-
-function holdingRows(fund) {
-  const holdings = fund.holdings || [];
-  if (!holdings.length) return '<div class="card empty">当前为空仓；影子盘允许不买股票。</div>';
-  return holdings.map(item => `
-    <div class="card">
-      <div class="row">
-        <div class="row-main"><b>${esc(item.name)}</b><div class="mini">${esc(item.symbol)} · ${number(item.qty)} 股 · ${esc(item.industry)}</div></div>
-        <div class="row-side"><b>${Number(item.weight_pct || 0).toFixed(1)}%</b><div class="mini ${tone(item.pnl_pct)}">${pct(item.pnl_pct)}</div></div>
-      </div>
-      <div class="progress"><i style="width:${Math.min(100, Number(item.weight_pct || 0))}%"></i></div>
-      <div class="mini">市值 ${money(item.market_value)} · 成本 ${number(item.avg_cost)} · 现价 ${number(item.last_price)}</div>
-    </div>`).join('');
-}
-
-function currentWeightPct(fund, holding) {
-  if (!holding) return 0;
-  if (holding.weight_pct != null && Number.isFinite(Number(holding.weight_pct))) return Number(holding.weight_pct);
-  const equity = Number(fund.metrics?.equity || 0);
-  return equity > 0 ? Number(holding.market_value || 0) / equity * 100 : 0;
-}
-
-function plannedAction(currentPct, targetPct) {
-  const epsilon = 0.05;
-  const delta = targetPct - currentPct;
-  if (currentPct > epsilon && targetPct <= epsilon) return { label: '卖出 · 清仓', tone: 'negative' };
-  if (currentPct <= epsilon && targetPct > epsilon) return { label: '买入 · 新开仓', tone: 'positive' };
-  if (delta > epsilon) return { label: '买入 · 加仓', tone: 'positive' };
-  if (delta < -epsilon) return { label: '卖出 · 减仓', tone: 'negative' };
-  return { label: '不变 · 持有', tone: '' };
-}
-
-function pendingPlanItems(fund) {
-  const targets = fund.pending_decision?.targets || [];
-  if (!targets.length) return [];
-  const holdings = fund.holdings || [];
-  const holdingBySymbol = new Map(holdings.map(item => [item.symbol, item]));
-  const targetSymbols = new Set(targets.map(item => item.symbol));
-  const plans = targets.map(item => {
-    const holding = holdingBySymbol.get(item.symbol);
-    const currentPct = currentWeightPct(fund, holding);
-    const targetPct = Number(item.target_weight || 0) * 100;
-    return { ...item, currentPct, targetPct, ...plannedAction(currentPct, targetPct), isExit: false };
-  });
-  holdings.filter(item => !targetSymbols.has(item.symbol)).forEach(item => {
-    const currentPct = currentWeightPct(fund, item);
-    plans.push({
-      ...item,
-      currentPct,
-      targetPct: 0,
-      v2_score: null,
-      label: '卖出 · 清仓',
-      tone: 'negative',
-      isExit: true,
-    });
-  });
-  return plans;
-}
-
-function pendingRows(fund) {
-  const plans = pendingPlanItems(fund);
-  if (!plans.length) return '<div class="card empty">下一交易日暂无待执行目标。</div>';
-  return plans.map(item => `
-    <div class="card">
-      <div class="row">
-        <div class="row-main"><b>${esc(item.name || item.symbol)}</b><div class="mini">${esc(item.symbol)} · ${esc(item.industry || '未分类')}</div></div>
-        <div class="row-side"><b class="${item.tone}">${esc(item.label)}</b><div class="mini">当前 ${Number(item.currentPct || 0).toFixed(1)}% → 目标 ${Number(item.targetPct || 0).toFixed(1)}%</div></div>
-      </div>
-      <div class="reason">${esc(item.isExit ? '未进入本次目标组合，下一交易日计划将目标仓位降至 0%。' : (item.thesis || '按 V2 规则生成的目标仓位'))}</div>
-      ${item.v2_score == null ? '' : `<div class="mini">评分 ${number(item.v2_score)}</div>`}
-      ${item.invalidation && !item.isExit ? `<div class="mini">失效条件：${esc(item.invalidation)}</div>` : ''}
-    </div>`).join('');
-}
-
-function eventRows(items, kind) {
-  if (!items?.length) return '<div class="empty">暂无记录。</div>';
-  return [...items].reverse().map(item => {
-    const isFill = kind === 'fill';
-    const title = isFill ? `${item.side === 'BUY' ? '买入' : '卖出'} ${item.name || item.symbol}` : `${item.side || '拒单'} ${item.name || item.symbol}`;
-    const detail = isFill
-      ? `${number(item.qty)} 股 · ${number(item.price)} · 手续费 ${money(item.fees)}`
-      : `${REJECTION_LABELS[item.reason] || item.reason || '规则拒绝'}${item.target_weight == null ? '' : ` · 目标 ${(Number(item.target_weight) * 100).toFixed(1)}%`}`;
-    return `<div class="detail-row"><div class="row"><div class="row-main"><b>${esc(title)}</b><div class="mini">${esc(item.trade_date || item.decision_date || '')}</div></div>${isFill ? `<b>${money(item.gross)}</b>` : '<span class="tag">未成交</span>'}</div><div class="mini">${esc(detail)}</div></div>`;
-  }).join('');
-}
-
-function concentrationCard(fund) {
-  const flags = fund.concentration_flags || [];
-  const pendingStats = fund.pending_decision?.portfolio_stats || {};
-  const industries = Object.entries(pendingStats.industry_weights || {}).sort((a, b) => b[1] - a[1]);
-  const top = industries.slice(0, 3).map(([name, weight]) => `${name} ${(Number(weight) * 100).toFixed(1)}%`).join(' · ');
-  if (!flags.length) return `<div class="card alert ok"><div class="alert-title">未触发行业集中告警</div><div class="mini">待执行组合${top ? `：${esc(top)}` : '暂无行业暴露'}</div></div>`;
-  return `<div class="card alert"><div class="alert-title">行业集中告警</div><div class="reason">${flags.map(flag => esc(FLAG_LABELS[flag] || flag)).join('；')}</div><div class="mini">待执行组合：${esc(top || '暂无行业明细')}</div></div>`;
-}
-
-function rankCards(data, activeId) {
-  return FUND_ORDER.map(id => data.funds[id]).sort((a, b) => Number(b.metrics.return_pct) - Number(a.metrics.return_pct)).map((fund, index) => `
-    <div class="rank-card ${fund.fund_id === activeId ? 'active' : ''}"><button data-fund="${fund.fund_id}"><small>#${index + 1} · ${fund.fund_id}</small><b>${esc(FUND_SHORT[fund.fund_id])}</b><span class="${tone(fund.metrics.return_pct)}">${pct(fund.metrics.return_pct)}</span><div class="mini">${money(fund.metrics.equity)}</div></button></div>`).join('');
-}
-
-function benchmarkSection(data, metrics) {
-  const benchmark = data.benchmark || {};
-  if (benchmark.return_pct == null) {
-    return `<section class="section"><h2>沪深300对比</h2><div class="card"><b>基准暂不可用</b><div class="mini">本次沪深300指数数据未成功取得，不用旧数据冒充。</div></div></section>`;
-  }
-  const excess = metrics.excess_hs300_pct == null
-    ? Number(metrics.return_pct || 0) - Number(benchmark.return_pct)
-    : Number(metrics.excess_hs300_pct);
-  return `<section class="section"><h2>跑赢大盘了吗</h2><div class="market-grid"><div class="card"><span class="label">本基金累计</span><div class="market-score ${tone(metrics.return_pct)}">${pct(metrics.return_pct)}</div></div><div class="card"><span class="label">沪深300同期</span><div class="market-score ${tone(benchmark.return_pct)}">${pct(benchmark.return_pct)}</div></div></div><div class="card" style="margin-top:8px"><span class="label">跑赢沪深300</span><div class="market-score ${tone(excess)}">${pct(excess)}</div><div class="mini">同一统计区间 ${esc(benchmark.start_date || '')} → ${esc(benchmark.end_date || data.updated_at || '')}</div></div></section>`;
-}
-
-function render(data, sourceLabel, activeId) {
-  const fund = data.funds[activeId] || data.funds.A;
-  const metrics = fund.metrics || {};
-  const positionPct = metrics.equity > 0 ? Number(metrics.position_market_value || 0) / Number(metrics.equity) * 100 : 0;
-  const flags = fund.concentration_flags || [];
-  const pendingPlans = pendingPlanItems(fund);
-  document.querySelector('#app').innerHTML = `
-    <div class="shell">
-      <header class="top"><div><div class="eyebrow">EXPERIMENTAL PORTFOLIO</div><div class="brand">V2 影子基金竞技场</div><div class="updated">更新 ${esc(data.updated_at)} · 行情 ${esc(marketSource(data))} · 每只初始 ${money(data.initial_cash_per_fund)}</div></div><span class="live-dot" aria-label="数据可用"></span></header>
-      <div class="safety-strip" aria-label="V2 状态"><span>V2 影子盘</span><span>非实盘</span><span>当前未替代 V1</span></div>
-      <section class="rank-strip" aria-label="五只基金收益排名">${rankCards(data, fund.fund_id)}</section>
-      <nav class="fund-tabs" aria-label="切换 V2 基金">${FUND_ORDER.map(id => `<button class="fund-tab ${id === fund.fund_id ? 'active' : ''}" data-fund="${id}">${id}<br>${FUND_SHORT[id]}</button>`).join('')}</nav>
-      <section class="hero">
-        <div class="fund-title"><div><span class="fund-id">${fund.fund_id}</span><div class="updated">${esc(fund.name)}</div></div><span class="tag">只读</span></div>
-        <div class="equity">${money(metrics.equity)}</div>
-        <div class="${tone(metrics.return_pct)}"><b>${pct(metrics.return_pct)}</b> 累计收益</div>
-        <div class="stats">
-          <div class="stat"><span class="label">现金</span><b>${money(metrics.cash)}</b></div>
-          <div class="stat"><span class="label">股票仓位</span><b>${positionPct.toFixed(1)}%</b></div>
-          <div class="stat"><span class="label">最大回撤</span><b class="${tone(metrics.max_drawdown_pct)}">${pct(metrics.max_drawdown_pct)}</b></div>
-          <div class="stat"><span class="label">交易日</span><b>${number(metrics.trading_days)}</b></div>
-        </div>
-      </section>
-      ${benchmarkSection(data, metrics)}
-      <section class="section"><h2>市场与风控</h2><div class="market-grid"><div class="card"><span class="label">市场状态</span><div class="market-score">${esc(regime(data.regime?.label))}</div><div class="mini">强度 ${number(data.regime?.score)} · 置信 ${number(data.regime?.confidence)}</div></div><div class="card"><span class="label">执行统计</span><div class="market-score">${number(metrics.fills)} / ${number(metrics.rejected_orders)}</div><div class="mini">成交 / 拒单 · 费用 ${money(metrics.fees)}</div></div></div></section>
-      <section class="section"><h2>行业集中</h2>${concentrationCard(fund)}</section>
-      <section class="section"><h2>当前持仓 · ${number(metrics.positions)} 只</h2>${holdingRows(fund)}</section>
-      <section class="section"><h2>待执行动作 · ${pendingPlans.length} 项</h2><div class="card mini">决策日 ${esc(fund.pending_decision?.decision_date || '暂无')} · 下面明确标注买入、卖出、加仓、减仓或清仓；仅在下一交易日开盘按规则模拟执行，不代表已经成交。</div>${pendingRows(fund)}</section>
-      <section class="section"><h2>成交与拒单</h2><details class="card" ${metrics.fills ? 'open' : ''}><summary>最近成交 · ${number(metrics.fills)} 笔</summary><div class="detail-body">${eventRows(fund.recent_fills, 'fill')}</div></details><details class="card" ${flags.length || metrics.rejected_orders ? 'open' : ''}><summary>最近拒单 · ${number(metrics.rejected_orders)} 笔</summary><div class="detail-body">${eventRows(fund.recent_rejected_orders, 'reject')}</div></details></section>
-      <div class="source-note">数据源：<b>${esc(sourceLabel)}</b>，固定读取 <code>v2-shadow/shadow_state/v2/summary.json</code>；备用文件为本目录 <code>data.json</code>。页面没有写入接口。</div>
-    </div>
-    <footer class="footer">V2 影子盘 · 不连接券商 · 不调用 Sol · 不读取或修改 V1 正式账本</footer>`;
-  document.querySelectorAll('[data-fund]').forEach(button => button.addEventListener('click', () => {
-    const nextId = button.dataset.fund;
-    sessionStorage.setItem('v2-shadow-fund', nextId);
-    render(data, sourceLabel, nextId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }));
-}
-
-loadSummary().then(({ data, source }) => {
-  const saved = sessionStorage.getItem('v2-shadow-fund');
-  render(data, source, FUND_ORDER.includes(saved) ? saved : 'A');
-}).catch(error => {
-  document.querySelector('#app').innerHTML = `<div class="error"><b>V2 数据加载失败</b><div class="mini">${esc(error.message)}</div><div class="reason">请稍后刷新。现有 V1 页面和正式账本不受影响。</div></div>`;
-});
-
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+const LIVE_SUMMARY='https://raw.githubusercontent.com/ghzyzttxwd/ai-stock-lab/v2-shadow/shadow_state/v2/summary.json';
+const FUND_ORDER=['A','B','C','D','L'];
+const FUND_SHORT={A:'保守稳健',B:'趋势追强',C:'短线快攻',D:'综合判断',L:'长线价值'};
+const FLAG_LABELS={effective_industries_below_2:'有效行业不足 2 个',single_industry_at_least_60pct_of_invested:'单一行业超过已投资仓位 60%',top2_industries_at_least_85pct_of_invested:'前两大行业超过已投资仓位 85%'};
+const REJECTION_LABELS={limit_up_locked:'涨停无法买入',limit_down_locked:'跌停无法卖出',t_plus_one_locked:'T+1 当日不可卖',insufficient_cash:'现金不足',insufficient_cash_or_below_lot:'现金不足或不足一手',below_board_lot:'不足一手',missing_execution_bar:'缺少执行行情',missing_or_suspended_bar:'缺少行情或停牌',invalid_ohlc:'日内行情无效',gap_above_max_chase:'跳空超过最高追价，放弃',gap_below_valid_floor:'跳空跌穿有效下限，放弃',breakout_not_triggered:'未达到突破价',pullback_not_triggered:'未回踩到计划价',range_not_touched:'未进入计划区间',open_below_valid_range:'开盘跌穿有效区间',legacy_or_missing_conditional_plan:'旧固定价计划已取消',already_at_or_above_target:'已达到目标仓位',stale_pending_decision:'待执行计划已过期',suspended:'停牌'};
+const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+const money=v=>new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:0}).format(Number(v)||0);
+const pct=v=>v==null?'样本不足':`${Number(v)>=0?'+':''}${Number(v).toFixed(2)}%`;
+const number=(v,d=2)=>v==null?'—':Number(v).toFixed(d);
+const tone=v=>Number(v)>=0?'positive':'negative';
+const setup=v=>({breakout:'突破确认',pullback:'回踩低吸',range:'区间等待','legacy-migrated':'旧仓保护'})[v]||v||'条件计划';
+const regime=v=>({bullish:'偏强',neutral:'中性',defensive:'防守',bearish:'偏弱',risk_off:'风险关闭'})[v]||v||'未知';
+const marketSource=s=>s?.source_ref?.data_quality?.snapshot_source||s?.source_ref?.bar_source||'未知';
+function assertSummary(d){if(!d||d.summary_version!=='v2-shadow-summary-1.2')throw new Error('V2 网页汇总版本不匹配');if(d.mode!=='FORWARD_SHADOW_ONLY')throw new Error('V2 模式标记不正确');if(FUND_ORDER.some(id=>!d.funds?.[id]))throw new Error('五只 V2 基金数据不完整');const s=d.safety||{};if(s.calls_sol||s.reads_v1_ledger||s.writes_v1_ledger)throw new Error('V2 隔离标记未通过');return d;}
+async function fetchJson(url,timeoutMs=6000){const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(`${url}${url.includes('?')?'&':'?'}t=${Date.now()}`,{cache:'no-store',signal:c.signal});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json()}finally{clearTimeout(t)}}
+async function loadSummary(){try{return{data:assertSummary(await fetchJson(LIVE_SUMMARY)),source:'V2 分支实时汇总'}}catch(e){return{data:assertSummary(await fetchJson('data.json',3000)),source:`同源备用快照（实时源暂不可用：${e.message}）`}}}
+function exitText(p){if(!p)return '<div class="mini">尚未建立条件退出计划</div>';const trail=Number(p.trailing_drawdown_pct||0)*100;return `<div class="reason"><b>退出条件：</b>止损 ${number(p.hard_stop_price)} · 止盈 ${number(p.take_profit_price)} · 移动回撤 ${trail?trail.toFixed(1)+'%':'—'} · 最长 ${p.max_hold_days||'—'} 日</div>${p.rotation_exit?`<div class="mini">换仓退出价 ${number(p.rotation_min_price)}；硬止损优先。</div>`:'<div class="mini">条件没到就继续持有，09:40本身不等于卖出。</div>'}`;}
+function holdingRows(f){const rows=f.holdings||[];if(!rows.length)return '<div class="card empty">当前为空仓；影子盘允许不买股票。</div>';return rows.map(x=>`<div class="card"><div class="row"><div class="row-main"><b>${esc(x.name)}</b><div class="mini">${esc(x.symbol)} · ${number(x.qty,0)} 股 · ${esc(x.industry||'未分类')}</div></div><div class="row-side"><b>${Number(x.weight_pct||0).toFixed(1)}%</b><div class="mini ${tone(x.pnl_pct)}">${pct(x.pnl_pct)}</div></div></div><div class="progress"><i style="width:${Math.min(100,Number(x.weight_pct||0))}%"></i></div><div class="mini">市值 ${money(x.market_value)} · 成本 ${number(x.avg_cost)} · 现价 ${number(x.last_price)}${x.opportunity_score==null?'':` · 机会分 ${number(x.opportunity_score,1)}`}</div>${exitText(x.exit_plan)}</div>`).join('');}
+function entryText(t){const p=t.trade_plan||{},e=p.entry||{};if(!e.mode)return '等待新版条件计划';if(e.mode==='breakout')return `≥ ${number(e.trigger_price,3)} 才买，最高追到 ${number(e.valid_max,3)}`;if(e.mode==='pullback')return `≤ ${number(e.trigger_price,3)} 才买，有效下限 ${number(e.valid_min,3)}`;return `${number(e.valid_min,3)} ~ ${number(e.valid_max,3)} 区间内才买`;}
+function pendingRows(f){const p=f.pending_decision,rows=p?.targets||[];if(!rows.length)return '<div class="card empty">下一交易日没有合格的新买点，保持现金；现有持仓仍按退出条件管理。</div>';const held=new Set((f.holdings||[]).map(x=>x.symbol));return rows.map(x=>{const plan=x.trade_plan||{},ex=plan.exit||{};return `<div class="card"><div class="row"><div class="row-main"><b>${held.has(x.symbol)?'条件加仓':'条件待买'} · ${esc(x.name||x.symbol)}</b><div class="mini">${esc(x.symbol)} · ${esc(setup(plan.setup||x.setup))} · 计划 ${(Number(x.target_weight||0)*100).toFixed(1)}%</div></div><div class="row-side"><b>机会 ${number(x.opportunity_score??plan.opportunity_score,1)}</b></div></div><div class="reason"><b>买入条件：</b>${esc(entryText(x))}</div><div class="mini">预估止损 ${number(ex.estimated_stop_price)} · 预估止盈 ${number(ex.estimated_take_profit_price)} · 最长 ${ex.max_hold_days||'—'} 个交易日</div>${x.thesis?`<div class="mini">逻辑：${esc(x.thesis)}</div>`:''}${x.invalidation?`<div class="mini">失效：${esc(x.invalidation)}</div>`:''}</div>`}).join('');}
+function eventRows(items,kind){if(!items?.length)return '<div class="empty">暂无记录。</div>';return [...items].reverse().map(x=>{const fill=kind==='fill',title=fill?`${x.side==='BUY'?'买入':'卖出'} ${x.name||x.symbol}`:`${x.side||'未成交'} ${x.name||x.symbol}`,detail=fill?`${number(x.qty,0)} 股 · ${number(x.price)} · 手续费 ${money(x.fees)}${x.trigger_reason?` · ${x.trigger_reason}`:''}${x.exit_reason?` · ${x.exit_reason}`:''}`:`${REJECTION_LABELS[x.reason]||x.reason||'规则拒绝'}`;return `<div class="detail-row"><div class="row"><div class="row-main"><b>${esc(title)}</b><div class="mini">${esc(x.trade_date||x.decision_date||'')}</div></div>${fill?`<b>${money(x.gross)}</b>`:'<span class="tag">未成交</span>'}</div><div class="mini">${esc(detail)}</div></div>`}).join('');}
+function concentrationCard(f){const flags=f.concentration_flags||[],stats=f.pending_decision?.portfolio_stats||{},inds=Object.entries(stats.industry_weights||{}).sort((a,b)=>b[1]-a[1]),top=inds.slice(0,3).map(([n,w])=>`${n} ${(Number(w)*100).toFixed(1)}%`).join(' · ');if(!flags.length)return `<div class="card alert ok"><div class="alert-title">未触发行业集中告警</div><div class="mini">计划组合${top?`：${esc(top)}`:'暂无新增仓位'}</div></div>`;return `<div class="card alert"><div class="alert-title">行业集中告警</div><div class="reason">${flags.map(x=>esc(FLAG_LABELS[x]||x)).join('；')}</div><div class="mini">计划组合：${esc(top||'暂无行业明细')}</div></div>`;}
+function benchmarkSection(d,m){const b=d.benchmark||{};if(b.return_pct==null)return '<section class="section"><h2>沪深300对比</h2><div class="card"><b>基准暂不可用</b><div class="mini">本次指数数据未成功取得，不用旧数据冒充。</div></div></section>';const ex=m.excess_hs300_pct==null?Number(m.return_pct||0)-Number(b.return_pct):Number(m.excess_hs300_pct);return `<section class="section"><h2>跑赢大盘了吗</h2><div class="market-grid"><div class="card"><span class="label">本基金累计</span><div class="market-score ${tone(m.return_pct)}">${pct(m.return_pct)}</div></div><div class="card"><span class="label">沪深300同期</span><div class="market-score ${tone(b.return_pct)}">${pct(b.return_pct)}</div></div></div><div class="card" style="margin-top:8px"><span class="label">跑赢沪深300</span><div class="market-score ${tone(ex)}">${pct(ex)}</div></div></section>`;}
+function render(d,sourceLabel,activeId){const f=d.funds[activeId]||d.funds.A,m=f.metrics||{},pos=m.equity>0?Number(m.position_market_value||0)/Number(m.equity)*100:0,pending=f.pending_decision?.targets||[];document.querySelector('#app').innerHTML=`<div class="shell"><header class="top"><div><div class="eyebrow">EXPERIMENTAL PORTFOLIO</div><div class="brand">V2 影子基金竞技场</div><div class="updated">更新 ${esc(d.updated_at)} · ${esc(sourceLabel)} · 行情 ${esc(marketSource(d))}</div></div><span class="live-dot"></span></header><div class="safety-strip"><span>V2 影子盘</span><span>非实盘</span><span>条件计划</span><span>当前未替代 V1</span></div><nav class="fund-tabs">${FUND_ORDER.map(id=>`<button class="fund-tab ${id===f.fund_id?'active':''}" data-fund="${id}">${id}<br>${FUND_SHORT[id]}</button>`).join('')}</nav><section class="hero"><div class="fund-title"><div><span class="fund-id">${f.fund_id}</span><div class="updated">${esc(f.name)}</div></div><span class="tag">${esc(regime(d.regime?.label))}</span></div><div class="equity">${money(m.equity)}</div><div class="${tone(m.return_pct)}"><b>${pct(m.return_pct)}</b> 累计收益</div><div class="stats"><div class="stat"><span class="label">现金</span><b>${money(m.cash)}</b></div><div class="stat"><span class="label">股票仓位</span><b>${pos.toFixed(1)}%</b></div><div class="stat"><span class="label">最大回撤</span><b>${pct(m.max_drawdown_pct)}</b></div><div class="stat"><span class="label">条件单</span><b>${pending.length}</b></div></div></section>${benchmarkSection(d,m)}<section class="section"><h2>执行规则</h2><div class="card reason">09:40只检查退出条件，不再到点强卖；15:10只结算白天真正触发过的预设买入条件。没有触发就保留现金。</div></section><section class="section"><h2>当前持仓</h2>${holdingRows(f)}</section><section class="section"><h2>下一交易日条件计划 · ${pending.length} 只</h2>${pendingRows(f)}</section><section class="section"><h2>组合集中度</h2>${concentrationCard(f)}</section><section class="section"><h2>最近成交</h2><div class="card">${eventRows(f.recent_fills,'fill')}</div></section><section class="section"><h2>最近未成交/拒绝</h2><div class="card">${eventRows(f.recent_rejected_orders,'reject')}</div></section><div class="footer">V2 独立影子账本 · 主板普通A股限制仍生效 · 不连接券商</div></div>`;document.querySelectorAll('[data-fund]').forEach(b=>b.addEventListener('click',()=>{localStorage.setItem('v2-active-fund',b.dataset.fund);render(d,sourceLabel,b.dataset.fund)}));}
+loadSummary().then(({data,source})=>{let active=localStorage.getItem('v2-active-fund');if(!FUND_ORDER.includes(active))active='D';render(data,source,active)}).catch(e=>document.querySelector('#app').innerHTML=`<div class="splash">V2 数据加载失败：${esc(e.message)}</div>`);
