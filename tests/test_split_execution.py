@@ -54,6 +54,26 @@ class SplitExecutionTests(unittest.TestCase):
         self.assertIn('sh.600000', state['positions'])
         self.assertIn('sh.600001', state['positions'])
 
+    def test_retail_policy_hard_blocks_chinext_and_star_buys(self):
+        state = {'fund_id': 'A', 'cash': 100000.0, 'positions': {}}
+        bars = {
+            'sz.300001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sz.301001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.688001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.689001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+        }
+        targets = [
+            {'symbol': symbol, 'name': symbol, 'target_weight': 0.2}
+            for symbol in bars
+        ]
+        fills = execute_target_weights(
+            state, targets, bars, '2026-08-19',
+            sides=('BUY',), price_field='close', note='retail-policy-test',
+        )
+        self.assertEqual(fills, [])
+        self.assertEqual(state['positions'], {})
+        self.assertEqual(state['cash'], 100000.0)
+
 
 if __name__ == '__main__':
     unittest.main()
