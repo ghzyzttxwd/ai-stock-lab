@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .conditional_plan import EXECUTION_MODEL, PLAN_VERSION
 from .intraday_quotes import is_exchange_session, live_execution_bars, previous_exchange_session
 from .shadow_ledger import (
     AUDIT_SCHEMA_VERSION,
@@ -20,7 +21,7 @@ from .shadow_ledger import (
     validate_ledger,
 )
 from .shadow_run import critical_symbols
-from .split_execution import execute_pending_side
+from .split_execution import execute_conditional_exit_scan
 
 
 SCHEDULED_MORNING_TIME = '09:40'
@@ -46,7 +47,7 @@ def _execution_snapshot(
         market_value += int(position.get('qty') or 0) * price
     return {
         'date': trade_date,
-        'phase': 'morning_sell',
+        'phase': 'conditional_exit_scan',
         'scheduled_time': SCHEDULED_MORNING_TIME,
         'executed_at': executed_at,
         'equity': round(cash + market_value, 2),
@@ -67,6 +68,7 @@ def _already_done(state_root: Path, trade_date: str) -> dict | None:
             'event_hash': event.get('event_hash'), 'audit_path': str(daily),
             'scheduled_time': source_ref.get('scheduled_time'),
             'executed_at': source_ref.get('executed_at'),
+            'execution_model': source_ref.get('execution_model'),
         }
     path = state_root / 'audit' / f'{trade_date}-execution.json'
     if not path.exists():
@@ -76,22 +78,25 @@ def _already_done(state_root: Path, trade_date: str) -> dict | None:
     for fund_id in FUND_NAMES:
         state = json.loads((state_root / 'ledgers' / f'{fund_id}.json').read_text(encoding='utf-8'))
         if state.get('audit_head') != event_hash:
-            raise RuntimeError(f'V2 morning audit/ledger head mismatch for {fund_id}')
-        if str(state.get('morning_sell_date') or '')[:10] != trade_date:
-            raise RuntimeError(f'V2 morning marker missing for {fund_id}')
+            raise RuntimeError(f'V2 conditional-exit audit/ledger head mismatch for {fund_id}')
+        marker = str(state.get('conditional_exit_date') or state.get('morning_sell_date') or '')[:10]
+        if marker != trade_date:
+            raise RuntimeError(f'V2 conditional-exit marker missing for {fund_id}')
         expected = ((event.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
         if expected != ledger_content_hash(state):
-            raise RuntimeError(f'V2 morning ledger content mismatch for {fund_id}')
+            raise RuntimeError(f'V2 conditional-exit ledger content mismatch for {fund_id}')
     source_ref = event.get('source_ref') or {}
     return {
-        'status': 'already_morning_sell', 'trade_date': trade_date,
+        'status': 'already_conditional_exit_scan', 'trade_date': trade_date,
         'event_hash': event_hash, 'audit_path': str(path),
         'scheduled_time': source_ref.get('scheduled_time'),
         'executed_at': source_ref.get('executed_at'),
+        'execution_model': source_ref.get('execution_model'),
     }
 
 
 def run_morning_sell(trade_date: str, state_root: Path) -> dict:
+    """Compatibility entry point: 09:40 now checks conditions; it no longer forces target-weight sells."""
     existing = _already_done(state_root, trade_date)
     if existing:
         return existing
@@ -100,7 +105,9 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
     if not is_exchange_session(ak, trade_date):
         return {
             'status': 'not_exchange_session', 'trade_date': trade_date,
-            'fills': {}, 'rejected_orders': {}, 'safety': {'writes_v1_ledger': False},
+            'fills': {}, 'rejected_orders': {},
+            'execution_model': EXECUTION_MODEL,
+            'safety': {'writes_v1_ledger': False, 'calls_sol': False},
         }
     previous_trade_date = previous_exchange_session(ak, trade_date)
     if not previous_trade_date:
@@ -111,7 +118,7 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
         for fund_id in FUND_NAMES
     }
     if any(str(x.get('last_processed_date') or '')[:10] == trade_date for x in states.values()):
-        raise RuntimeError(f'V2 daily processing already started for {trade_date}; refusing morning sell')
+        raise RuntimeError(f'V2 daily processing already started for {trade_date}; refusing 09:40 conditional scan')
 
     critical = critical_symbols(states)
     bars, quote_source = live_execution_bars(ak, critical)
@@ -128,40 +135,19 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
 
     for fund_id, state in states.items():
         pending = state.get('pending_decision')
-        if pending and str(pending.get('decision_date') or '')[:10] == previous_trade_date:
-            execution = execute_pending_side(
-                state, pending, bars, trade_date,
-                side='SELL', price_field='close',
-                note=(
-                    f'V2 上一交易日决策 · 实际{execution_clock}盘中卖出/减仓'
-                    f'（计划{SCHEDULED_MORNING_TIME}）'
-                ),
-            )
-        elif pending:
-            # Stale decisions are not silently executed in the morning window. Evening processing will expire them.
-            execution = {
-                'phase': 'sell', 'decision_date': pending.get('decision_date'), 'trade_date': trade_date,
-                'reference_price_field': 'close', 'fills': [], 'rejected_orders': [],
-                'policy_adjustments': [], 'valuation_fallback_symbols': [], 'fees': 0.0,
-                'stale_pending': True,
-            }
-        else:
-            execution = {
-                'phase': 'sell', 'decision_date': None, 'trade_date': trade_date,
-                'reference_price_field': 'close', 'fills': [], 'rejected_orders': [],
-                'policy_adjustments': [], 'valuation_fallback_symbols': [], 'fees': 0.0,
-            }
-
-        snapshot = _execution_snapshot(
-            state,
-            bars,
-            trade_date,
-            execution.get('fees', 0.0),
-            executed_at,
+        execution = execute_conditional_exit_scan(
+            state, bars, trade_date, clock=execution_clock, pending=pending,
         )
+        snapshot = _execution_snapshot(
+            state, bars, trade_date, execution.get('fees', 0.0), executed_at,
+        )
+        # Keep the old field for report compatibility, but the semantic marker is conditional_exit_date.
         state['morning_sell_date'] = trade_date
+        state['conditional_exit_date'] = trade_date
         state['last_execution_date'] = trade_date
         state['last_execution_snapshot'] = snapshot
+        state['execution_model'] = EXECUTION_MODEL
+        state['plan_version'] = PLAN_VERSION
         validate_ledger(state)
         fill_counts[fund_id] = len(execution.get('fills') or [])
         reject_counts[fund_id] = len(execution.get('rejected_orders') or [])
@@ -174,7 +160,7 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
 
     event = {
         'schema_version': AUDIT_SCHEMA_VERSION,
-        'event_kind': 'morning_sell',
+        'event_kind': 'conditional_exit_scan',
         'trade_date': trade_date,
         'previous_trade_date': previous_trade_date,
         'execution_policy_version': EXECUTION_POLICY_VERSION,
@@ -183,10 +169,11 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
             'missing_critical_execution_bars': missing_critical,
             'scheduled_time': SCHEDULED_MORNING_TIME,
             'executed_at': executed_at,
+            'execution_model': EXECUTION_MODEL,
+            'plan_version': PLAN_VERSION,
             'note': (
-                'Previous-session SELL/reduce intents executed using the live quote captured at '
-                f'{execution_clock} Asia/Shanghai; scheduled target was {SCHEDULED_MORNING_TIME}. '
-                'BUY intents remain pending for close settlement.'
+                f'At {execution_clock} Asia/Shanghai the V2 shadow portfolio checked hard-stop, '
+                'take-profit, trailing, rotation and time conditions. The clock itself is not a sell signal.'
             ),
         },
         'regime': None,
@@ -198,6 +185,7 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
             'reads_v1_ledger': False,
             'writes_v1_ledger': False,
             'generates_new_targets': False,
+            'forced_clock_sell': False,
             'state_root': 'shadow_state/v2',
         },
     }
@@ -207,7 +195,6 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
         state['audit_head'] = event_hash
         fund_events[fund_id]['closing_ledger_content_sha256'] = ledger_content_hash(state)
 
-    # Closing hashes exclude audit_head, so recomputing the event hash after adding them is stable.
     event.pop('event_hash', None)
     event_hash = sha256_json(event)
     event['event_hash'] = event_hash
@@ -220,11 +207,13 @@ def run_morning_sell(trade_date: str, state_root: Path) -> dict:
         save_ledger(state_root / 'ledgers' / f'{fund_id}.json', state)
 
     return {
-        'status': 'morning_sell_processed',
+        'status': 'conditional_exit_processed',
         'trade_date': trade_date,
         'previous_trade_date': previous_trade_date,
         'scheduled_time': SCHEDULED_MORNING_TIME,
         'executed_at': executed_at,
+        'execution_model': EXECUTION_MODEL,
+        'plan_version': PLAN_VERSION,
         'event_hash': event_hash,
         'audit_path': str(audit_path),
         'fills': fill_counts,
