@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from .board_policy import BOARD_POLICY_VERSION, filter_mainboard_candidates, is_retail_buyable_symbol
+from .conditional_plan import PLAN_VERSION, attach_plans
 from .regime import MarketRegime
 from .strategies import (
     strategy_a_v2,
@@ -64,7 +65,6 @@ def _portfolio_stats(targets: list[dict]) -> dict:
 
 
 def _concentration_flags(stats: dict[str, dict]) -> dict[str, list[str]]:
-    """Surface B/C concentration without silently optimizing it away."""
     result: dict[str, list[str]] = {}
     for label in ('B', 'C'):
         item = stats[label]
@@ -108,6 +108,9 @@ def _validate_one(label: str, targets: list[dict], regime: MarketRegime) -> list
             errors.append(f'{_code(x)} missing thesis')
         if not str(x.get('invalidation') or '').strip():
             errors.append(f'{_code(x)} missing invalidation')
+        plan=x.get('trade_plan') or {}
+        if plan.get('plan_version') != PLAN_VERSION or not plan.get('entry') or not plan.get('exit'):
+            errors.append(f'{_code(x)} missing conditional trade plan')
     industries = defaultdict(float)
     for x in targets:
         industries[str(x.get('industry') or 'UNKNOWN')] += float(x.get('target_weight') or 0.0)
@@ -155,14 +158,17 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
         )
     regime = _regime(enriched)
     dds = dict(fund_drawdowns or {})
+    trade_date=str(enriched.get('trade_date') or '')[:10]
 
-    targets = {
+    raw_targets = {
         'A': strategy_a_v2(candidates, regime, float(dds.get('A') or 0.0)),
         'B': strategy_b_v2(candidates, regime, float(dds.get('B') or 0.0)),
         'C': strategy_c_v2(candidates, regime, float(dds.get('C') or 0.0)),
         'D': strategy_d_fallback_v2(candidates, regime, float(dds.get('D') or 0.0)),
         'L': strategy_l_v2(candidates, regime, float(dds.get('L') or 0.0)),
     }
+    # Conditions are attached after strategy selection and may deliberately reduce exposure to cash.
+    targets={label:attach_plans(label,rows,trade_date) for label,rows in raw_targets.items()}
 
     validation = {k: _validate_one(k, v, regime) for k, v in targets.items()}
     overlap = {}
@@ -171,15 +177,14 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
         for b in labels[i + 1:]:
             overlap[f'{a}-{b}'] = _jaccard(targets[a], targets[b])
 
-    # Distinctness is diagnostic, not a hard optimization target. A high overlap is surfaced for
-    # review rather than silently tuning parameters to make the experiment look diverse.
     high_overlap = {k: v for k, v in overlap.items() if v >= 0.60}
     all_errors = {k: v for k, v in validation.items() if v}
     stats = {k: _portfolio_stats(v) for k, v in targets.items()}
     return {
-        'target_version': 'v2-shadow-targets-0.2',
+        'target_version': 'v2-shadow-targets-conditional-0.3',
         'trade_date': enriched.get('trade_date'),
-        'decision_for': 'next_trading_session_open',
+        'decision_for': 'next_trading_session_conditional_entry',
+        'plan_version':PLAN_VERSION,
         'regime': {
             'label': regime.label,
             'score': regime.score,
@@ -210,9 +215,9 @@ def build_shadow_targets(enriched: dict, fund_drawdowns: dict | None = None) -> 
             'targets_valid': not bool(all_errors),
             'd_mode': 'deterministic_fallback_only',
             'board_policy_version': BOARD_POLICY_VERSION,
-            'next_required_stage': (
-                'review live target distinctness and execution feasibility; then build separate V2 shadow ledgers'
-            ),
+            'plan_version':PLAN_VERSION,
+            'allows_cash_when_no_trigger':True,
+            'next_required_stage':'settle only declared conditions in isolated V2 shadow ledgers',
         },
     }
 
