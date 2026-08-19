@@ -1,3 +1,4 @@
+# Retail board-policy regression coverage: target generation + final BUY boundary.
 import unittest
 
 from engine.broker import execute_target_weights
