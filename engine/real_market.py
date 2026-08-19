@@ -102,8 +102,10 @@ class AKShareMarket:
     def latest_trade_date(self, today: str) -> str:
         requested = date.fromisoformat(today)
         now_cn = datetime.now(ZoneInfo('Asia/Shanghai'))
-        if requested == now_cn.date() and now_cn.time() < dt_time(15, 20):
-            raise RuntimeError('A股尚未收盘。正式日频虚拟盘请在北京时间15:20之后运行；盘中请运行“连接测试（行情 + AI）”。')
+        # The primary production slot is 15:10. By then the exchange session has ended;
+        # providers may still lag briefly, so workflows retain 15:20/15:30 retries.
+        if requested == now_cn.date() and now_cn.time() < dt_time(15, 5):
+            raise RuntimeError('A股尚未收盘。正式日频虚拟盘请在北京时间15:05之后运行。')
 
         start=(requested-timedelta(days=20)).strftime('%Y%m%d')
         end=requested.strftime('%Y%m%d')
