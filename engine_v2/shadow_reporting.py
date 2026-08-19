@@ -42,6 +42,32 @@ def verify_audit_chain(state_root: Path) -> dict:
     return {'status':'PASS','events':len(files),'head':previous,'first_date':files[0].stem,'last_date':files[-1].stem}
 
 
+def _summary_source_ref(current_audit: dict) -> dict | None:
+    source_ref = current_audit.get('source_ref')
+    if source_ref is None:
+        return None
+    source_ref = dict(source_ref)
+    if current_audit.get('event_kind') != 'morning_sell':
+        return source_ref
+
+    source_ref.setdefault('scheduled_time', '09:40')
+    if source_ref.get('executed_at'):
+        source_ref['timing_status'] = 'RECORDED'
+        return source_ref
+
+    # Legacy morning events used "09:40" in prose even when a retry actually ran later.
+    # Preserve the immutable audit event, but never present that scheduled time as a verified fill time.
+    source_ref['executed_at'] = None
+    source_ref['timing_status'] = 'LEGACY_ACTUAL_TIME_UNRECORDED'
+    source_ref['legacy_note'] = source_ref.get('note')
+    source_ref['note'] = (
+        'Previous-session SELL/reduce intents executed using an intraday live quote. '
+        'This legacy audit event did not record the actual execution timestamp; '
+        '09:40 is the scheduled target, not a verified actual execution time.'
+    )
+    return source_ref
+
+
 def _max_drawdown(values: list[float]) -> float:
     peak = 0.0
     worst = 0.0
@@ -176,7 +202,7 @@ def build_summary(state_root: Path) -> dict:
         'initial_cash_per_fund': 1_000_000,
         'mode': 'FORWARD_SHADOW_ONLY',
         'regime': latest_decision_audit.get('regime'),
-        'source_ref': current_audit.get('source_ref'),
+        'source_ref': _summary_source_ref(current_audit),
         'target_diagnostics': latest_decision_audit.get('target_diagnostics'),
         'funds': ledgers,
         'audit_head': head,
