@@ -102,6 +102,8 @@ jobs:
             --state-root shadow_state/v2 \
             --output shadow_state/v2/summary.json \
             --web-output web/v2/data.json
+      - name: Verify generated V2 web fallback after reporting
+        run: python -m unittest discover -s tests -p 'test_v2_web.py' -v
       - name: Assert V2 isolation
         shell: bash
         run: |
