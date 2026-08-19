@@ -1,0 +1,59 @@
+import unittest
+
+from engine.broker import execute_target_weights
+import engine.morning_run  # noqa: F401 - import is a syntax/regression check
+import engine.evening_split_run  # noqa: F401 - import is a syntax/regression check
+
+
+class SplitExecutionTests(unittest.TestCase):
+    def test_sell_only_uses_close_price_and_never_buys(self):
+        state = {
+            'fund_id': 'A',
+            'cash': 0.0,
+            'positions': {
+                'sh.600000': {
+                    'name': '测试股', 'qty': 1000, 'avg_cost': 10.0,
+                    'acquired_date': '2026-08-18', 'last_price': 10.0,
+                }
+            },
+        }
+        bars = {
+            'sh.600000': {'open': 10.0, 'close': 12.0, 'preclose': 11.5, 'tradestatus': '1'}
+        }
+        fills = execute_target_weights(
+            state, [], bars, '2026-08-19',
+            sides=('SELL',), price_field='close', note='morning',
+        )
+        self.assertEqual([x['side'] for x in fills], ['SELL'])
+        self.assertEqual(fills[0]['execution_price_field'], 'close')
+        self.assertEqual(state['positions'], {})
+        self.assertGreater(state['cash'], 0)
+
+    def test_buy_only_does_not_sell_existing_position(self):
+        state = {
+            'fund_id': 'A',
+            'cash': 100000.0,
+            'positions': {
+                'sh.600000': {
+                    'name': '旧持仓', 'qty': 1000, 'avg_cost': 10.0,
+                    'acquired_date': '2026-08-18', 'last_price': 10.0,
+                }
+            },
+        }
+        bars = {
+            'sh.600000': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.600001': {'open': 20.0, 'close': 20.0, 'preclose': 20.0, 'tradestatus': '1'},
+        }
+        targets = [{'symbol': 'sh.600001', 'name': '新持仓', 'target_weight': 0.5}]
+        fills = execute_target_weights(
+            state, targets, bars, '2026-08-19',
+            sides=('BUY',), price_field='close', note='close-buy',
+        )
+        self.assertTrue(fills)
+        self.assertTrue(all(x['side'] == 'BUY' for x in fills))
+        self.assertIn('sh.600000', state['positions'])
+        self.assertIn('sh.600001', state['positions'])
+
+
+if __name__ == '__main__':
+    unittest.main()
