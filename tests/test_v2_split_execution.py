@@ -1,7 +1,7 @@
 import unittest
 
 from engine_v2.split_execution import combine_phase_executions, execute_pending_side
-import engine_v2.morning_sell_run  # noqa: F401 - import catches syntax/regression errors
+from engine_v2.morning_sell_run import SCHEDULED_MORNING_TIME, _execution_snapshot
 import engine_v2.shadow_run_split  # noqa: F401
 
 
@@ -29,6 +29,26 @@ class V2SplitExecutionTests(unittest.TestCase):
         self.assertEqual(result['fills'][0]['execution_price_field'], 'close')
         self.assertEqual(state['positions'], {})
         self.assertGreater(state['cash'], 0)
+
+    def test_morning_snapshot_distinguishes_schedule_from_actual_execution_time(self):
+        state = {
+            'cash': 1000.0,
+            'positions': {
+                'sh.600000': {
+                    'qty': 100,
+                    'avg_cost': 10.0,
+                    'last_price': 10.0,
+                }
+            },
+        }
+        bars = {'sh.600000': {'close': 10.5}}
+        executed_at = '2026-08-19T10:32:43+08:00'
+        snapshot = _execution_snapshot(state, bars, '2026-08-19', 3.5, executed_at)
+        self.assertEqual(SCHEDULED_MORNING_TIME, '09:40')
+        self.assertEqual(snapshot['phase'], 'morning_sell')
+        self.assertEqual(snapshot['scheduled_time'], '09:40')
+        self.assertEqual(snapshot['executed_at'], executed_at)
+        self.assertNotEqual(snapshot['executed_at'][11:16], snapshot['scheduled_time'])
 
     def test_close_buy_only_does_not_sell_old_position(self):
         state = {
