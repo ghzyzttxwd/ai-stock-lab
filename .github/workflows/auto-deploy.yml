@@ -31,6 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 锁定 main 最新提交
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: 准备 Python
         uses: actions/setup-python@v5
         with:
@@ -43,10 +52,54 @@ jobs:
       - name: 运行自动测试
         run: python -m unittest discover -s tests -v
 
-      - name: 发布前同步最新基金数据
+      - name: 发布前断言三套网页均为条件计划模型
+        shell: bash
         run: |
-          git fetch origin main
-          git checkout origin/main -- web/d/data.json web/e/data.json web/v2/data.json
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          d=json.loads(Path('web/d/data.json').read_text(encoding='utf-8'))
+          e=json.loads(Path('web/e/data.json').read_text(encoding='utf-8'))
+          v2=json.loads(Path('web/v2/data.json').read_text(encoding='utf-8'))
+          if d.get('execution_model')!='CONDITIONAL_PLAN_V1' or d.get('plan_version')!='conditional-plan-v1':
+              raise SystemExit('V1 D is not conditional-plan-v1')
+          if e.get('execution_model')!='CONDITIONAL_PLAN_V1' or e.get('plan_version')!='conditional-plan-v1':
+              raise SystemExit('V1 E is not conditional-plan-v1')
+          if v2.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or v2.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('V2 is not v2-conditional-plan-v1')
+
+          for item in d.get('decisions') or []:
+              if (item.get('trade_plan') or {}).get('plan_version')!='conditional-plan-v1':
+                  raise SystemExit('V1 D contains a legacy pending entry')
+          for fund in e.get('funds') or []:
+              for item in fund.get('pending_targets') or []:
+                  if (item.get('trade_plan') or {}).get('plan_version')!='conditional-plan-v1':
+                      raise SystemExit(f'V1 {fund.get("id")} contains a legacy pending entry')
+              for holding in fund.get('holdings') or []:
+                  if (holding.get('exit_plan') or {}).get('plan_version')!='conditional-plan-v1':
+                      raise SystemExit(f'V1 {fund.get("id")} holding missing exit plan')
+          for fid,fund in (v2.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if pending:
+                  if pending.get('plan_version')!='v2-conditional-plan-v1':
+                      raise SystemExit(f'V2 {fid} pending version mismatch')
+                  for item in pending.get('targets') or []:
+                      if (item.get('trade_plan') or {}).get('plan_version')!='v2-conditional-plan-v1':
+                          raise SystemExit(f'V2 {fid} contains a legacy pending entry')
+              for holding in fund.get('holdings') or []:
+                  if (holding.get('exit_plan') or {}).get('plan_version')!='v2-conditional-plan-v1':
+                      raise SystemExit(f'V2 {fid} holding missing exit plan')
+          print('LOCAL CONDITIONAL DATA INVARIANTS PASS')
+          PY
+          grep -q "09:40本身不等于卖出\|时钟本身不是卖出信号" web/d/app.js
+          grep -q "没有合格的新买点" web/e/app.js
+          grep -q "09:40本身不等于卖出" web/v2/app.js
+          if grep -q "下一交易日开盘模拟执行" web/d/app.js web/e/app.js web/v2/app.js; then
+            echo "Legacy fixed-open UI wording survived" >&2
+            exit 1
+          fi
 
       - name: 准备 GitHub Pages
         uses: actions/configure-pages@v5
@@ -60,104 +113,135 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: 公网验收 V1 与 V2 数据均与本次发布完全一致
+      - name: 公网验收数据和前端文件均与本次发布完全一致
         id: verify_public
         shell: bash
+        env:
+          DEPLOYED_SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
-          expected_d="$(sha256sum web/d/data.json | awk '{print $1}')"
-          expected_v2="$(sha256sum web/v2/data.json | awk '{print $1}')"
-          export EXPECTED_D_SHA256="$expected_d"
-          export EXPECTED_V2_SHA256="$expected_v2"
-          echo "expected_d_sha256=$expected_d"
-          echo "expected_v2_sha256=$expected_v2"
-          for i in $(seq 1 24); do
+          files=(
+            "d/data.json"
+            "e/data.json"
+            "v2/data.json"
+            "d/app.js"
+            "e/app.js"
+            "v2/app.js"
+          )
+          for file in "${files[@]}"; do
+            key="$(echo "$file" | tr '/.' '__' | tr '[:lower:]' '[:upper:]')"
+            expected="$(sha256sum "web/$file" | awk '{print $1}')"
+            export "EXPECTED_${key}=$expected"
+            echo "expected $file=$expected"
+          done
+
+          for i in $(seq 1 36); do
             ok=1
-            curl -fsS --connect-timeout 5 --max-time 20 \
-              "https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}" \
-              -o /tmp/live-d-data.json || ok=0
-            curl -fsS --connect-timeout 5 --max-time 20 \
-              "https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?verify=${GITHUB_SHA}-${GITHUB_RUN_ID}-${i}" \
-              -o /tmp/live-v2-data.json || ok=0
+            for file in "${files[@]}"; do
+              safe="$(echo "$file" | tr '/' '-')"
+              curl -fsS --connect-timeout 5 --max-time 20 \
+                "https://ghzyzttxwd.github.io/ai-stock-lab/${file}?verify=${DEPLOYED_SOURCE_SHA}-${GITHUB_RUN_ID}-${i}" \
+                -o "/tmp/live-${safe}" || ok=0
+            done
             if [ "$ok" = "1" ]; then
-              actual_d="$(sha256sum /tmp/live-d-data.json | awk '{print $1}')"
-              actual_v2="$(sha256sum /tmp/live-v2-data.json | awk '{print $1}')"
-              echo "attempt=$i d=$actual_d v2=$actual_v2"
-              if [ "$actual_d" = "$expected_d" ] && [ "$actual_v2" = "$expected_v2" ]; then
-                export ACTUAL_D_SHA256="$actual_d"
-                export ACTUAL_V2_SHA256="$actual_v2"
+              all_match=1
+              for file in "${files[@]}"; do
+                safe="$(echo "$file" | tr '/' '-')"
+                key="$(echo "$file" | tr '/.' '__' | tr '[:lower:]' '[:upper:]')"
+                expected_var="EXPECTED_${key}"
+                expected="${!expected_var}"
+                actual="$(sha256sum "/tmp/live-${safe}" | awk '{print $1}')"
+                echo "attempt=$i $file=$actual"
+                if [ "$actual" != "$expected" ]; then all_match=0; fi
+              done
+              if [ "$all_match" = "1" ]; then
                 python - <<'PY'
+          import hashlib
           import json
           import os
           from datetime import datetime, timezone
+          from pathlib import Path
 
           d=json.load(open('/tmp/live-d-data.json',encoding='utf-8'))
+          e=json.load(open('/tmp/live-e-data.json',encoding='utf-8'))
           v2=json.load(open('/tmp/live-v2-data.json',encoding='utf-8'))
-          if d.get('execution_model') != '09:40_SELL_15:10_OPEN_BUY':
-              raise SystemExit(f'public V1 execution model mismatch: {d.get("execution_model")}')
+          if (d.get('execution_model'),d.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('public V1 D model mismatch')
+          if (e.get('execution_model'),e.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('public V1 E model mismatch')
+          if (v2.get('execution_model'),v2.get('plan_version')) != ('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('public V2 model mismatch')
 
-          def walk(obj):
-              if isinstance(obj,dict):
-                  yield obj
-                  for value in obj.values():
-                      yield from walk(value)
-              elif isinstance(obj,list):
-                  for value in obj:
-                      yield from walk(value)
+          d_js=Path('/tmp/live-d-app.js').read_text(encoding='utf-8')
+          e_js=Path('/tmp/live-e-app.js').read_text(encoding='utf-8')
+          v2_js=Path('/tmp/live-v2-app.js').read_text(encoding='utf-8')
+          if '下一交易日开盘模拟执行' in d_js+e_js+v2_js:
+              raise SystemExit('public UI still contains legacy forced-open wording')
+          if '时钟本身不是卖出信号' not in d_js:
+              raise SystemExit('public D UI does not explain conditional exit semantics')
+          if '没有合格的新买点' not in e_js:
+              raise SystemExit('public E UI does not expose cash/no-trade semantics')
+          if '09:40本身不等于卖出' not in v2_js:
+              raise SystemExit('public V2 UI does not expose conditional exit semantics')
 
-          d_buys=[x for x in walk(d) if x.get('side')=='BUY' and str(x.get('trade_date') or '')[:10]=='2026-08-19']
-          v2_buys=[x for x in walk(v2) if x.get('side')=='BUY' and str(x.get('trade_date') or '')[:10]=='2026-08-19']
-          if any(x.get('execution_price_field') != 'open' for x in d_buys):
-              raise SystemExit('public V1 still exposes a 2026-08-19 BUY not based on open price')
-          if any(x.get('execution_price_field') not in (None,'open') for x in v2_buys):
-              raise SystemExit('public V2 still exposes a 2026-08-19 BUY based on close price')
-          source_ref=v2.get('source_ref') or {}
-          if source_ref.get('correct_buy_reference') != 'session_open':
-              raise SystemExit('public V2 correction marker missing')
-
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
           receipt={
               'status':'verified',
-              'source_commit':os.environ['GITHUB_SHA'],
+              'source_commit':os.environ['DEPLOYED_SOURCE_SHA'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],
               'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'updated_at':v2.get('updated_at'),
-              'execution_model':'09:40_SELL_15:10_OPEN_BUY',
-              'buy_reference':'session_open',
-              'd_expected_sha256':os.environ['EXPECTED_D_SHA256'],
-              'd_public_sha256':os.environ['ACTUAL_D_SHA256'],
-              'expected_sha256':os.environ['EXPECTED_V2_SHA256'],
-              'public_sha256':os.environ['ACTUAL_V2_SHA256'],
-              'v1_20260819_buy_fills_checked':len(d_buys),
-              'v2_20260819_buy_fills_exposed_checked':len(v2_buys),
+              'execution_model_v1':'CONDITIONAL_PLAN_V1',
+              'plan_version_v1':'conditional-plan-v1',
+              'execution_model_v2':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version_v2':'v2-conditional-plan-v1',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
+              'verified_files':{
+                  'd/data.json':digest('/tmp/live-d-data.json'),
+                  'e/data.json':digest('/tmp/live-e-data.json'),
+                  'v2/data.json':digest('/tmp/live-v2-data.json'),
+                  'd/app.js':digest('/tmp/live-d-app.js'),
+                  'e/app.js':digest('/tmp/live-e-app.js'),
+                  'v2/app.js':digest('/tmp/live-v2-app.js'),
+              },
+              'updated_at':d.get('updated_at'),
               'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
-              'public_url':'https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json',
+              'public_urls':{
+                  'd':'https://ghzyzttxwd.github.io/ai-stock-lab/d/',
+                  'e':'https://ghzyzttxwd.github.io/ai-stock-lab/e/',
+                  'v2':'https://ghzyzttxwd.github.io/ai-stock-lab/v2/',
+              },
           }
-          open('/tmp/v2-pages-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          Path('/tmp/conditional-pages-full-verification.json').write_text(
+              json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'
+          )
+          print('PUBLIC CONDITIONAL DATA + UI VERIFIED')
           PY
-                echo "d_sha256=$actual_d" >> "$GITHUB_OUTPUT"
-                echo "v2_sha256=$actual_v2" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
             sleep 5
           done
-          echo "公网 V1/V2 数据与本次发布文件不一致，禁止判定成功。"
+          echo "公网数据或前端文件与本次发布不一致，禁止判定成功。"
           exit 1
 
-      - name: 持久化公网验收回执
+      - name: 持久化条件计划公网验收回执
         shell: bash
         run: |
           set -euo pipefail
-          test -s /tmp/v2-pages-verification.json
+          test -s /tmp/conditional-pages-full-verification.json
+          git fetch origin main
+          git reset --hard origin/main
           mkdir -p state
-          cp /tmp/v2-pages-verification.json state/v2_pages_verification.json
+          cp /tmp/conditional-pages-full-verification.json state/conditional_pages_full_verification.json
           git config user.name "pages-verification-bot"
           git config user.email "pages-verification-bot@users.noreply.github.com"
-          git add state/v2_pages_verification.json
+          git add state/conditional_pages_full_verification.json
           if git diff --cached --quiet; then
             echo "Verification receipt unchanged."
             exit 0
           fi
-          git commit -m "ops: persist V1/V2 Pages verification receipt"
+          git commit -m "ops: verify conditional data and UI on public Pages"
           git pull --rebase origin main
           git push origin HEAD:main
