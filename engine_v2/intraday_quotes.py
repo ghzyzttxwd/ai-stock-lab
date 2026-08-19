@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date
 
 
@@ -27,6 +28,14 @@ def is_exchange_session(ak, trade_date: str) -> bool:
     return trade_date in set(exchange_sessions(ak))
 
 
+def _positive_quote(value, fallback: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    return number if math.isfinite(number) and number > 0 else fallback
+
+
 def _eastmoney_bars(ak, critical: dict[str, str]) -> dict[str, dict]:
     frame = ak.stock_zh_a_spot_em()
     bars: dict[str, dict] = {}
@@ -40,14 +49,20 @@ def _eastmoney_bars(ak, critical: dict[str, str]) -> dict[str, dict]:
             previous = float(row.get('昨收') or 0.0)
         except (TypeError, ValueError):
             continue
-        if last <= 0:
+        if not math.isfinite(last) or last <= 0:
             continue
+        opening = _positive_quote(opening, last)
+        previous = _positive_quote(previous, last)
+        high = max(_positive_quote(row.get('最高'), last), last, opening)
+        low = min(_positive_quote(row.get('最低'), last), last, opening)
         bars[symbol] = {
             'code': symbol,
             'name': str(row.get('名称') or critical.get(symbol) or symbol),
-            'open': opening or last,
+            'open': opening,
+            'high': high,
+            'low': low,
             'close': last,
-            'preclose': previous or last,
+            'preclose': previous,
             'tradestatus': '1',
             'source': 'eastmoney-intraday',
         }
@@ -67,14 +82,20 @@ def _sina_bars(ak, critical: dict[str, str]) -> dict[str, dict]:
             previous = float(row.get('昨收') or 0.0)
         except (TypeError, ValueError):
             continue
-        if last <= 0:
+        if not math.isfinite(last) or last <= 0:
             continue
+        opening = _positive_quote(opening, last)
+        previous = _positive_quote(previous, last)
+        high = max(_positive_quote(row.get('最高'), last), last, opening)
+        low = min(_positive_quote(row.get('最低'), last), last, opening)
         bars[symbol] = {
             'code': symbol,
             'name': str(row.get('名称') or critical.get(symbol) or symbol),
-            'open': opening or last,
+            'open': opening,
+            'high': high,
+            'low': low,
             'close': last,
-            'preclose': previous or last,
+            'preclose': previous,
             'tradestatus': '1',
             'source': 'sina-intraday',
         }
@@ -93,5 +114,5 @@ def live_execution_bars(ak, critical: dict[str, str]) -> tuple[dict[str, dict], 
         print(f'[V2 MORNING] eastmoney intraday failed: {exc}')
     bars = _sina_bars(ak, critical)
     if not bars:
-        raise RuntimeError('V2 09:40 intraday quote snapshot returned no critical symbols')
+        raise RuntimeError('V2 intraday quote snapshot returned no critical symbols')
     return bars, 'sina-intraday'
