@@ -1,0 +1,104 @@
+name: One-off open vs intraday check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'state/.open-check-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          path: v2branch
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Compare today's opens with current quotes for actually sold stocks
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import akshare as ak
+
+          today=datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+          funds={}
+          # V1 fills
+          names={'D_MAIN':'V1 AI综合','A':'V1 A','B':'V1 B','C':'V1 C','D':'V1 D','L':'V1 L'}
+          for fid,label in names.items():
+              p=Path('state')/f'{fid}.json'
+              if not p.exists(): continue
+              s=json.loads(p.read_text(encoding='utf-8'))
+              fs=[x for x in s.get('fills',[]) if str(x.get('trade_date',''))[:10]==today and x.get('side')=='SELL']
+              if fs: funds[label]=fs
+          # V2 morning audit
+          ap=Path('v2branch/shadow_state/v2/audit')/f'{today}-execution.json'
+          if ap.exists():
+              a=json.loads(ap.read_text(encoding='utf-8'))
+              for fid,item in (a.get('funds') or {}).items():
+                  fs=[x for x in ((item.get('execution') or {}).get('fills') or []) if x.get('side')=='SELL']
+                  if fs: funds[f'V2 {fid}']=fs
+
+          symbols={x['symbol'] for fs in funds.values() for x in fs}
+          def norm(code):
+              code=str(code).zfill(6)
+              return ('sh.' if code.startswith(('600','601','603','605')) else 'sz.')+code
+          rows={}
+          source='eastmoney'
+          try:
+              df=ak.stock_zh_a_spot_em()
+              for _,r in df.iterrows():
+                  sym=norm(r.get('代码',''))
+                  if sym not in symbols: continue
+                  try:
+                      op=float(r.get('今开') or 0); last=float(r.get('最新价') or 0); prev=float(r.get('昨收') or 0)
+                  except: continue
+                  rows[sym]={'name':str(r.get('名称') or sym),'open':op,'last':last,'prev_close':prev}
+          except Exception as e:
+              source='sina'
+              df=ak.stock_zh_a_spot()
+              for _,r in df.iterrows():
+                  raw=str(r.get('代码','')).lower(); digits=''.join(c for c in raw if c.isdigit())[-6:]
+                  if len(digits)!=6: continue
+                  sym=('sh.' if raw.startswith('sh') else 'sz.' if raw.startswith('sz') else norm(digits)[:3])+digits
+                  if sym not in symbols: continue
+                  try:
+                      op=float(r.get('今开') or 0); last=float(r.get('最新价') or 0); prev=float(r.get('昨收') or 0)
+                  except: continue
+                  rows[sym]={'name':str(r.get('名称') or sym),'open':op,'last':last,'prev_close':prev}
+
+          out={'generated_at':datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(timespec='seconds'),'trade_date':today,'source':source,'funds':{},'symbols':rows}
+          for label,fs in funds.items():
+              open_gross=actual_gross=latest_gross=0.0; details=[]
+              for f in fs:
+                  sym=f['symbol']; q=int(f.get('qty') or 0); r=rows.get(sym) or {}
+                  op=float(r.get('open') or 0); last=float(r.get('last') or 0); actual=float(f.get('price') or 0)
+                  open_gross += op*q; actual_gross += actual*q; latest_gross += last*q
+                  details.append({'symbol':sym,'name':f.get('name') or r.get('name') or sym,'qty':q,'open':op,'actual_sell':actual,'latest':last,'actual_vs_open_pct':round((actual/op-1)*100,3) if op else None,'latest_vs_open_pct':round((last/op-1)*100,3) if op else None})
+              out['funds'][label]={'open_gross':round(open_gross,2),'actual_gross':round(actual_gross,2),'latest_gross':round(latest_gross,2),'actual_minus_open':round(actual_gross-open_gross,2),'actual_vs_open_pct':round((actual_gross/open_gross-1)*100,3) if open_gross else None,'details':details}
+          Path('state/manual_open_check.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - name: Persist one-off result
+        run: |
+          git config user.name "ai-stock-bot"
+          git config user.email "ai-stock-bot@users.noreply.github.com"
+          git add state/manual_open_check.json
+          git commit -m "data: compare open vs intraday sold basket" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
