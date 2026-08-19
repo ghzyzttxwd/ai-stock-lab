@@ -590,7 +590,7 @@
   ],
   "pending_decision": {
     "decision_date": "2026-08-19",
-    "execute_on": "next_session_0940_sell_1510_open_buy",
+    "execute_on": "next_session_conditional_entry_and_exit_checks",
     "strategy_version": "v2-b-deterministic-0.1",
     "target_version": "v2-shadow-targets-0.2",
     "regime": {
@@ -618,86 +618,7 @@
       "industry_hhi": 0.307285,
       "effective_industries": 3.2543
     },
-    "targets": [
-      {
-        "symbol": "sh.603259",
-        "raw_code": "603259",
-        "name": "药明康德",
-        "industry": "医药生物",
-        "industry_code": "801150",
-        "target_weight": 0.039964,
-        "v2_score": 86.65,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      },
-      {
-        "symbol": "sh.600547",
-        "raw_code": "600547",
-        "name": "山东黄金",
-        "industry": "有色金属",
-        "industry_code": "801050",
-        "target_weight": 0.041887,
-        "v2_score": 86.15,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      },
-      {
-        "symbol": "sz.002407",
-        "raw_code": "002407",
-        "name": "多氟多",
-        "industry": "基础化工",
-        "industry_code": "801030",
-        "target_weight": 0.031352,
-        "v2_score": 85.82,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      },
-      {
-        "symbol": "sh.600737",
-        "raw_code": "600737",
-        "name": "中粮糖业",
-        "industry": "农林牧渔",
-        "industry_code": "801010",
-        "target_weight": 0.037588,
-        "v2_score": 84.95,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      },
-      {
-        "symbol": "sz.000506",
-        "raw_code": "000506",
-        "name": "招金黄金",
-        "industry": "有色金属",
-        "industry_code": "801050",
-        "target_weight": 0.026835,
-        "v2_score": 84.34,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      },
-      {
-        "symbol": "sz.002428",
-        "raw_code": "002428",
-        "name": "云南锗业",
-        "industry": "有色金属",
-        "industry_code": "801050",
-        "target_weight": 0.022374,
-        "v2_score": 84.34,
-        "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-        "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-        "fundamental_ready": true,
-        "limit_status": "normal"
-      }
-    ],
+    "targets": [],
     "source_ref": {
       "snapshot_version": "v2-shadow-data-0.4",
       "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
@@ -751,10 +672,12 @@
           }
         },
         "missing_critical_execution_bars": []
-      }
+      },
+      "conditional_plan_migration": true
     },
     "calls_sol": false,
-    "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+    "execution_model": "V2_CONDITIONAL_PLAN_V1",
+    "plan_version": "v2-conditional-plan-v1"
   },
   "decisions": [
     {
@@ -1368,7 +1291,7 @@
   ],
   "created_date": "2026-08-14",
   "last_processed_date": "2026-08-19",
-  "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+  "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
   "execution_policy_version": "v1-parity-2026-08-14",
   "execution_policy": {
     "initial_cash": 1000000.0,
@@ -1392,7 +1315,7 @@
     "valuation_fallback_symbols": []
   },
   "morning_sell_date": "2026-08-19",
-  "execution_model": "09:40_SELL_15:10_OPEN_BUY",
+  "execution_model": "V2_CONDITIONAL_PLAN_V1",
   "open_buy_reference": "session_open",
   "data_corrections": [
     {
@@ -1402,5 +1325,105 @@
       "to": "session_open",
       "reason": "2026-08-19 close-price BUY settlement was incorrect"
     }
-  ]
+  ],
+  "exit_plans": {
+    "sz.000426": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-17",
+      "entry_price": 37.0307,
+      "hard_stop_price": 34.342,
+      "take_profit_price": 37.771,
+      "trailing_activation_price": 37.401,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 37.0307,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 36.392,
+      "setup": "legacy-migrated"
+    },
+    "sz.000703": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 17.5243,
+      "hard_stop_price": 18.221,
+      "take_profit_price": 19.748,
+      "trailing_activation_price": 19.462,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 19.08,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 19.137,
+      "setup": "legacy-migrated"
+    },
+    "sh.603259": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 167.1331,
+      "hard_stop_price": 156.62,
+      "take_profit_price": 170.476,
+      "trailing_activation_price": 168.804,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 167.1331,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 165.968,
+      "setup": "legacy-migrated"
+    },
+    "sz.002842": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 39.4318,
+      "hard_stop_price": 36.175,
+      "take_profit_price": 40.22,
+      "trailing_activation_price": 39.826,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 39.4318,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 38.335,
+      "setup": "legacy-migrated"
+    },
+    "sh.600227": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 3.7031,
+      "hard_stop_price": 3.553,
+      "take_profit_price": 3.85,
+      "trailing_activation_price": 3.794,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 3.72,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 3.731,
+      "setup": "legacy-migrated"
+    },
+    "sh.603823": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 91.0723,
+      "hard_stop_price": 79.523,
+      "take_profit_price": 92.894,
+      "trailing_activation_price": 91.983,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 91.0723,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 84.269,
+      "setup": "legacy-migrated"
+    }
+  },
+  "plan_version": "v2-conditional-plan-v1",
+  "conditional_plan_migrated_on": "2026-08-19"
 }

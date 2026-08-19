@@ -384,7 +384,7 @@
   ],
   "pending_decision": {
     "decision_date": "2026-08-19",
-    "execute_on": "next_session_0940_sell_1510_open_buy",
+    "execute_on": "next_session_conditional_entry_and_exit_checks",
     "strategy_version": "v2-c-deterministic-0.1",
     "target_version": "v2-shadow-targets-0.2",
     "regime": {
@@ -461,10 +461,12 @@
           }
         },
         "missing_critical_execution_bars": []
-      }
+      },
+      "conditional_plan_migration": true
     },
     "calls_sol": false,
-    "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+    "execution_model": "V2_CONDITIONAL_PLAN_V1",
+    "plan_version": "v2-conditional-plan-v1"
   },
   "decisions": [
     {
@@ -914,7 +916,7 @@
   ],
   "created_date": "2026-08-14",
   "last_processed_date": "2026-08-19",
-  "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+  "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
   "execution_policy_version": "v1-parity-2026-08-14",
   "execution_policy": {
     "initial_cash": 1000000.0,
@@ -938,7 +940,7 @@
     "valuation_fallback_symbols": []
   },
   "morning_sell_date": "2026-08-19",
-  "execution_model": "09:40_SELL_15:10_OPEN_BUY",
+  "execution_model": "V2_CONDITIONAL_PLAN_V1",
   "open_buy_reference": "session_open",
   "data_corrections": [
     {
@@ -948,5 +950,73 @@
       "to": "session_open",
       "reason": "2026-08-19 close-price BUY settlement was incorrect"
     }
-  ]
+  ],
+  "exit_plans": {
+    "sh.600737": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 15.3726,
+      "hard_stop_price": 14.258,
+      "take_profit_price": 15.68,
+      "trailing_activation_price": 15.526,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 15.3726,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 15.109,
+      "setup": "legacy-migrated"
+    },
+    "sh.603580": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 65.0515,
+      "hard_stop_price": 64.93,
+      "take_profit_price": 70.37,
+      "trailing_activation_price": 69.35,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 67.99,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 68.194,
+      "setup": "legacy-migrated"
+    },
+    "sh.600722": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 12.6098,
+      "hard_stop_price": 12.262,
+      "take_profit_price": 13.289,
+      "trailing_activation_price": 13.097,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 12.84,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 12.879,
+      "setup": "legacy-migrated"
+    },
+    "sh.603823": {
+      "plan_version": "v2-conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 91.0723,
+      "hard_stop_price": 79.523,
+      "take_profit_price": 92.894,
+      "trailing_activation_price": 91.983,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 91.0723,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 84.269,
+      "setup": "legacy-migrated"
+    }
+  },
+  "plan_version": "v2-conditional-plan-v1",
+  "conditional_plan_migrated_on": "2026-08-19"
 }
