@@ -126,6 +126,7 @@ def run_shadow_session_split(
         'enrichment_sha256': sha256_json(enriched),
         'target_version': targets_payload.get('target_version'),
         'execution_model': '09:40_SELL_CLOSE_BUY',
+        'board_policy': targets_payload.get('board_policy'),
         'data_quality': {
             'snapshot_source': (snapshot.get('source_notes') or {}).get('stock_snapshot'),
             'snapshot_grade': (snapshot.get('safety') or {}).get('snapshot_grade'),
@@ -178,6 +179,7 @@ def run_shadow_session_split(
             'overlap_jaccard': targets_payload.get('overlap_jaccard'),
             'high_overlap_pairs': targets_payload.get('high_overlap_pairs'),
             'concentration_flags': targets_payload.get('concentration_flags'),
+            'board_policy': targets_payload.get('board_policy'),
         },
         'previous_event_hashes': previous_heads,
         'funds': fund_events,
@@ -203,6 +205,7 @@ def run_shadow_session_split(
         'audit_path': str(audit_path), 'source_ref': source_ref,
         'drawdowns': drawdowns,
         'target_stats': targets_payload.get('stats'),
+        'board_policy': targets_payload.get('board_policy'),
         'concentration_flags': targets_payload.get('concentration_flags'),
         'fills': {fund_id: len(x.get('fills') or []) for fund_id, x in execution.items()},
         'rejected_orders': {fund_id: len(x.get('rejected_orders') or []) for fund_id, x in execution.items()},
