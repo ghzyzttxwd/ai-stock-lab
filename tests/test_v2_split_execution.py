@@ -2,6 +2,7 @@ import unittest
 
 from engine_v2.split_execution import combine_phase_executions, execute_pending_side
 from engine_v2.morning_sell_run import SCHEDULED_MORNING_TIME, _execution_snapshot
+from engine_v2.shadow_reporting import _summary_source_ref
 import engine_v2.shadow_run_split  # noqa: F401
 
 
@@ -49,6 +50,21 @@ class V2SplitExecutionTests(unittest.TestCase):
         self.assertEqual(snapshot['scheduled_time'], '09:40')
         self.assertEqual(snapshot['executed_at'], executed_at)
         self.assertNotEqual(snapshot['executed_at'][11:16], snapshot['scheduled_time'])
+
+    def test_legacy_morning_audit_never_claims_scheduled_time_is_actual(self):
+        legacy = {
+            'event_kind': 'morning_sell',
+            'source_ref': {
+                'execution_bar_source': 'sina-intraday',
+                'note': 'Previous-session SELL/reduce intents executed at the 09:40 live quote.',
+            },
+        }
+        source_ref = _summary_source_ref(legacy)
+        self.assertEqual(source_ref['scheduled_time'], '09:40')
+        self.assertIsNone(source_ref['executed_at'])
+        self.assertEqual(source_ref['timing_status'], 'LEGACY_ACTUAL_TIME_UNRECORDED')
+        self.assertIn('not a verified actual execution time', source_ref['note'])
+        self.assertIn('09:40 live quote', source_ref['legacy_note'])
 
     def test_close_buy_only_does_not_sell_old_position(self):
         state = {
