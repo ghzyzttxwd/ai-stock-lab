@@ -8,7 +8,7 @@ import engine.evening_split_run  # noqa: F401 - import is a syntax/regression ch
 
 
 class SplitExecutionTests(unittest.TestCase):
-    def test_sell_only_uses_close_price_and_never_buys(self):
+    def test_sell_only_uses_live_close_field_and_never_buys(self):
         state = {
             'fund_id': 'A',
             'cash': 0.0,
@@ -31,7 +31,7 @@ class SplitExecutionTests(unittest.TestCase):
         self.assertEqual(state['positions'], {})
         self.assertGreater(state['cash'], 0)
 
-    def test_buy_only_does_not_sell_existing_position(self):
+    def test_1510_buy_uses_open_and_does_not_sell_existing_position(self):
         state = {
             'fund_id': 'A',
             'cash': 100000.0,
@@ -43,16 +43,17 @@ class SplitExecutionTests(unittest.TestCase):
             },
         }
         bars = {
-            'sh.600000': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
-            'sh.600001': {'open': 20.0, 'close': 20.0, 'preclose': 20.0, 'tradestatus': '1'},
+            'sh.600000': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.600001': {'open': 19.0, 'close': 20.0, 'preclose': 18.5, 'tradestatus': '1'},
         }
         targets = [{'symbol': 'sh.600001', 'name': '新持仓', 'target_weight': 0.5}]
         fills = execute_target_weights(
             state, targets, bars, '2026-08-19',
-            sides=('BUY',), price_field='close', note='close-buy',
+            sides=('BUY',), price_field='open', note='15:10-open-buy',
         )
         self.assertTrue(fills)
         self.assertTrue(all(x['side'] == 'BUY' for x in fills))
+        self.assertTrue(all(x['execution_price_field'] == 'open' for x in fills))
         self.assertIn('sh.600000', state['positions'])
         self.assertIn('sh.600001', state['positions'])
 
@@ -79,10 +80,10 @@ class SplitExecutionTests(unittest.TestCase):
     def test_retail_policy_hard_blocks_chinext_and_star_buys(self):
         state = {'fund_id': 'A', 'cash': 100000.0, 'positions': {}}
         bars = {
-            'sz.300001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
-            'sz.301001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
-            'sh.688001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
-            'sh.689001': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sz.300001': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sz.301001': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.688001': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.689001': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
         }
         targets = [
             {'symbol': symbol, 'name': symbol, 'target_weight': 0.2}
@@ -90,7 +91,7 @@ class SplitExecutionTests(unittest.TestCase):
         ]
         fills = execute_target_weights(
             state, targets, bars, '2026-08-19',
-            sides=('BUY',), price_field='close', note='retail-policy-test',
+            sides=('BUY',), price_field='open', note='retail-policy-test',
         )
         self.assertEqual(fills, [])
         self.assertEqual(state['positions'], {})
