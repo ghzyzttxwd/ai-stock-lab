@@ -1,8 +1,10 @@
 {
-  "summary_version": "v2-shadow-summary-1.1",
+  "summary_version": "v2-shadow-summary-1.2",
   "updated_at": "2026-08-19",
   "initial_cash_per_fund": 1000000,
   "mode": "FORWARD_SHADOW_ONLY",
+  "execution_model": "V2_CONDITIONAL_PLAN_V1",
+  "plan_version": "v2-conditional-plan-v1",
   "regime": {
     "label": "risk_off",
     "score": 21.05,
@@ -13,12 +15,12 @@
     ]
   },
   "source_ref": {
-    "reason": "2026-08-19 BUY legs were incorrectly settled from close prices",
-    "old_buy_reference": "session_close",
-    "correct_buy_reference": "session_open",
-    "accounting_time": "15:10 Asia/Shanghai",
-    "execution_model": "09:40_SELL_15:10_OPEN_BUY",
-    "bar_source": "tencent-execution"
+    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
+    "execution_model": "V2_CONDITIONAL_PLAN_V1",
+    "plan_version": "v2-conditional-plan-v1",
+    "economics_mutated": false,
+    "historical_fills_rewritten": false,
+    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
   },
   "target_diagnostics": {
     "stats": {
@@ -139,6 +141,8 @@
       "fund_id": "A",
       "name": "V2 保守稳健影子基金",
       "strategy_family": "v2-shadow",
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 4,
         "equity": 996200.25,
@@ -178,7 +182,25 @@
           "weight_pct": 7.5,
           "pnl_pct": -1.8612,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 8.9567,
+            "hard_stop_price": 8.394,
+            "take_profit_price": 9.136,
+            "trailing_activation_price": 9.046,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 8.9567,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 8.895,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002215",
@@ -191,7 +213,25 @@
           "weight_pct": 5.7612,
           "pnl_pct": -1.0621,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 9.2078,
+            "hard_stop_price": 8.7,
+            "take_profit_price": 9.429,
+            "trailing_activation_price": 9.3,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 9.2078,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 9.18,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002170",
@@ -204,7 +244,25 @@
           "weight_pct": 5.5384,
           "pnl_pct": -2.3375,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 11.5295,
+            "hard_stop_price": 10.753,
+            "take_profit_price": 11.76,
+            "trailing_activation_price": 11.645,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.5295,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 11.395,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.000567",
@@ -217,7 +275,25 @@
           "weight_pct": 5.5041,
           "pnl_pct": -2.3031,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 6.1005,
+            "hard_stop_price": 5.692,
+            "take_profit_price": 6.223,
+            "trailing_activation_price": 6.162,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 6.1005,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 6.032,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.601009",
@@ -230,7 +306,25 @@
           "weight_pct": 5.3122,
           "pnl_pct": 5.0995,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 11.1894,
+            "hard_stop_price": 11.231,
+            "take_profit_price": 12.172,
+            "trailing_activation_price": 11.995,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.76,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 11.795,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600919",
@@ -243,7 +337,25 @@
           "weight_pct": 5.2781,
           "pnl_pct": 2.4037,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 11.6695,
+            "hard_stop_price": 11.412,
+            "take_profit_price": 12.368,
+            "trailing_activation_price": 12.189,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.95,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 11.986,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.000989",
@@ -256,7 +368,25 @@
           "weight_pct": 5.1941,
           "pnl_pct": -2.8442,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 9.5105,
+            "hard_stop_price": 8.824,
+            "take_profit_price": 9.701,
+            "trailing_activation_price": 9.606,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 9.5105,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 9.351,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002948",
@@ -269,7 +399,25 @@
           "weight_pct": 5.1438,
           "pnl_pct": 1.9966,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 5.7747,
+            "hard_stop_price": 5.625,
+            "take_profit_price": 6.096,
+            "trailing_activation_price": 6.008,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 5.89,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 5.908,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002142",
@@ -282,7 +430,25 @@
           "weight_pct": 4.9659,
           "pnl_pct": 2.0999,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 32.3017,
+            "hard_stop_price": 31.496,
+            "take_profit_price": 34.134,
+            "trailing_activation_price": 33.64,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 32.98,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 33.079,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.603444",
@@ -295,7 +461,25 @@
           "weight_pct": 3.8626,
           "pnl_pct": -1.1028,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 389.0807,
+            "hard_stop_price": 367.474,
+            "take_profit_price": 398.258,
+            "trailing_activation_price": 392.972,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 389.0807,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 387.913,
+            "setup": "legacy-migrated"
+          }
         }
       ],
       "recent_fills": [
@@ -695,7 +879,7 @@
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_1510_open_buy",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-a-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -725,138 +909,7 @@
           "industry_hhi": 0.303623,
           "effective_industries": 3.2936
         },
-        "targets": [
-          {
-            "symbol": "sh.600919",
-            "raw_code": "600919",
-            "name": "江苏银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.026078,
-            "v2_score": 85.47,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002142",
-            "raw_code": "002142",
-            "name": "宁波银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.023236,
-            "v2_score": 84.79,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002033",
-            "raw_code": "002033",
-            "name": "丽江股份",
-            "industry": "社会服务",
-            "industry_code": "801210",
-            "target_weight": 0.026078,
-            "v2_score": 83.54,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.601009",
-            "raw_code": "601009",
-            "name": "南京银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.025807,
-            "v2_score": 82.95,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002948",
-            "raw_code": "002948",
-            "name": "青岛银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.023756,
-            "v2_score": 82.78,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002215",
-            "raw_code": "002215",
-            "name": "诺 普 信",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.015937,
-            "v2_score": 82.48,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.000567",
-            "raw_code": "000567",
-            "name": "海德股份",
-            "industry": "非银金融",
-            "industry_code": "801790",
-            "target_weight": 0.015275,
-            "v2_score": 80.62,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.000989",
-            "raw_code": "000989",
-            "name": "九芝堂",
-            "industry": "医药生物",
-            "industry_code": "801150",
-            "target_weight": 0.01382,
-            "v2_score": 79.68,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.603182",
-            "raw_code": "603182",
-            "name": "嘉华股份",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.017236,
-            "v2_score": 79.16,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.603444",
-            "raw_code": "603444",
-            "name": "吉比特",
-            "industry": "传媒",
-            "industry_code": "801760",
-            "target_weight": 0.012775,
-            "v2_score": 78.52,
-            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          }
-        ],
+        "targets": [],
         "source_ref": {
           "snapshot_version": "v2-shadow-data-0.4",
           "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
@@ -910,18 +963,22 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
       "concentration_flags": []
     },
     "B": {
       "fund_id": "B",
       "name": "V2 趋势追强影子基金",
       "strategy_family": "v2-shadow",
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 4,
         "equity": 991850.63,
@@ -958,7 +1015,25 @@
           "weight_pct": 16.736,
           "pnl_pct": 8.8774,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 17.5243,
+            "hard_stop_price": 18.221,
+            "take_profit_price": 19.748,
+            "trailing_activation_price": 19.462,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 19.08,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 19.137,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.603259",
@@ -971,7 +1046,25 @@
           "weight_pct": 13.2278,
           "pnl_pct": -1.8746,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 167.1331,
+            "hard_stop_price": 156.62,
+            "take_profit_price": 170.476,
+            "trailing_activation_price": 168.804,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 167.1331,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 165.968,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002842",
@@ -984,7 +1077,25 @@
           "weight_pct": 9.9297,
           "pnl_pct": -3.9354,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 39.4318,
+            "hard_stop_price": 36.175,
+            "take_profit_price": 40.22,
+            "trailing_activation_price": 39.826,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 39.4318,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 38.335,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.000426",
@@ -997,7 +1108,25 @@
           "weight_pct": 9.789,
           "pnl_pct": -2.8914,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 37.0307,
+            "hard_stop_price": 34.342,
+            "take_profit_price": 37.771,
+            "trailing_activation_price": 37.401,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 37.0307,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 36.392,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600227",
@@ -1010,7 +1139,25 @@
           "weight_pct": 9.6014,
           "pnl_pct": 0.4564,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 3.7031,
+            "hard_stop_price": 3.553,
+            "take_profit_price": 3.85,
+            "trailing_activation_price": 3.794,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 3.72,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 3.731,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.603823",
@@ -1023,7 +1170,25 @@
           "weight_pct": 5.0373,
           "pnl_pct": -8.5671,
           "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 91.0723,
+            "hard_stop_price": 79.523,
+            "take_profit_price": 92.894,
+            "trailing_activation_price": 91.983,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 91.0723,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 84.269,
+            "setup": "legacy-migrated"
+          }
         }
       ],
       "recent_fills": [
@@ -1393,7 +1558,7 @@
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_1510_open_buy",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-b-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -1421,86 +1586,7 @@
           "industry_hhi": 0.307285,
           "effective_industries": 3.2543
         },
-        "targets": [
-          {
-            "symbol": "sh.603259",
-            "raw_code": "603259",
-            "name": "药明康德",
-            "industry": "医药生物",
-            "industry_code": "801150",
-            "target_weight": 0.039964,
-            "v2_score": 86.65,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600547",
-            "raw_code": "600547",
-            "name": "山东黄金",
-            "industry": "有色金属",
-            "industry_code": "801050",
-            "target_weight": 0.041887,
-            "v2_score": 86.15,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002407",
-            "raw_code": "002407",
-            "name": "多氟多",
-            "industry": "基础化工",
-            "industry_code": "801030",
-            "target_weight": 0.031352,
-            "v2_score": 85.82,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600737",
-            "raw_code": "600737",
-            "name": "中粮糖业",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.037588,
-            "v2_score": 84.95,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.000506",
-            "raw_code": "000506",
-            "name": "招金黄金",
-            "industry": "有色金属",
-            "industry_code": "801050",
-            "target_weight": 0.026835,
-            "v2_score": 84.34,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002428",
-            "raw_code": "002428",
-            "name": "云南锗业",
-            "industry": "有色金属",
-            "industry_code": "801050",
-            "target_weight": 0.022374,
-            "v2_score": 84.34,
-            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          }
-        ],
+        "targets": [],
         "source_ref": {
           "snapshot_version": "v2-shadow-data-0.4",
           "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
@@ -1554,18 +1640,22 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
       "concentration_flags": []
     },
     "C": {
       "fund_id": "C",
       "name": "V2 短线快攻影子基金",
       "strategy_family": "v2-shadow",
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 4,
         "equity": 993787.08,
@@ -1600,7 +1690,25 @@
           "weight_pct": 16.8261,
           "pnl_pct": -2.8791,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 15.3726,
+            "hard_stop_price": 14.258,
+            "take_profit_price": 15.68,
+            "trailing_activation_price": 15.526,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 15.3726,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 15.109,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.603580",
@@ -1613,7 +1721,25 @@
           "weight_pct": 10.2623,
           "pnl_pct": 4.5172,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 65.0515,
+            "hard_stop_price": 64.93,
+            "take_profit_price": 70.37,
+            "trailing_activation_price": 69.35,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 67.99,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 68.194,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600722",
@@ -1626,7 +1752,25 @@
           "weight_pct": 9.8194,
           "pnl_pct": 1.8256,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 12.6098,
+            "hard_stop_price": 12.262,
+            "take_profit_price": 13.289,
+            "trailing_activation_price": 13.097,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 12.84,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 12.879,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.603823",
@@ -1639,7 +1783,25 @@
           "weight_pct": 6.7032,
           "pnl_pct": -8.5671,
           "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 91.0723,
+            "hard_stop_price": 79.523,
+            "take_profit_price": 92.894,
+            "trailing_activation_price": 91.983,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 91.0723,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 84.269,
+            "setup": "legacy-migrated"
+          }
         }
       ],
       "recent_fills": [
@@ -1971,7 +2133,7 @@
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_1510_open_buy",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-c-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -2048,18 +2210,22 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
       "concentration_flags": []
     },
     "D": {
       "fund_id": "D",
       "name": "V2 综合判断影子基金（规则兜底）",
       "strategy_family": "v2-shadow",
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 4,
         "equity": 976651.22,
@@ -2096,7 +2262,25 @@
           "weight_pct": 11.7545,
           "pnl_pct": 1.761,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 161.162,
+            "hard_stop_price": 156.62,
+            "take_profit_price": 169.74,
+            "trailing_activation_price": 167.28,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 164.0,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 164.492,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002582",
@@ -2109,7 +2293,25 @@
           "weight_pct": 10.7246,
           "pnl_pct": -5.4961,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 11.1953,
+            "hard_stop_price": 10.104,
+            "take_profit_price": 11.419,
+            "trailing_activation_price": 11.307,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.1953,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 10.707,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002768",
@@ -2122,7 +2324,25 @@
           "weight_pct": 9.7066,
           "pnl_pct": -2.8462,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 65.0515,
+            "hard_stop_price": 60.356,
+            "take_profit_price": 66.353,
+            "trailing_activation_price": 65.702,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 65.0515,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 63.958,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600251",
@@ -2135,7 +2355,25 @@
           "weight_pct": 7.467,
           "pnl_pct": -4.476,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 10.4581,
+            "hard_stop_price": 9.54,
+            "take_profit_price": 10.667,
+            "trailing_activation_price": 10.563,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 10.4581,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 10.11,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.601952",
@@ -2148,7 +2386,25 @@
           "weight_pct": 5.5801,
           "pnl_pct": -2.8482,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 9.0477,
+            "hard_stop_price": 8.394,
+            "take_profit_price": 9.229,
+            "trailing_activation_price": 9.138,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 9.0477,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 8.895,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002772",
@@ -2161,7 +2417,25 @@
           "weight_pct": 5.5666,
           "pnl_pct": -5.4914,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 11.2794,
+            "hard_stop_price": 10.18,
+            "take_profit_price": 11.505,
+            "trailing_activation_price": 11.392,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.2794,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 10.788,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.000019",
@@ -2174,7 +2448,25 @@
           "weight_pct": 5.1296,
           "pnl_pct": -2.2397,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 6.9251,
+            "hard_stop_price": 6.465,
+            "take_profit_price": 7.064,
+            "trailing_activation_price": 6.994,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 6.9251,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 6.851,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600354",
@@ -2187,7 +2479,25 @@
           "weight_pct": 3.577,
           "pnl_pct": -2.5064,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 7.0261,
+            "hard_stop_price": 6.542,
+            "take_profit_price": 7.167,
+            "trailing_activation_price": 7.096,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 7.0261,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 6.932,
+            "setup": "legacy-migrated"
+          }
         }
       ],
       "recent_fills": [
@@ -2559,7 +2869,7 @@
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_1510_open_buy",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-d-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -2589,112 +2899,7 @@
           "industry_hhi": 0.238079,
           "effective_industries": 4.2003
         },
-        "targets": [
-          {
-            "symbol": "sh.603182",
-            "raw_code": "603182",
-            "name": "嘉华股份",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.033582,
-            "v2_score": 80.35,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.603259",
-            "raw_code": "603259",
-            "name": "药明康德",
-            "industry": "医药生物",
-            "industry_code": "801150",
-            "target_weight": 0.017239,
-            "v2_score": 79.1,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600354",
-            "raw_code": "600354",
-            "name": "敦煌种业",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.016459,
-            "v2_score": 77.31,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600346",
-            "raw_code": "600346",
-            "name": "恒力石化",
-            "industry": "石油石化",
-            "industry_code": "801960",
-            "target_weight": 0.026284,
-            "v2_score": 76.54,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.000506",
-            "raw_code": "000506",
-            "name": "招金黄金",
-            "industry": "有色金属",
-            "industry_code": "801050",
-            "target_weight": 0.011575,
-            "v2_score": 75.9,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002326",
-            "raw_code": "002326",
-            "name": "永太科技",
-            "industry": "基础化工",
-            "industry_code": "801030",
-            "target_weight": 0.020657,
-            "v2_score": 75.78,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600919",
-            "raw_code": "600919",
-            "name": "江苏银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.050809,
-            "v2_score": 75.77,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600598",
-            "raw_code": "600598",
-            "name": "北大荒",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.023396,
-            "v2_score": 75.55,
-            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          }
-        ],
+        "targets": [],
         "source_ref": {
           "snapshot_version": "v2-shadow-data-0.4",
           "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
@@ -2748,18 +2953,22 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
       "concentration_flags": []
     },
     "L": {
       "fund_id": "L",
       "name": "V2 长线价值影子基金",
       "strategy_family": "v2-shadow",
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 4,
         "equity": 1000235.41,
@@ -2797,7 +3006,25 @@
           "weight_pct": 11.3364,
           "pnl_pct": -1.8612,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 8.9567,
+            "hard_stop_price": 8.394,
+            "take_profit_price": 9.136,
+            "trailing_activation_price": 9.046,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 8.9567,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 8.895,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002215",
@@ -2810,7 +3037,25 @@
           "weight_pct": 8.8346,
           "pnl_pct": -1.0621,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 9.2078,
+            "hard_stop_price": 8.7,
+            "take_profit_price": 9.429,
+            "trailing_activation_price": 9.3,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 9.2078,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 9.18,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600919",
@@ -2823,7 +3068,25 @@
           "weight_pct": 8.4825,
           "pnl_pct": 2.5091,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 11.6575,
+            "hard_stop_price": 11.412,
+            "take_profit_price": 12.368,
+            "trailing_activation_price": 12.189,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.95,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 11.986,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.601009",
@@ -2836,7 +3099,25 @@
           "weight_pct": 8.4652,
           "pnl_pct": 2.0878,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-19",
+            "entry_price": 11.5195,
+            "hard_stop_price": 11.231,
+            "take_profit_price": 12.172,
+            "trailing_activation_price": 11.995,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.76,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 11.795,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002142",
@@ -2849,7 +3130,25 @@
           "weight_pct": 7.5836,
           "pnl_pct": 2.1926,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 32.2724,
+            "hard_stop_price": 31.496,
+            "take_profit_price": 34.134,
+            "trailing_activation_price": 33.64,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 32.98,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 33.079,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002772",
@@ -2862,7 +3161,25 @@
           "weight_pct": 7.2471,
           "pnl_pct": -1.4624,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-18",
+            "entry_price": 10.8182,
+            "hard_stop_price": 10.18,
+            "take_profit_price": 11.035,
+            "trailing_activation_price": 10.926,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 10.8182,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 1,
+            "rotation_exit": true,
+            "rotation_min_price": 10.786,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sh.600546",
@@ -2875,7 +3192,25 @@
           "weight_pct": 7.0561,
           "pnl_pct": 0.6926,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 12.9801,
+            "hard_stop_price": 12.482,
+            "take_profit_price": 13.527,
+            "trailing_activation_price": 13.331,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 13.07,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 13.109,
+            "setup": "legacy-migrated"
+          }
         },
         {
           "symbol": "sz.002582",
@@ -2888,7 +3223,25 @@
           "weight_pct": 5.8176,
           "pnl_pct": -5.8208,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+          "opportunity_score": null,
+          "setup": null,
+          "exit_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "opened_date": "2026-08-17",
+            "entry_price": 11.2339,
+            "hard_stop_price": 10.104,
+            "take_profit_price": 11.459,
+            "trailing_activation_price": 11.346,
+            "trailing_drawdown_pct": 0.025,
+            "highest_price": 11.2339,
+            "partial_taken": false,
+            "max_hold_days": 3,
+            "sessions_held": 0,
+            "rotation_exit": true,
+            "rotation_min_price": 10.707,
+            "setup": "legacy-migrated"
+          }
         }
       ],
       "recent_fills": [
@@ -3285,7 +3638,7 @@
       ],
       "pending_decision": {
         "decision_date": "2026-08-19",
-        "execute_on": "next_session_0940_sell_1510_open_buy",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-l-deterministic-0.1",
         "target_version": "v2-shadow-targets-0.2",
         "regime": {
@@ -3313,112 +3666,7 @@
           "industry_hhi": 0.43108,
           "effective_industries": 2.3198
         },
-        "targets": [
-          {
-            "symbol": "sh.600919",
-            "raw_code": "600919",
-            "name": "江苏银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.056555,
-            "v2_score": 84.42,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002142",
-            "raw_code": "002142",
-            "name": "宁波银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.050391,
-            "v2_score": 83.8,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.601009",
-            "raw_code": "601009",
-            "name": "南京银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.055967,
-            "v2_score": 83.23,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002948",
-            "raw_code": "002948",
-            "name": "青岛银行",
-            "industry": "银行",
-            "industry_code": "801780",
-            "target_weight": 0.051519,
-            "v2_score": 82.89,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002772",
-            "raw_code": "002772",
-            "name": "众兴菌业",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.02085,
-            "v2_score": 81.71,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002215",
-            "raw_code": "002215",
-            "name": "诺 普 信",
-            "industry": "农林牧渔",
-            "industry_code": "801010",
-            "target_weight": 0.034562,
-            "v2_score": 81.4,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sh.600801",
-            "raw_code": "600801",
-            "name": "华新建材",
-            "industry": "建筑材料",
-            "industry_code": "801710",
-            "target_weight": 0.0236,
-            "v2_score": 80.29,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          },
-          {
-            "symbol": "sz.002033",
-            "raw_code": "002033",
-            "name": "丽江股份",
-            "industry": "社会服务",
-            "industry_code": "801210",
-            "target_weight": 0.056555,
-            "v2_score": 80.22,
-            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-            "fundamental_ready": true,
-            "limit_status": "normal"
-          }
-        ],
+        "targets": [],
         "source_ref": {
           "snapshot_version": "v2-shadow-data-0.4",
           "snapshot_sha256": "cd2c3204ab2cfce6187d892bf9aa42bbd75dd874ac0abe64d17fb9a15cc1ce48",
@@ -3472,22 +3720,24 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
-        "execution_model": "09:40_SELL_15:10_OPEN_BUY"
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
       "concentration_flags": []
     }
   },
-  "audit_head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+  "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
   "audit_verification": {
     "status": "PASS",
-    "events": 8,
-    "head": "ede6ad7d1f3384aeb4de31d0a193fa49588578ab28a6b5c8d1ecbf913ba596b1",
+    "events": 9,
+    "head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-19~buy-price-correction"
+    "last_date": "2026-08-19~conditional-plan-migration"
   },
   "safety": {
     "calls_sol": false,
@@ -3495,7 +3745,7 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "buy_price_correction",
+  "audit_event_kind": "conditional_plan_migration",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
