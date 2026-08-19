@@ -1,4 +1,4 @@
-name: Morning 09:40 virtual-fund sell refresh
+name: Conditional intraday exit scans
 
 on:
   workflow_dispatch:
@@ -7,9 +7,12 @@ on:
     paths:
       - 'state/.morning-trigger'
   schedule:
-    - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
-    - cron: '50 1 * * 1-5'  # 09:50 Beijing retry
-    - cron: '0 2 * * 1-5'   # 10:00 Beijing final retry
+    - cron: '40 1 * * 1-5'  # 09:40 Beijing
+    - cron: '30 2 * * 1-5'  # 10:30 Beijing
+    - cron: '20 3 * * 1-5'  # 11:20 Beijing
+    - cron: '30 5 * * 1-5'  # 13:30 Beijing
+    - cron: '30 6 * * 1-5'  # 14:30 Beijing
+    - cron: '55 6 * * 1-5'  # 14:55 Beijing
 
 permissions:
   contents: write
@@ -17,11 +20,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ai-stock-morning
+  group: ai-stock-conditional-scan
   cancel-in-progress: false
 
 jobs:
-  morning-sell:
+  conditional-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -35,20 +38,21 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
-      - name: Execute prior-session sell/reduce intents at current intraday quotes
+      - name: Check hard-stop take-profit trailing rotation and time exits
         run: python -m engine.morning_run
-      - name: Run regression tests
+      - name: Run regression tests before persistence
         run: python -m unittest discover -s tests -v
-      - name: Persist morning ledger and intraday public snapshots
+      - name: Persist conditional-exit ledger and intraday public snapshots
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
           git add state/ web/d/data.json web/e/data.json
           if git diff --cached --quiet; then
-            echo "No morning state change (holiday, no fresh decision, or already handled)."
+            echo "No conditional-scan state change."
           else
-            git commit -m "data: 09:40 sell and intraday valuation"
+            git commit -m "data: conditional intraday exit scan"
             git pull --rebase origin main
             git push origin HEAD:main
           fi
