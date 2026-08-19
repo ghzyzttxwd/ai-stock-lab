@@ -51,6 +51,8 @@ class V2TargetTests(unittest.TestCase):
         self.assertFalse(result['safety']['executes_orders'])
         self.assertEqual(set(result['targets']), {'A','B','C','D','L'})
         self.assertEqual(set(result['concentration_flags']), {'B','C'})
+        self.assertEqual(result['board_policy']['scope'], 'SH_SZ_MAINBOARD_ONLY')
+        self.assertEqual(result['board_policy']['excluded_non_mainboard_count'], 0)
         for label, targets in result['targets'].items():
             self.assertGreater(len(targets), 0, label)
             for row in targets:
@@ -61,6 +63,47 @@ class V2TargetTests(unittest.TestCase):
             self.assertIn('industry_hhi', stats)
             self.assertIn('effective_industries', stats)
             self.assertLessEqual(stats['top2_industry_share_of_invested'], 1.0)
+
+    def test_non_mainboard_candidates_are_removed_before_strategy_selection(self):
+        enriched = self._enriched()
+        forbidden = ('sz.300001', 'sz.301001', 'sh.688001', 'sh.689001')
+        for i, symbol in enumerate(forbidden):
+            code = symbol[-6:]
+            enriched['candidates'].append({
+                'raw_code': code,
+                'code': symbol,
+                'name': f'FORBIDDEN{i}',
+                'industry': 'HOT',
+                'correlation_cluster': 'HOT',
+                'fundamental_ready': True,
+                'financial_distress': False,
+                'quality_score': 100,
+                'cashflow_score': 100,
+                'valuation_score': 100,
+                'risk': 100,
+                'trend': 100,
+                'momentum': 100,
+                'liquidity': 100,
+                'industry_score': 100,
+                'leader_score': 100,
+                'theme_score': 100,
+                'sentiment_score': 100,
+                'breakout_quality': 100,
+                'crowding_score': 0,
+                'vol20': 0.01,
+                'one_word_limit': False,
+            })
+        result = build_shadow_targets(enriched)
+        self.assertTrue(result['safety']['targets_valid'])
+        self.assertEqual(result['board_policy']['excluded_non_mainboard_count'], 4)
+        selected = {
+            row['code'] if row.get('code') else row.get('symbol')
+            for targets in result['targets'].values()
+            for row in targets
+        }
+        self.assertTrue(all(symbol not in selected for symbol in forbidden))
+        excluded = set(result['board_policy']['excluded_non_mainboard_symbols'])
+        self.assertTrue(set(forbidden).issubset(excluded))
 
     def test_degraded_upstream_universe_blocks_target_generation(self):
         with self.assertRaisesRegex(RuntimeError, 'blocked by upstream safety'):
