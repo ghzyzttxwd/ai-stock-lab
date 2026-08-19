@@ -1,14 +1,12 @@
-name: Daily 15:10 virtual-fund buy settlement
+name: Daily 15:10 conditional-plan settlement
 on:
   workflow_dispatch:
-  # Safe recovery hook: changing only this marker can start a production catch-up/read-only refresh run.
   push:
     branches: [main]
     paths:
       - 'state/.production-trigger'
   schedule:
-    # Beijing time, Monday-Friday. 15:10 is the primary buy-settlement slot; later slots are retries.
-    - cron: '10 7 * * 1-5'  # 15:10 primary
+    - cron: '10 7 * * 1-5'  # 15:10 Beijing primary
     - cron: '20 7 * * 1-5'  # 15:20 retry
     - cron: '30 7 * * 1-5'  # 15:30 final retry
 permissions:
@@ -21,12 +19,14 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     environment:
       name: github-pages
     steps:
       - uses: actions/checkout@v4
-      - name: Skip redundant retry if today already succeeded
+        with:
+          fetch-depth: 0
+      - name: Skip redundant retry if today already has a conditional plan
         id: guard
         shell: bash
         run: |
@@ -39,16 +39,18 @@ jobs:
           today = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
           fund_ids = ('D_MAIN','A','B','C','D','L')
           processed = True
+          conditional = True
           for fid in fund_ids:
               path = Path('state') / f'{fid}.json'
               try:
                   state = json.loads(path.read_text(encoding='utf-8'))
               except Exception:
-                  processed = False
+                  processed = conditional = False
                   break
               if str(state.get('last_processed_date') or '')[:10] != today:
                   processed = False
-                  break
+              if str(state.get('conditional_plan_date') or '')[:10] != today:
+                  conditional = False
 
           cache_ok = False
           cache_path = Path('state/market_universe.json')
@@ -61,17 +63,13 @@ jobs:
           except Exception:
               pass
 
-          # Scheduled retry slots can skip market/AI work once the ledger and cache are healthy.
-          # An explicit production-trigger push intentionally rebuilds read-only web snapshots;
-          # run_all sees the same processed date and does not trade or call AI again.
           explicit_refresh = os.getenv('GITHUB_EVENT_NAME') == 'push'
-          done = processed and cache_ok and not explicit_refresh
+          done = processed and conditional and cache_ok and not explicit_refresh
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'done={str(done).lower()}\n')
           print(
-              f'[guard] Beijing date={today}; processed={processed}; '
-              f'recovery_cache_ok={cache_ok}; explicit_refresh={explicit_refresh}; '
-              f'ledger_work_needed={not done}'
+              f'[guard] Beijing date={today}; processed={processed}; conditional_plan={conditional}; '
+              f'recovery_cache_ok={cache_ok}; explicit_refresh={explicit_refresh}; work_needed={not done}'
           )
           PY
       - uses: actions/setup-python@v5
@@ -85,33 +83,81 @@ jobs:
         id: marketday
         if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
         run: python -m engine.schedule_guard production
-      - name: Settle 15:10 BUY/add using today's open, then build next decision
+      - name: Settle triggered entry conditions and build tomorrow conditional plans
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: python -m engine.evening_split_run
-      - run: python -m unittest discover -s tests -v
+      - name: Run full regression before persistence
+        run: python -m unittest discover -s tests -v
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
+      - name: Assert new plans are conditional or intentionally empty
+        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for fid in ('D_MAIN','A','B','C','D','L'):
+              s=json.loads((Path('state')/f'{fid}.json').read_text(encoding='utf-8'))
+              if s.get('execution_model') != 'CONDITIONAL_PLAN_V1':
+                  raise SystemExit(f'{fid}: wrong execution_model')
+              if str(s.get('conditional_plan_date') or '')[:10] != str(s.get('last_processed_date') or '')[:10]:
+                  raise SystemExit(f'{fid}: conditional plan date mismatch')
+              for t in s.get('pending_targets') or []:
+                  p=t.get('trade_plan') or {}
+                  if p.get('plan_version') != 'conditional-plan-v1':
+                      raise SystemExit(f'{fid}: legacy fixed-price target survived')
+          print('conditional-plan invariant OK')
+          PY
       - name: Persist portfolio ledger and public snapshots
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         run: |
+          set -euo pipefail
           git config user.name "ai-stock-bot"
           git config user.email "ai-stock-bot@users.noreply.github.com"
           git add state/ web/d/data.json web/e/data.json
-          git diff --cached --quiet || git commit -m "data: 15:10 open-price buy settlement"
+          git diff --cached --quiet || git commit -m "data: conditional-plan settlement and next plan"
           git pull --rebase origin main
           git push
       - name: Refresh latest committed web before deploy
         run: |
           git fetch origin main
           git reset --hard origin/main
-      # Pages deployment is still run on redundant retry slots and holidays.
-      # This repairs the case where ledger persistence succeeded but a prior deploy failed.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify public D and E data match this deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          d_expected="$(sha256sum web/d/data.json | awk '{print $1}')"
+          e_expected="$(sha256sum web/e/data.json | awk '{print $1}')"
+          for i in $(seq 1 24); do
+            ok=1
+            curl -fsS --connect-timeout 5 --max-time 20 "https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json?v=${GITHUB_RUN_ID}-${i}" -o /tmp/live-d.json || ok=0
+            curl -fsS --connect-timeout 5 --max-time 20 "https://ghzyzttxwd.github.io/ai-stock-lab/e/data.json?v=${GITHUB_RUN_ID}-${i}" -o /tmp/live-e.json || ok=0
+            if [ "$ok" = "1" ]; then
+              d_actual="$(sha256sum /tmp/live-d.json | awk '{print $1}')"
+              e_actual="$(sha256sum /tmp/live-e.json | awk '{print $1}')"
+              echo "attempt=$i d=$d_actual e=$e_actual"
+              if [ "$d_actual" = "$d_expected" ] && [ "$e_actual" = "$e_expected" ]; then
+                python - <<'PY'
+          import json
+          for path in ('/tmp/live-d.json','/tmp/live-e.json'):
+              x=json.load(open(path,encoding='utf-8'))
+              if x.get('execution_model') != 'CONDITIONAL_PLAN_V1':
+                  raise SystemExit(f'public {path} is not conditional-plan model')
+          print('PUBLIC CONDITIONAL PLAN VERIFIED')
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public D/E data did not converge to committed deployment"
+          exit 1
