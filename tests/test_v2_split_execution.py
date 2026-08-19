@@ -66,7 +66,7 @@ class V2SplitExecutionTests(unittest.TestCase):
         self.assertIn('not a verified actual execution time', source_ref['note'])
         self.assertIn('09:40 live quote', source_ref['legacy_note'])
 
-    def test_close_buy_only_does_not_sell_old_position(self):
+    def test_1510_buy_uses_session_open_and_does_not_sell_old_position(self):
         state = {
             'fund_id': 'A',
             'cash': 100000.0,
@@ -83,25 +83,26 @@ class V2SplitExecutionTests(unittest.TestCase):
             'targets': [{'symbol': 'sh.600001', 'name': '新持仓', 'target_weight': 0.5}],
         }
         bars = {
-            'sh.600000': {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'},
-            'sh.600001': {'open': 20.0, 'close': 20.0, 'preclose': 20.0, 'tradestatus': '1'},
+            'sh.600000': {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'},
+            'sh.600001': {'open': 19.0, 'close': 20.0, 'preclose': 18.5, 'tradestatus': '1'},
         }
         result = execute_pending_side(
             state, pending, bars, '2026-08-19',
-            side='BUY', price_field='close',
+            side='BUY', price_field='open',
         )
         self.assertTrue(result['fills'])
         self.assertTrue(all(x['side'] == 'BUY' for x in result['fills']))
+        self.assertTrue(all(x['execution_price_field'] == 'open' for x in result['fills']))
+        self.assertEqual(result['fills'][0]['reference_price'], 19.0)
         self.assertIn('sh.600000', state['positions'])
         self.assertIn('sh.600001', state['positions'])
 
-    def test_close_buy_hard_blocks_chinext_and_star_even_if_pending_is_injected(self):
+    def test_open_buy_hard_blocks_chinext_and_star_even_if_pending_is_injected(self):
         state = {
             'fund_id': 'A',
             'cash': 100000.0,
             'positions': {},
-            'fills': [],
-            'rejected_orders': [],
+            'fills': [], 'rejected_orders': [],
         }
         symbols = ('sz.300001', 'sz.301001', 'sh.688001', 'sh.689001')
         pending = {
@@ -112,12 +113,12 @@ class V2SplitExecutionTests(unittest.TestCase):
             ],
         }
         bars = {
-            symbol: {'open': 10.0, 'close': 10.0, 'preclose': 10.0, 'tradestatus': '1'}
+            symbol: {'open': 10.0, 'close': 11.0, 'preclose': 10.0, 'tradestatus': '1'}
             for symbol in symbols
         }
         result = execute_pending_side(
             state, pending, bars, '2026-08-19',
-            side='BUY', price_field='close',
+            side='BUY', price_field='open',
         )
         self.assertEqual(result['fills'], [])
         self.assertEqual(state['positions'], {})
