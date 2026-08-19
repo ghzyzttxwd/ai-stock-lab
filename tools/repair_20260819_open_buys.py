@@ -4,8 +4,15 @@ import argparse
 import copy
 import json
 import subprocess
+import sys
 from pathlib import Path
 
+
+# Running a script by path puts tools/ rather than the repository root on sys.path.
+# Add the root explicitly so the one-shot repair can import engine/ reliably.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 TRADE_DATE = '2026-08-19'
 V1_BASE_COMMIT = 'f0aa1f1c73f3fa89001cd8bfe4b4cde4ad0b8908'
