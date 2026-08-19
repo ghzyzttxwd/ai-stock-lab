@@ -28,6 +28,50 @@ jobs:
         with:
           ref: v2-shadow
           fetch-depth: 0
+      - name: Record V2 morning run start
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          status={
+              'status': 'started',
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'event_name': os.environ.get('GITHUB_EVENT_NAME'),
+              'source_sha': os.environ.get('GITHUB_SHA'),
+              'started_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(
+              json.dumps(status, ensure_ascii=False, indent=2) + '\n'
+          )
+          PY
+          rm -rf /tmp/main-status
+          git fetch origin main
+          git worktree add --detach /tmp/main-status origin/main
+          cd /tmp/main-status
+          git config user.name "v2-morning-status-bot"
+          git config user.email "v2-morning-status-bot@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-morning-job-status.json state/v2_morning_job_status.json
+            git add state/v2_morning_job_status.json
+            if git diff --cached --quiet; then
+              pushed=1
+              break
+            fi
+            git commit -m "ops: V2 morning run started"
+            if git push origin HEAD:main; then
+              pushed=1
+              break
+            fi
+          done
+          test "$pushed" = "1"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -244,3 +288,52 @@ jobs:
           path: /tmp/v2-morning-sell.json
           if-no-files-found: warn
           retention-days: 30
+      - name: Persist final V2 morning job status
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          status={
+              'status': os.environ['JOB_STATUS'],
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'event_name': os.environ.get('GITHUB_EVENT_NAME'),
+              'source_sha': os.environ.get('GITHUB_SHA'),
+              'finished_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(
+              json.dumps(status, ensure_ascii=False, indent=2) + '\n'
+          )
+          PY
+          if [ ! -d /tmp/main-status/.git ] && [ ! -f /tmp/main-status/.git ]; then
+            rm -rf /tmp/main-status
+            git fetch origin main
+            git worktree add --detach /tmp/main-status origin/main
+          fi
+          cd /tmp/main-status
+          git config user.name "v2-morning-status-bot"
+          git config user.email "v2-morning-status-bot@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-morning-job-status.json state/v2_morning_job_status.json
+            git add state/v2_morning_job_status.json
+            if git diff --cached --quiet; then
+              pushed=1
+              break
+            fi
+            git commit -m "ops: V2 morning run ${JOB_STATUS}"
+            if git push origin HEAD:main; then
+              pushed=1
+              break
+            fi
+          done
+          test "$pushed" = "1"
