@@ -4,11 +4,18 @@ import json
 import os
 from datetime import date
 from pathlib import Path
-from .broker import execute_target_weights
+
 from .demo import generate_history, NAMES
 from .pipeline import build_candidates, market_temperature, targets_for
 from .reporting import mark_to_market, metrics
 from .state import load_state, save_state
+from .trading_plan import (
+    EXECUTION_MODEL,
+    PLAN_VERSION,
+    build_conditional_targets,
+    pending_is_conditional,
+    refresh_exit_plans,
+)
 
 ROOT=Path(__file__).resolve().parents[1]
 STATE_ROOT=Path(os.getenv('FUND_STATE_DIR', str(ROOT/'state')))
@@ -24,7 +31,6 @@ FUNDS={
 
 
 def _critical_market_symbols() -> dict[str,str]:
-    """Symbols that must not disappear from recovery mode: holdings + pending targets."""
     out={}
     for fid in FUNDS:
         path=STATE_ROOT/f'{fid}.json'
@@ -88,7 +94,6 @@ def _merge_recovery_universe(cached: list[dict], critical: dict[str,str]) -> lis
 
 
 def _readonly_portfolio_snapshot(state: dict, bars: dict[str,dict]) -> dict:
-    """Value an already-processed portfolio without mutating state or appending equity."""
     equity=float(state.get('cash',0))
     holdings=[]
     for sym,p in (state.get('positions') or {}).items():
@@ -106,7 +111,6 @@ def _readonly_portfolio_snapshot(state: dict, bars: dict[str,dict]) -> dict:
 
 
 def _decision_diary(state: dict, trade_date: str) -> str:
-    """Preserve the real diary when a same-day run is only refreshing data/pages."""
     for decision in reversed(state.get('decisions') or []):
         if str(decision.get('date') or '')[:10] == trade_date:
             diary=str(decision.get('diary') or '').strip()
@@ -126,7 +130,11 @@ def enrich_real_candidates(candidates, snapshot_rows):
             val=45.0
         c['valuation']=round(val,2)
         c['peTTM']=round(pe,2); c['pbMRQ']=round(pb,2)
-        c['score_d']=round(.30*c['trend']+.20*c['quality']+.20*c['momentum']+.15*c['valuation']+.15*c['risk'],2)
+        c['score_d']=round(
+            .30*float(c.get('opportunity_score') or 0) +
+            .16*c['trend']+.14*c['momentum']+.12*c['quality']+
+            .13*c['valuation']+.15*c['risk'],2
+        )
     candidates.sort(key=lambda x:x['score_d'],reverse=True)
     return candidates
 
@@ -161,6 +169,28 @@ def _pending_is_fresh(state: dict, previous_trade_date: str | None) -> bool:
     return _pending_decision_date(state) == previous_trade_date
 
 
+def _install_new_plan(fid: str, sid: str, st: dict, candidates: list[dict], mscore: float, trade_date: str, use_ai: bool) -> str:
+    raw_targets,diary=targets_for(sid,candidates,mscore,st,use_ai=(use_ai and sid=='D'))
+    targets=build_conditional_targets(fid,raw_targets,candidates,trade_date,state=st)
+    st['pending_targets']=targets
+    st['pending_decision_date']=trade_date
+    st['conditional_plan_date']=trade_date
+    st['execution_model']=EXECUTION_MODEL
+    refresh_exit_plans(st,targets,candidates,trade_date)
+    st.setdefault('decisions',[]).append({
+        'date':trade_date,
+        'market_score':mscore,
+        'targets':targets,
+        'diary':diary,
+        'plan_version':PLAN_VERSION,
+        'execution_model':EXECUTION_MODEL,
+        'planned_exposure':round(sum(float(x.get('target_weight') or 0.0) for x in targets),6),
+        'allow_cash':True,
+    })
+    print(f'[plan] {fid} conditional targets={len(targets)} exposure={sum(float(x.get("target_weight") or 0) for x in targets):.3f}')
+    return diary
+
+
 def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=None):
     candidates=build_candidates(histories,names)
     if snapshot_rows is not None:
@@ -173,30 +203,40 @@ def run_all(trade_date: str, histories, names, bars, use_ai=True, snapshot_rows=
         path=STATE_ROOT/f'{fid}.json'
         st=load_state(path,fid,name)
         st['name']=name
+
         if st.get('last_processed_date') == trade_date:
-            print(f'[skip] {fid} already processed {trade_date}')
+            # Same-day explicit refresh is also the migration path from old fixed-price pending targets.
+            planned_today=(str(st.get('conditional_plan_date') or '')[:10] == trade_date)
+            current_pending=list(st.get('pending_targets') or [])
+            needs_migration=(not planned_today) or (current_pending and not pending_is_conditional(current_pending))
+            if needs_migration:
+                print(f'[migrate] {fid} replacing legacy fixed-price pending plan for {trade_date}')
+                diary=_install_new_plan(fid,sid,st,candidates,mscore,trade_date,use_ai)
+                save_state(path,st)
+            else:
+                diary=_decision_diary(st,trade_date)
+                print(f'[skip] {fid} already has conditional plan for {trade_date}')
             mtm=_readonly_portfolio_snapshot(st,bars)
             snapshots[fid]={
-                'state':st,
-                'mtm':mtm,
+                'state':st,'mtm':mtm,
                 'metrics':metrics(st['equity_curve'],st['initial_cash']),
-                'diary':_decision_diary(st,trade_date),
+                'diary':diary,
             }
             continue
+
         if st.get('pending_targets'):
+            decision_date=_pending_decision_date(st)
             if _pending_is_fresh(st,previous_trade_date):
-                fills=execute_target_weights(st,st['pending_targets'],bars,trade_date)
-                st['fills'].extend(fills)
-            else:
-                decision_date=_pending_decision_date(st)
-                print(f'[expire] {fid} pending targets from {decision_date} not valid for {trade_date}; previous trade date={previous_trade_date}')
-                st['pending_targets']=[]
+                raise RuntimeError(
+                    f'{fid} still has an unsettled previous-session plan from {decision_date}; '
+                    'conditional buy settlement must run before daily target generation'
+                )
+            print(f'[expire] {fid} stale pending targets from {decision_date}; previous trade date={previous_trade_date}')
+            st['pending_targets']=[]
             st.pop('pending_decision_date',None)
+
         mtm=mark_to_market(st,bars,trade_date)
-        targets,diary=targets_for(sid,candidates,mscore,st,use_ai=(use_ai and sid=='D'))
-        st['pending_targets']=targets
-        st['pending_decision_date']=trade_date
-        st['decisions'].append({'date':trade_date,'market_score':mscore,'targets':targets,'diary':diary})
+        diary=_install_new_plan(fid,sid,st,candidates,mscore,trade_date,use_ai)
         st['last_processed_date']=trade_date
         save_state(path,st)
         snapshots[fid]={'state':st,'mtm':mtm,'metrics':metrics(st['equity_curve'],st['initial_cash']),'diary':diary}
@@ -291,40 +331,80 @@ def _score(met: dict, excess):
     return round(float(met.get('return_pct',0)) + 1.2*ex - 0.45*abs(float(met.get('max_drawdown_pct',0))) - 0.05*float(met.get('volatility_pct',0)),2)
 
 
+def _public_pending(target: dict) -> dict:
+    plan=target.get('trade_plan') or {}
+    entry=plan.get('entry') or {}
+    exit_spec=plan.get('exit') or {}
+    mode=entry.get('mode')
+    if mode=='breakout':
+        condition=f">= {float(entry.get('trigger_price') or 0):.3f}，最高追到 {float(entry.get('valid_max') or 0):.3f}"
+    elif mode=='pullback':
+        condition=f"<= {float(entry.get('trigger_price') or 0):.3f}，有效下限 {float(entry.get('valid_min') or 0):.3f}"
+    else:
+        condition=f"{float(entry.get('valid_min') or 0):.3f} ~ {float(entry.get('valid_max') or 0):.3f}"
+    return {
+        'action':'条件待买','name':target.get('name',target.get('symbol')),'symbol':target.get('symbol'),
+        'weight':f"{float(target.get('target_weight') or 0)*100:.1f}%",
+        'reason':target.get('reason','条件计划'),
+        'setup':mode,'opportunity_score':target.get('opportunity_score'),
+        'buy_condition':condition,
+        'stop_estimate':exit_spec.get('estimated_stop_price'),
+        'take_profit_estimate':exit_spec.get('estimated_take_profit_price'),
+        'max_hold_days':exit_spec.get('max_hold_days'),
+        'timing':'下一交易日价格触发才成交；未触发保持现金',
+        'trade_plan':plan,
+    }
+
+
 def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
     hs300=_benchmark_lookup(benchmarks)
     d=s['D_MAIN']; st=d['state']; mtm=d['mtm']; met=d['metrics']
     if not mtm.get('holdings'):
         mtm['holdings']=[]
     excess=round(met['return_pct']-hs300['return_pct'],2) if hs300 and hs300.get('return_pct') is not None else None
+    exit_plans=st.get('exit_plans') or {}
+    d_holdings=[]
+    for x in mtm['holdings']:
+        d_holdings.append({
+            **x,
+            'weight':round(x['market_value']/mtm['equity']*100,1) if mtm['equity'] else 0,
+            'score':next((c['score_d'] for c in candidates if c['symbol']==x['symbol']),0),
+            'opportunity_score':next((c.get('opportunity_score') for c in candidates if c['symbol']==x['symbol']),None),
+            'exit_plan':exit_plans.get(x['symbol']),
+        })
     d_json={
       'mode': 'REAL' if getattr(export_web, '_real_mode', False) else 'DEMO',
       'updated_at':trade_date,'market_score':mscore,'market_source':getattr(export_web,'_market_source','demo'),
       'market_label':'强势' if mscore>=80 else '偏强' if mscore>=60 else '震荡' if mscore>=40 else '偏弱' if mscore>=20 else '高风险',
+      'execution_model':EXECUTION_MODEL,'plan_version':PLAN_VERSION,
       'fund':{'name':st['name'],'initial':st['initial_cash'],'equity':mtm['equity'],'cash':st['cash'],'position_pct':round((mtm['equity']-st['cash'])/mtm['equity']*100,1) if mtm['equity'] else 0},
       'metrics':{**met,'week_pct':met.get('return_5d_pct'),'win_rate_pct':0,'profit_factor':0,'trades':len(st['fills']),'excess_hs300_pct':excess},
       'activity':_activity(st,trade_date),
-      'holdings':[{**x,'weight':round(x['market_value']/mtm['equity']*100,1),'score':next((c['score_d'] for c in candidates if c['symbol']==x['symbol']),0)} for x in mtm['holdings']],
-      'decisions':[{'action':'待执行','name':x.get('name',x['symbol']),'symbol':x['symbol'],'weight':f"{x['target_weight']*100:.1f}%",'reason':x.get('reason','组合目标仓位'),'timing':'下一交易日开盘模拟执行'} for x in st.get('pending_targets',[])],
+      'holdings':d_holdings,
+      'decisions':[_public_pending(x) for x in st.get('pending_targets',[])],
       'recent_fills':st.get('fills',[])[-10:],
       'benchmark':hs300,
       'candidates':candidates[:10], 'equity_curve':st['equity_curve'], 'diary':d['diary'],
-      'plain_explanation':'不押单一风格：趋势、公司质量、估值、动量和风险一起看，再由 AI 决定组合。'}
+      'plain_explanation':'先挑未来1-3日相对强势机会，再给每只股票设突破/回踩/区间条件；价格不到就不买，持仓按止损、止盈、移动止盈和时间条件卖。'}
     (ROOT/'web/d/data.json').write_text(json.dumps(d_json,ensure_ascii=False,indent=2),encoding='utf-8')
 
     funds=[]
     risk_map={'A':'低','B':'高','C':'很高','D':'中','L':'中低'}
     style_map={'A':'保守','B':'追强','C':'短线','D':'综合','L':'长线'}
     desc_map={
-        'A':'少折腾，先控制亏损和回撤，再考虑赚钱。',
-        'B':'专找最近明显走强的股票，顺势买入；转弱就换。',
-        'C':'偏热点、动量和活跃股，通常几天级别，换手最快。',
-        'D':'趋势、公司、估值、动量和风险都看，属于综合均衡型。',
-        'L':'更看重估值和公司质量，买入后倾向拿得更久。',
+        'A':'少折腾，只有价格和风险条件都合格才买。',
+        'B':'找相对大盘真正走强的股票，突破确认才进。',
+        'C':'偏1-3日短线，重视量价和相对强弱，并惩罚过热追高。',
+        'D':'短周期机会、趋势、估值、稳定性和风险综合判断。',
+        'L':'更看重估值和稳定性，但买点仍需条件触发。',
     }
     for fid in ('A','B','C','D','L'):
         x=s[fid]; st2=x['state']; mtm2=x['mtm']; met2=x['metrics']
         bx=round(met2['return_pct']-hs300['return_pct'],2) if hs300 and hs300.get('return_pct') is not None else None
+        exits=st2.get('exit_plans') or {}
+        holdings=[]
+        for h in mtm2.get('holdings',[]):
+            holdings.append({**h,'exit_plan':exits.get(h.get('symbol'))})
         funds.append({
             'id':fid,'name':st2['name'],'style':style_map[fid],'description':desc_map[fid],
             'equity':mtm2['equity'],'return_pct':met2['return_pct'],
@@ -336,8 +416,8 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
             'excess_hs300_pct':bx,'composite_score':_score(met2,bx),
             'risk':risk_map[fid],'trades':len(st2.get('fills',[])),'curve':st2['equity_curve'],
             'activity':_activity(st2,trade_date),
-            'holdings':mtm2.get('holdings',[]),
-            'pending_targets':st2.get('pending_targets',[]),
+            'holdings':holdings,
+            'pending_targets':[_public_pending(t) for t in st2.get('pending_targets',[])],
             'recent_fills':st2.get('fills',[])[-8:],
             'diary':x.get('diary',''),
         })
@@ -353,9 +433,10 @@ def export_web(trade_date: str,candidates,mscore,s,benchmarks=None):
     e_json={
         'mode':'REAL' if getattr(export_web,'_real_mode',False) else 'DEMO',
         'updated_at':trade_date,'market_source':getattr(export_web,'_market_source','demo'),
+        'execution_model':EXECUTION_MODEL,'plan_version':PLAN_VERSION,
         'experiment_days':max((f['trading_days'] for f in funds),default=0),
         'funds':funds,'benchmarks':bs,'weekly_report':weekly,
-        'evaluation_note':'至少看20/60个交易日；若连续几个月跑输并出现明显负收益，系统会直接标记为长期表现差。'
+        'evaluation_note':'条件没触发就留现金；至少看20/60个交易日再评价策略，不用一天盈亏自我欺骗。'
     }
     (ROOT/'web/e/data.json').write_text(json.dumps(e_json,ensure_ascii=False,indent=2),encoding='utf-8')
 
