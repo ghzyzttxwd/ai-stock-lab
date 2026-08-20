@@ -52,8 +52,8 @@ jobs:
           PY
           )
           echo "test_count=$count" >> "$GITHUB_OUTPUT"
-          test "$count" -ge 61
-      - name: Assert six checkpoints, stale failure, audit ordering, and core durability are wired
+          test "$count" -ge 62
+      - name: Assert checkpoint freshness, late duplicate no-op, audit ordering, durability and monotonic receipts
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -64,6 +64,7 @@ jobs:
           runner = Path('v2/engine_v2/morning_sell_run.py').read_text(encoding='utf-8')
           reporting = Path('v2/engine_v2/shadow_reporting.py').read_text(encoding='utf-8')
           ordering_test = Path('v2/tests/test_v2_audit_order.py')
+          timing_test = Path('v2/tests/test_v2_checkpoint_timing.py').read_text(encoding='utf-8')
 
           expected = (
               "'40 1 * * 1-5'", "'30 2 * * 1-5'", "'20 3 * * 1-5'",
@@ -82,16 +83,24 @@ jobs:
 
           if 'stale_checkpoint_skipped' not in runner:
               raise SystemExit('runner no longer exposes stale checkpoint status')
+          if 'late_duplicate_noop' not in runner:
+              raise SystemExit('runner does not classify late duplicate checkpoints')
           if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in runner:
               raise SystemExit('10-minute freshness limit missing from V2 runner')
           if "'reads_market_quotes': False" not in runner or "'mutates_v2_ledger': False" not in runner:
-              raise SystemExit('stale V2 run is not proven fail-closed before quotes/state mutation')
-          if 'V2 checkpoint was not operationally completed' not in workflow:
-              raise SystemExit('canonical workflow does not explicitly fail a non-operational checkpoint')
-          if 'V2 checkpoint is not operationally valid' not in guard:
-              raise SystemExit('guard workflow does not explicitly fail a non-operational checkpoint')
-          if 'stale checkpoint must never be reported as green' not in guard:
-              raise SystemExit('guard workflow does not explicitly reject stale green status')
+              raise SystemExit('stale/late duplicate V2 run is not proven fail-closed')
+          if 'test_late_duplicate_is_noop_and_never_claims_fresh_evaluation' not in timing_test:
+              raise SystemExit('late duplicate regression test is missing')
+          if 'late_duplicate_noop' not in workflow:
+              raise SystemExit('canonical workflow does not understand late duplicate no-op')
+          if "evaluated_fresh=checkpoint_status=='conditional_exit_processed'" not in workflow:
+              raise SystemExit('canonical status can still label duplicate work as freshly evaluated')
+          if '[MONOTONIC RECEIPT]' not in workflow:
+              raise SystemExit('canonical receipt can still roll back to an older checkpoint')
+          if '[MONOTONIC STATUS]' not in workflow:
+              raise SystemExit('canonical status can still roll back to an older checkpoint')
+          if 'v2_morning_last_attempt.json' not in workflow:
+              raise SystemExit('late attempts are not preserved separately from monotonic checkpoint status')
 
           if '_ordered_audit_events' not in reporting:
               raise SystemExit('V2 audit verification still relies on filename ordering')
@@ -109,7 +118,7 @@ jobs:
                   if marker not in text:
                       raise SystemExit(f'{label} workflow status lacks {marker}')
 
-          print('V2 CHECKPOINT + STALE FAILURE + AUDIT ORDERING + CORE DURABILITY WIRING PASS')
+          print('V2 CHECKPOINT + LATE DUPLICATE NO-OP + MONOTONIC RECEIPT + AUDIT ORDERING + CORE DURABILITY PASS')
           PY
       - name: Verify current V2 audit and ledger chain
         id: audit
@@ -154,6 +163,12 @@ jobs:
               'stale_run_reads_market_quotes': False,
               'stale_run_mutates_v2_ledger': False,
               'stale_checkpoint_is_workflow_failure': True,
+              'late_duplicate_noop_protected': True,
+              'late_duplicate_reads_market_quotes': False,
+              'late_duplicate_mutates_v2_ledger': False,
+              'checkpoint_status_is_monotonic': True,
+              'checkpoint_receipt_is_monotonic': True,
+              'late_attempt_recorded_separately': True,
               'audit_parent_link_ordering': True,
               'core_persisted_before_derived_reporting': True,
               'status_distinguishes_durable_and_end_to_end': True,
