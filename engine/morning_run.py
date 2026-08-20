@@ -13,6 +13,13 @@ from .trading_plan import EXECUTION_MODEL, PLAN_VERSION
 
 
 CHECKPOINTS = {'09:40', '10:30', '11:20', '13:30', '14:30', '14:55'}
+MAX_CHECKPOINT_LATENESS_MINUTES = 10
+
+
+def _checkpoint_delay_minutes(now: datetime, slot: str) -> float:
+    hour, minute = (int(x) for x in slot.split(':', 1))
+    scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return (now - scheduled).total_seconds() / 60.0
 
 
 def _symbol(code: str) -> str:
@@ -177,7 +184,14 @@ def _intraday_return(snapshot: dict, state: dict) -> tuple[float, float]:
     return round(cumulative, 2), round(today, 2)
 
 
-def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], source: str, trade_date: str, clock: str) -> None:
+def _refresh_public_snapshots(
+    states: dict[str, dict],
+    bars: dict[str, dict],
+    source: str,
+    trade_date: str,
+    actual_clock: str,
+    scheduled_slot: str,
+) -> None:
     d_path = ROOT / 'web/d/data.json'
     e_path = ROOT / 'web/e/data.json'
 
@@ -197,8 +211,10 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
                 'opportunity_score': old.get('opportunity_score'),
             })
         data['updated_at'] = trade_date
-        data['updated_time'] = clock
-        data['session_phase'] = f'{clock}条件卖出检查完成；15:10结算当天触发的买入条件'
+        data['updated_time'] = actual_clock
+        data['scheduled_checkpoint'] = scheduled_slot
+        data['actual_execution_time'] = actual_clock
+        data['session_phase'] = f'{scheduled_slot}计划检查点于{actual_clock}实际执行；15:10结算当天触发的买入条件'
         data['market_source'] = source
         data.setdefault('fund', {}).update({
             'equity': snap['equity'],
@@ -236,8 +252,10 @@ def _refresh_public_snapshots(states: dict[str, dict], bars: dict[str, dict], so
             item['activity'] = _today_activity(state, trade_date)
             item['recent_fills'] = list(state.get('fills') or [])[-8:]
         data['updated_at'] = trade_date
-        data['updated_time'] = clock
-        data['session_phase'] = f'{clock}条件卖出检查完成；15:10结算当天触发的买入条件'
+        data['updated_time'] = actual_clock
+        data['scheduled_checkpoint'] = scheduled_slot
+        data['actual_execution_time'] = actual_clock
+        data['session_phase'] = f'{scheduled_slot}计划检查点于{actual_clock}实际执行；15:10结算当天触发的买入条件'
         data['market_source'] = source
         data['execution_model'] = EXECUTION_MODEL
         data['plan_version'] = PLAN_VERSION
@@ -251,6 +269,17 @@ def main() -> None:
     slot = os.getenv('CONDITIONAL_SCAN_SLOT', '').strip()
     if slot not in CHECKPOINTS:
         slot = now.strftime('%H:%M')
+
+    delay_minutes = _checkpoint_delay_minutes(now, slot)
+    if delay_minutes < 0 or delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+        print(
+            f'[conditional-scan] stale checkpoint {slot}: actual={now.strftime("%H:%M:%S")} '
+            f'delay={delay_minutes:.1f}m; skip before reading quotes or mutating state'
+        )
+        return
+
+    actual_execution_at = now.isoformat(timespec='seconds')
+    actual_clock = now.strftime('%H:%M')
     in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
     final_slot_grace = slot == '14:55' and dt_time(15, 0) < now.time() <= dt_time(15, 5)
     if not (in_session or final_slot_grace):
@@ -276,20 +305,35 @@ def main() -> None:
             print(f'[conditional-scan] {fid} already checked {scan_key}')
             continue
         fills, checks = execute_conditional_sells(state, bars, trade_date, clock=slot)
+        for fill in fills:
+            fill['scheduled_time'] = slot
+            fill['actual_execution_time'] = actual_execution_at
+            fill['actual_clock'] = actual_clock
         state.setdefault('fills', []).extend(fills)
         state['last_conditional_scan_key'] = scan_key
-        state['last_conditional_scan_at'] = now.isoformat(timespec='seconds')
+        state['last_conditional_scan_at'] = actual_execution_at
         state['execution_model'] = EXECUTION_MODEL
         log=state.setdefault('conditional_scan_log',[])
-        log.append({'slot':slot,'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})
+        log.append({
+            'slot': slot,
+            'scheduled_time': slot,
+            'actual_clock': actual_clock,
+            'delay_minutes': round(delay_minutes, 2),
+            'at': state['last_conditional_scan_at'],
+            'fills': len(fills),
+            'checks': checks,
+        })
         if len(log)>30:
             del log[:-30]
         _portfolio_snapshot(state,bars)
         save_state(STATE_ROOT / f'{fid}.json', state)
-        print(f'[conditional-scan] {fid} slot={slot} fills={len(fills)} checks={len(checks)}')
+        print(f'[conditional-scan] {fid} slot={slot} actual={actual_clock} fills={len(fills)} checks={len(checks)}')
 
-    _refresh_public_snapshots(states, bars, source, trade_date, slot)
-    print(f'[conditional-scan] completed {trade_date} slot={slot} actual={now.strftime("%H:%M:%S")} source={source} holdings={len(critical)} bars={len(bars)}')
+    _refresh_public_snapshots(states, bars, source, trade_date, actual_clock, slot)
+    print(
+        f'[conditional-scan] completed {trade_date} slot={slot} actual={now.strftime("%H:%M:%S")} '
+        f'delay={delay_minutes:.1f}m source={source} holdings={len(critical)} bars={len(bars)}'
+    )
 
 
 if __name__ == '__main__':
