@@ -99,23 +99,13 @@ jobs:
           now = datetime.now(tz)
           hour, minute = (int(x) for x in os.environ['CHECKPOINT'].split(':', 1))
           target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-          # The canonical workflow owns the exact checkpoint. This guard fires at +7 minutes:
-          # still inside the 10-minute freshness window, but late enough to avoid racing a healthy run.
           fallback_target = target.timestamp() + 7 * 60
           wait_seconds = fallback_target - now.timestamp()
           if wait_seconds > 0:
-              print(
-                  f"[PREWARM] waiting {wait_seconds:.1f}s for checkpoint fallback "
-                  f"{os.environ['CHECKPOINT']}+07m",
-                  flush=True,
-              )
+              print(f"[PREWARM] waiting {wait_seconds:.1f}s for checkpoint fallback {os.environ['CHECKPOINT']}+07m", flush=True)
               time.sleep(wait_seconds)
           else:
-              print(
-                  f"[PREWARM] fallback for {os.environ['CHECKPOINT']} already reached; "
-                  "freshness gate will decide",
-                  flush=True,
-              )
+              print(f"[PREWARM] fallback for {os.environ['CHECKPOINT']} already reached; freshness gate will decide", flush=True)
           PY
 
       - uses: actions/checkout@v4
@@ -134,17 +124,17 @@ jobs:
         if: steps.td.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
-      - name: Run V2 regression tests before mutation
-        if: steps.td.outputs.skip != 'true'
-        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-
-      - name: Refresh v2-shadow immediately before checkpoint claim
+      - name: Refresh V2 branch before regression and mutation
         if: steps.td.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin v2-shadow
           git reset --hard origin/v2-shadow
+
+      - name: Run V2 regression tests before mutation
+        if: steps.td.outputs.skip != 'true'
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
 
       - name: Check protective and profit exit conditions at fresh live quote
         if: steps.td.outputs.skip != 'true'
@@ -162,21 +152,51 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json
-
           report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
           status = report.get('status')
-          allowed = {
-              'conditional_exit_processed',
-              'already_conditional_exit_scan',
-              'already_processed',
-              'not_exchange_session',
-          }
+          allowed = {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}
           if status not in allowed:
               raise SystemExit(f'V2 checkpoint is not operationally valid: {status}; report={report}')
           if status == 'stale_checkpoint_skipped':
               raise SystemExit('stale checkpoint must never be reported as green')
+          safety = report.get('safety') or {}
+          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 checkpoint isolation invariant violated')
+          if safety.get('forced_clock_sell'):
+              raise SystemExit('V2 checkpoint attempted a forced clock sale')
           print('[V2 GUARD]', status, report.get('scheduled_time'), report.get('actual_clock'), report.get('delay_minutes'))
           PY
+
+      - name: Verify mutated V2 audit and ledger core
+        if: steps.td.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from engine_v2.shadow_reporting import verify_audit_chain
+          result=verify_audit_chain(Path('shadow_state/v2'))
+          if result.get('status')!='PASS':
+              raise SystemExit(f'V2 mutated core verification failed: {result}')
+          print('[V2 GUARD CORE VERIFIED]',result)
+          PY
+
+      - name: Persist V2 audit and ledger core before derived reporting
+        if: steps.td.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "v2-checkpoint-guard-bot"
+          git config user.email "v2-checkpoint-guard-bot@users.noreply.github.com"
+          git add shadow_state/v2/audit shadow_state/v2/ledgers
+          if git diff --cached --quiet; then
+            echo "No V2 core mutation to persist."
+          else
+            git commit -m "v2-data: persist guarded checkpoint core"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
+          touch /tmp/v2-core-durable
 
       - name: Build intraday V2 summary
         if: steps.td.outputs.skip != 'true'
@@ -198,7 +218,6 @@ jobs:
           git diff --quiet -- state web/d web/e
           python - <<'PY'
           import json
-
           report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
           safety = report.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
@@ -207,18 +226,18 @@ jobs:
               raise SystemExit('V2 checkpoint attempted a forced clock sale')
           PY
 
-      - name: Persist only isolated V2 checkpoint state
+      - name: Persist derived V2 summary and web data
         if: steps.td.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "v2-checkpoint-guard-bot"
           git config user.email "v2-checkpoint-guard-bot@users.noreply.github.com"
-          git add shadow_state/v2 web/v2/data.json
+          git add shadow_state/v2/summary.json web/v2/data.json
           if git diff --cached --quiet; then
-            echo "No V2 checkpoint state change."
+            echo "No derived V2 checkpoint state change."
           else
-            git commit -m "v2-data: guarded conditional exit checkpoint"
+            git commit -m "v2-data: guarded checkpoint summary"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
@@ -232,14 +251,12 @@ jobs:
           cp web/v2/data.json /tmp/v2-data.json
           expected="$(sha256sum /tmp/v2-data.json | awk '{print $1}')"
           echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
-
           rm -rf /tmp/main-sync
           git fetch origin main
           git worktree add --detach /tmp/main-sync origin/main
           cd /tmp/main-sync
           git config user.name "v2-checkpoint-guard-bot"
           git config user.email "v2-checkpoint-guard-bot@users.noreply.github.com"
-
           synced=0
           for attempt in 1 2 3; do
             git fetch origin main
@@ -251,7 +268,6 @@ jobs:
             if git push origin HEAD:main; then synced=1; break; fi
           done
           test "$synced" = "1"
-
           git fetch origin main
           actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
           test "$actual" = "$expected"
@@ -307,13 +323,14 @@ jobs:
           import json
           import os
           from datetime import datetime, timezone
-
           report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
           if os.environ['EXPECTED_SHA256'] != os.environ['PUBLIC_SHA256']:
               raise SystemExit('guarded checkpoint public hash mismatch')
           receipt = {
               'status': 'verified',
               'checkpoint_valid': True,
+              'checkpoint_durable': True,
+              'end_to_end_verified': True,
               'trade_date': os.environ['TRADE_DATE'],
               'conditional_exit_status': report.get('status'),
               'event_hash': report.get('event_hash'),
@@ -330,11 +347,8 @@ jobs:
               'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
               'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
-          open('/tmp/v2-checkpoint-guard-verification.json', 'w', encoding='utf-8').write(
-              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
-          )
+          open('/tmp/v2-checkpoint-guard-verification.json', 'w', encoding='utf-8').write(json.dumps(receipt, ensure_ascii=False, indent=2) + '\n')
           PY
-
           cd /tmp/main-sync
           pushed=0
           for attempt in 1 2 3; do
@@ -371,21 +385,20 @@ jobs:
           import os
           from datetime import datetime, timezone
           from pathlib import Path
-
           report = {}
           path = Path('/tmp/v2-checkpoint-guard.json')
           if path.exists():
               report = json.loads(path.read_text(encoding='utf-8'))
           checkpoint_status = report.get('status')
-          checkpoint_valid = checkpoint_status in {
-              'conditional_exit_processed',
-              'already_conditional_exit_scan',
-              'already_processed',
-              'not_exchange_session',
-          }
+          operational = checkpoint_status in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}
+          durable = Path('/tmp/v2-core-durable').exists()
+          end_to_end = os.environ['JOB_STATUS'] == 'success'
           status = {
               'status': os.environ['JOB_STATUS'],
-              'checkpoint_valid': checkpoint_valid,
+              'checkpoint_valid': operational and durable,
+              'checkpoint_evaluated_fresh': operational,
+              'checkpoint_durable': durable,
+              'end_to_end_verified': end_to_end,
               'checkpoint_status': checkpoint_status,
               'workflow_run_id': os.environ['GITHUB_RUN_ID'],
               'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
@@ -397,18 +410,14 @@ jobs:
               'event_hash': report.get('event_hash'),
               'finished_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
-          open('/tmp/v2-checkpoint-guard-status.json', 'w', encoding='utf-8').write(
-              json.dumps(status, ensure_ascii=False, indent=2) + '\n'
-          )
+          open('/tmp/v2-checkpoint-guard-status.json', 'w', encoding='utf-8').write(json.dumps(status, ensure_ascii=False, indent=2) + '\n')
           PY
-
           rm -rf /tmp/main-status
           git fetch origin main
           git worktree add --detach /tmp/main-status origin/main
           cd /tmp/main-status
           git config user.name "v2-checkpoint-guard-bot"
           git config user.email "v2-checkpoint-guard-bot@users.noreply.github.com"
-
           pushed=0
           for attempt in 1 2 3; do
             git fetch origin main
