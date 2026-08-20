@@ -102,3 +102,12 @@ try:
     _broker.execute_conditional_sells = _guarded_execute_conditional_sells
 except Exception as _v1_checkpoint_guard_error:
     print(f'[V1] checkpoint safety guard install warning: {_v1_checkpoint_guard_error}')
+
+# Observability must be the outermost market wrapper so the timing reflects the final effective
+# provider stack (timeouts, exact-date overlays, cache and fallbacks included). It never changes
+# return values or failure semantics, and failure to install timing must never block production.
+try:
+    from .runtime_metrics import install as _install_v1_runtime_metrics
+    _install_v1_runtime_metrics()
+except Exception as _v1_runtime_metrics_error:
+    print(f'[V1] runtime timing install warning: {_v1_runtime_metrics_error}')
