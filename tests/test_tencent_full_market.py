@@ -115,9 +115,14 @@ class TencentFullMarketTests(unittest.TestCase):
             }
         }
 
+        # This is a provider-fallback unit test. Keep both installed critical-symbol
+        # wrappers on the same one-symbol fixture instead of leaking live repo state
+        # into the fake market and turning unrelated holdings into missing test bars.
+        critical = {'sh.600000': '测试0'}
         with patch('engine.real_market.time.sleep', return_value=None), \
              patch('engine.tencent_full_market.time.sleep', return_value=None), \
-             patch('engine.tencent_full_market._critical_symbols', return_value={'sh.600000': '测试0'}):
+             patch('engine.tencent_full_market._critical_symbols', return_value=critical), \
+             patch('engine.exact_critical_snapshot._critical_symbols', return_value=critical):
             rows = market.snapshot()
 
         by_code = {row['code']: row for row in rows}
