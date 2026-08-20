@@ -17,6 +17,13 @@ except Exception as _v1_market_patch_error:
 from .exchange_calendar_market import install as _install_v1_exchange_calendar_market
 _install_v1_exchange_calendar_market()
 
+# Exact-date execution bars are requested by several independent safety layers. Cache only
+# successful rows for the lifetime of one AKShareMarket instance so Tencent is not queried
+# repeatedly for the same date/symbol. Missing rows remain retryable and all downstream
+# fail-closed coverage checks stay unchanged.
+from .execution_bar_cache import install as _install_v1_execution_bar_cache
+_install_v1_execution_bar_cache()
+
 # Tencent qfq daily bars can publish the completed session later than unadjusted/current
 # market data. Keep historical features on the qfq basis, but bridge only a verified
 # exact-date completed-session daily bar. Basis mismatches fail closed.
