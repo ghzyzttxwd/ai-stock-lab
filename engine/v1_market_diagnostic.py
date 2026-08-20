@@ -16,15 +16,17 @@ OUT = ROOT / 'state' / 'v1_market_diagnostic.json'
 CN = ZoneInfo('Asia/Shanghai')
 
 
-def timed(result: dict, key: str, fn):
+def timed(result: dict, key: str, fn, *, store_value: bool = False):
     started = time.monotonic()
     try:
         value = fn()
-        result[key] = {
+        entry = {
             'ok': True,
             'seconds': round(time.monotonic() - started, 3),
-            'value': value,
         }
+        if store_value:
+            entry['value'] = value
+        result[key] = entry
         return value
     except Exception as exc:
         result[key] = {
@@ -110,10 +112,25 @@ def main() -> None:
             report['state_dates'][fid] = {'error': f'{type(exc).__name__}: {exc}'}
 
     market = AKShareMarket()
-    latest = timed(report, 'exchange_calendar_latest', lambda: exchange_calendar_latest_session(requested, market.ak))
+    latest = timed(
+        report,
+        'exchange_calendar_latest',
+        lambda: exchange_calendar_latest_session(requested, market.ak),
+        store_value=True,
+    )
     if latest:
-        timed(report, 'exchange_calendar_previous', lambda: exchange_calendar_previous_session(latest, market.ak))
-    engine_date = timed(report, 'engine_latest_trade_date', lambda: market.latest_trade_date(requested))
+        timed(
+            report,
+            'exchange_calendar_previous',
+            lambda: exchange_calendar_previous_session(latest, market.ak),
+            store_value=True,
+        )
+    engine_date = timed(
+        report,
+        'engine_latest_trade_date',
+        lambda: market.latest_trade_date(requested),
+        store_value=True,
+    )
     trade_date = engine_date or latest or requested
 
     snapshot = timed(report, 'full_market_snapshot', market.snapshot)
@@ -128,7 +145,8 @@ def main() -> None:
         report['preselect_summary'] = {'rows': len(selected)}
 
         critical = _critical_market_symbols()
-        critical_in_snapshot = sum(1 for sym in critical if any(row.get('code') == sym for row in snapshot))
+        snapshot_codes = {row.get('code') for row in snapshot}
+        critical_in_snapshot = sum(1 for sym in critical if sym in snapshot_codes)
         report['critical_summary'] = {
             'count': len(critical),
             'present_in_snapshot': critical_in_snapshot,
