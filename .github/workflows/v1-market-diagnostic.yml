@@ -33,6 +33,16 @@ jobs:
         continue-on-error: true
         run: pip install -r requirements.txt
 
+      - name: Run V1 market safety regressions
+        id: regression
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python -m unittest \
+            tests.test_current_bar_history \
+            tests.test_schedule_guard_calendar \
+            tests.test_split_execution -v
+
       - name: Run read-only V1 market probe
         id: probe
         if: steps.install.outcome == 'success'
@@ -44,6 +54,7 @@ jobs:
         shell: bash
         env:
           INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          REGRESSION_OUTCOME: ${{ steps.regression.outcome }}
           PROBE_OUTCOME: ${{ steps.probe.outcome }}
         run: |
           set -euo pipefail
@@ -56,12 +67,27 @@ jobs:
           payload={
               'status':'diagnostic_workflow_failed_before_report',
               'install_outcome':os.environ.get('INSTALL_OUTCOME'),
+              'regression_outcome':os.environ.get('REGRESSION_OUTCOME'),
               'probe_outcome':os.environ.get('PROBE_OUTCOME'),
               'generated_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
           Path('state/v1_market_diagnostic.json').write_text(
               json.dumps(payload,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'
           )
+          PY
+          else
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          path=Path('state/v1_market_diagnostic.json')
+          payload=json.loads(path.read_text(encoding='utf-8'))
+          payload['workflow_outcomes']={
+              'install':os.environ.get('INSTALL_OUTCOME'),
+              'regression':os.environ.get('REGRESSION_OUTCOME'),
+              'probe':os.environ.get('PROBE_OUTCOME'),
+          }
+          path.write_text(json.dumps(payload,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           fi
 
@@ -72,6 +98,6 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: Fail workflow if probe did not run cleanly
-        if: steps.install.outcome != 'success' || steps.probe.outcome != 'success'
+      - name: Fail workflow if diagnostic path did not run cleanly
+        if: steps.install.outcome != 'success' || steps.regression.outcome != 'success' || steps.probe.outcome != 'success'
         run: exit 1
