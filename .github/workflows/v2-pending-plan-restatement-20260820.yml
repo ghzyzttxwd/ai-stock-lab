@@ -1,0 +1,329 @@
+name: Repair V2 2026-08-20 pending conditional plans
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v2-pending-plan-restatement-20260820.yml'
+      - 'scripts/v2_restate_pending_plan_20260820.py'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: v2-daily-settlement
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Checkout canonical V2 shadow
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          path: v2
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: v2/requirements.txt
+
+      - run: pip install -r v2/requirements.txt
+
+      - name: Locate exact canonical replay artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          row="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired==false) | select(.name|startswith("v2-20260820-restatement-")) | [.id,.name,.created_at] | @tsv' \
+            | sort -k3 | tail -n 1)"
+          test -n "$row"
+          artifact_id="$(printf '%s' "$row" | cut -f1)"
+          artifact_name="$(printf '%s' "$row" | cut -f2)"
+          test -n "$artifact_id"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          rm -rf /tmp/v2-restatement-artifact
+          mkdir -p /tmp/v2-restatement-artifact
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > /tmp/v2-restatement-artifact.zip
+          unzip -q /tmp/v2-restatement-artifact.zip -d /tmp/v2-restatement-artifact
+          snapshot="$(find /tmp/v2-restatement-artifact -type f -name 'v2-restatement-snapshot.json' -print -quit)"
+          enriched="$(find /tmp/v2-restatement-artifact -type f -name 'v2-restatement-enriched.json' -print -quit)"
+          test -s "$snapshot"
+          test -s "$enriched"
+          echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
+          echo "enriched=$enriched" >> "$GITHUB_OUTPUT"
+          echo "FOUND RESTATEMENT ARTIFACT id=$artifact_id name=$artifact_name"
+
+      - name: Reproduce exact targets and append pending-plan-only restatement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/v2_restate_pending_plan_20260820.py \
+            --v2-root v2 \
+            --snapshot '${{ steps.artifact.outputs.snapshot }}' \
+            --enriched '${{ steps.artifact.outputs.enriched }}' \
+            --artifact-id '${{ steps.artifact.outputs.artifact_id }}' \
+            --artifact-name '${{ steps.artifact.outputs.artifact_name }}' \
+            --report /tmp/v2-pending-plan-restatement-report.json
+
+      - name: Rebuild V2 derived artifacts from corrected ledgers
+        working-directory: v2
+        run: |
+          set -euo pipefail
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+
+      - name: Run all V2 regressions and terminal invariants
+        working-directory: v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v2*.py' -v
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from engine_v2.conditional_plan import EXECUTION_MODEL, PLAN_VERSION
+          from engine_v2.shadow_guard import processed_session
+          from engine_v2.shadow_ledger import FUND_NAMES
+          from engine_v2.shadow_reporting import verify_audit_chain
+
+          td='2026-08-20'
+          root=Path('shadow_state/v2')
+          audit=verify_audit_chain(root)
+          if audit.get('status')!='PASS':
+              raise SystemExit(f'audit chain failed: {audit}')
+          session=processed_session(root,td)
+          if not session or session.get('terminal_event_kind')!='conditional_plan_restatement':
+              raise SystemExit(f'pending-plan restatement is not terminal: {session}')
+          for fid in FUND_NAMES:
+              state=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if float(state.get('cash') or 0)<-1e-6:
+                  raise SystemExit(f'{fid}: negative cash')
+              if str(state.get('last_processed_date') or '')[:10]!=td or str(state.get('last_execution_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: terminal dates mismatch')
+              pending=state.get('pending_decision')
+              if not isinstance(pending,dict) or pending.get('execution_model')!=EXECUTION_MODEL or pending.get('plan_version')!=PLAN_VERSION:
+                  raise SystemExit(f'{fid}: outer pending plan invalid')
+              for target in pending.get('targets') or []:
+                  plan=target.get('trade_plan') or {}
+                  if plan.get('plan_version')!=PLAN_VERSION or not plan.get('entry') or not plan.get('exit'):
+                      raise SystemExit(f'{fid}: {target.get("symbol")} conditional plan missing')
+              for fill in state.get('fills') or []:
+                  if str(fill.get('trade_date') or '')[:10]==td and fill.get('note')=='V2 目标仓位再平衡':
+                      raise SystemExit(f'{fid}: invalid legacy catch-up fill survived')
+          web=json.loads(Path('web/v2/data.json').read_text(encoding='utf-8'))
+          if str(web.get('updated_at') or '')[:10]!=td:
+              raise SystemExit('V2 web date mismatch')
+          if (web.get('execution_model'),web.get('plan_version'))!=(EXECUTION_MODEL,PLAN_VERSION):
+              raise SystemExit('V2 web model/version mismatch')
+          for fid,fund in (web.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if not isinstance(pending,dict):
+                  raise SystemExit(f'web {fid}: pending missing')
+              for target in pending.get('targets') or []:
+                  if ((target.get('trade_plan') or {}).get('plan_version'))!=PLAN_VERSION:
+                      raise SystemExit(f'web {fid}: legacy pending target survived')
+          print('V2 PENDING-PLAN RESTATEMENT TERMINAL INVARIANTS PASS')
+          PY
+
+      - name: Persist corrected V2 shadow state
+        id: persist_v2
+        working-directory: v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "v2-pending-plan-restatement-bot"
+          git config user.email "v2-pending-plan-restatement-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "v2-data: restore 2026-08-20 conditional pending plans"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
+          git fetch origin v2-shadow
+          echo "sha=$(git rev-parse origin/v2-shadow)" >> "$GITHUB_OUTPUT"
+          cp web/v2/data.json /tmp/v2-pending-plan-corrected-data.json
+
+      - name: Sync exact corrected V2 artifact into main
+        id: sync_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum /tmp/v2-pending-plan-corrected-data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
+          git config user.name "v2-pending-plan-restatement-bot"
+          git config user.email "v2-pending-plan-restatement-bot@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/v2-pending-plan-corrected-data.json web/v2/data.json
+            git add web/v2/data.json
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "v2-data: publish restored 2026-08-20 conditional plans"
+            if git push origin HEAD:main; then pushed=1; break; fi
+          done
+          test "$pushed" = "1"
+          git fetch origin main
+          actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
+          test "$actual" = "$expected"
+          echo "main_sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch and require canonical Pages deployment
+        id: deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          before_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/runs?event=workflow_dispatch&branch=main&per_page=1" --jq '.workflow_runs[0].id // 0')"
+          code=$(curl -sS -o /tmp/v2-plan-deploy-dispatch.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
+            -d '{"ref":"main"}')
+          cat /tmp/v2-plan-deploy-dispatch.txt || true
+          test "$code" = "204"
+          run_id=''
+          for i in $(seq 1 20); do
+            sleep 3
+            latest="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/runs?event=workflow_dispatch&branch=main&per_page=1" --jq '.workflow_runs[0].id // 0')"
+            if [ "$latest" != "0" ] && [ "$latest" != "$before_id" ]; then run_id="$latest"; break; fi
+          done
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Verify actual public V2 bytes equal corrected main
+        id: public
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ steps.sync_main.outputs.expected_sha256 }}'
+          for i in $(seq 1 36); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?pending_plan_restatement=${GITHUB_RUN_ID}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-pending-plan.json; then
+              actual="$(sha256sum /tmp/live-v2-pending-plan.json | awk '{print $1}')"
+              echo "PUBLIC_ATTEMPT=$i EXPECTED=$expected ACTUAL=$actual"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-pending-plan.json',encoding='utf-8'))
+          if str(live.get('updated_at') or '')[:10]!='2026-08-20':
+              raise SystemExit('public V2 date mismatch')
+          if (live.get('execution_model'),live.get('plan_version'))!=('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('public V2 model/version mismatch')
+          for fid,fund in (live.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if not isinstance(pending,dict):
+                  raise SystemExit(f'public {fid}: pending decision missing')
+              for target in pending.get('targets') or []:
+                  plan=target.get('trade_plan') or {}
+                  if plan.get('plan_version')!='v2-conditional-plan-v1' or not plan.get('entry') or not plan.get('exit'):
+                      raise SystemExit(f'public {fid}: {target.get("symbol")} conditional plan missing')
+          print('PUBLIC V2 CONDITIONAL PENDING PLANS VERIFIED')
+          PY
+                echo "sha256=$actual" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Persist terminal 2026-08-20 receipts only after public equality
+        env:
+          EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
+          PUBLIC_SHA256: ${{ steps.public.outputs.sha256 }}
+          V2_SHADOW_SHA: ${{ steps.persist_v2.outputs.sha }}
+          MAIN_SOURCE_SHA: ${{ steps.sync_main.outputs.main_sha }}
+          PAGES_RUN_ID: ${{ steps.deploy.outputs.run_id }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ steps.artifact.outputs.artifact_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_SHA256" = "$PUBLIC_SHA256"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          report=json.load(open('/tmp/v2-pending-plan-restatement-report.json',encoding='utf-8'))
+          receipt={
+              'status':'verified',
+              'daily_complete':True,
+              'end_to_end_verified':True,
+              'trade_date':'2026-08-20',
+              'execution_model':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version':'v2-conditional-plan-v1',
+              'buy_reference':'predeclared_price_condition',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
+              'ledger_restatement':True,
+              'pending_plan_restatement':True,
+              'economic_history_unchanged':True,
+              'history_preserved_append_only':True,
+              'corrected_invalid_execution_catchup_hash':'ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7',
+              'execution_restatement_event_hash':report['base_event_hash'],
+              'pending_plan_restatement_event_hash':report['event_hash'],
+              'audit_head':report['audit_head'],
+              'audit_events':int(report['audit_events']),
+              'historical_artifact_id':os.environ['ARTIFACT_ID'],
+              'historical_artifact_name':os.environ['ARTIFACT_NAME'],
+              'snapshot_sha256':report['snapshot_sha256'],
+              'enrichment_sha256':report['enrichment_sha256'],
+              'expected_sha256':os.environ['EXPECTED_SHA256'],
+              'public_sha256':os.environ['PUBLIC_SHA256'],
+              'v2_shadow_source_commit':os.environ['V2_SHADOW_SHA'],
+              'main_source_commit':os.environ['MAIN_SOURCE_SHA'],
+              'pages_workflow_run_id':os.environ['PAGES_RUN_ID'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          for path in ('/tmp/v2-1510-chain-verification.json','/tmp/v2-20260820-pending-plan-restatement-verification.json'):
+              open(path,'w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          PY
+          git config user.name "v2-pending-plan-restatement-bot"
+          git config user.email "v2-pending-plan-restatement-bot@users.noreply.github.com"
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-1510-chain-verification.json state/v2_1510_chain_verification.json
+            cp /tmp/v2-20260820-pending-plan-restatement-verification.json state/v2_20260820_pending_plan_restatement_verification.json
+            git add state/v2_1510_chain_verification.json state/v2_20260820_pending_plan_restatement_verification.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: verify V2 2026-08-20 pending-plan terminal chain"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-pending-plan-restatement-${{ github.run_id }}
+          path: |
+            /tmp/v2-pending-plan-restatement-report.json
+            /tmp/live-v2-pending-plan.json
+          if-no-files-found: warn
+          retention-days: 30
