@@ -15,8 +15,9 @@ permissions:
   contents: write
   actions: write
 
+# Every normal and fallback settlement run shares one serialized accounting lane.
 concurrency:
-  group: v2-snapshot-smoke
+  group: v2-daily-settlement
   cancel-in-progress: false
 
 jobs:
@@ -122,7 +123,56 @@ jobs:
                       raise SystemExit(f'V2 {fid} holding lacks conditional exit plan')
           print('[V2 CONDITIONAL] invariants verified')
           PY
-      - name: Persist only V2 shadow state
+      - name: Require complete daily conditional state before persistence
+        shell: bash
+        env:
+          TRADE_DATE: ${{ steps.td.outputs.date }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from engine_v2.shadow_reporting import verify_audit_chain, _ordered_audit_events
+
+          td=os.environ['TRADE_DATE']
+          root=Path('shadow_state/v2')
+          daily=root/'audit'/f'{td}.json'
+          if not daily.exists():
+              raise SystemExit(f'V2 daily audit missing for {td}')
+          event=json.loads(daily.read_text(encoding='utf-8'))
+          if event.get('trade_date') != td or event.get('event_kind') != 'conditional_entries_and_decision':
+              raise SystemExit(f'V2 daily audit is not a complete conditional session: {event.get("event_kind")}')
+
+          verification=verify_audit_chain(root)
+          if verification.get('status') != 'PASS':
+              raise SystemExit(f'V2 audit verification failed: {verification}')
+          _, current=_ordered_audit_events(root)[-1]
+          if current.get('event_kind') == 'execution_catchup':
+              raise SystemExit('legacy execution_catchup can never be the terminal V2 accounting state')
+
+          for fid in ('A','B','C','D','L'):
+              state=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if str(state.get('last_processed_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: last_processed_date is not {td}')
+              if str(state.get('last_execution_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: last_execution_date is not {td}')
+              if state.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or state.get('plan_version') != 'v2-conditional-plan-v1':
+                  raise SystemExit(f'{fid}: conditional model/version missing')
+              pending=state.get('pending_decision')
+              if not isinstance(pending, dict):
+                  raise SystemExit(f'{fid}: next-session plan is missing; null is not a completed day')
+              if str(pending.get('decision_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: next-session decision date mismatch')
+              if pending.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or pending.get('plan_version') != 'v2-conditional-plan-v1':
+                  raise SystemExit(f'{fid}: next-session plan model/version mismatch')
+              for target in pending.get('targets') or []:
+                  if (target.get('trade_plan') or {}).get('plan_version') != 'v2-conditional-plan-v1':
+                      raise SystemExit(f'{fid}: target without conditional trade plan')
+              if float(state.get('cash') or 0.0) < -1e-6:
+                  raise SystemExit(f'{fid}: negative cash')
+          print('[V2 DAILY COMPLETE]', td, verification.get('head'))
+          PY
+      - name: Persist only complete V2 shadow state
         shell: bash
         run: |
           set -euo pipefail
@@ -130,7 +180,7 @@ jobs:
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
           if git diff --cached --quiet; then
-            echo "V2 conditional state already persisted."
+            echo "V2 complete conditional state already persisted."
           else
             git commit -m "v2-data: conditional plans and trigger-based accounting"
             git pull --rebase origin v2-shadow
@@ -188,6 +238,8 @@ jobs:
       - name: Verify public V2 data equals conditional-plan result
         id: verify_public
         shell: bash
+        env:
+          TRADE_DATE: ${{ steps.td.outputs.date }}
         run: |
           set -euo pipefail
           expected="${{ steps.sync_main.outputs.expected_sha256 }}"
@@ -197,10 +249,16 @@ jobs:
               actual="$(sha256sum /tmp/live-v2-1510.json | awk '{print $1}')"
               if [ "$actual" = "$expected" ]; then
                 python - <<'PY'
-          import json
+          import json, os
           live=json.load(open('/tmp/live-v2-1510.json',encoding='utf-8'))
+          if str(live.get('updated_at') or '')[:10] != os.environ['TRADE_DATE']:
+              raise SystemExit('public V2 trade date mismatch')
           if live.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or live.get('plan_version')!='v2-conditional-plan-v1':
               raise SystemExit('public V2 is not conditional-plan model')
+          for fid,fund in (live.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10] != os.environ['TRADE_DATE']:
+                  raise SystemExit(f'public V2 {fid} next-session plan missing')
           print('PUBLIC V2 CONDITIONAL VERIFIED',live.get('updated_at'))
           PY
                 echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
@@ -224,6 +282,8 @@ jobs:
           from datetime import datetime, timezone
           receipt={
               'status':'verified',
+              'daily_complete':True,
+              'end_to_end_verified':True,
               'trade_date':os.environ['TRADE_DATE'],
               'execution_model':'V2_CONDITIONAL_PLAN_V1',
               'plan_version':'v2-conditional-plan-v1',
@@ -233,6 +293,7 @@ jobs:
               'expected_sha256':os.environ['EXPECTED_SHA256'],
               'public_sha256':os.environ['PUBLIC_SHA256'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
               'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
           open('/tmp/v2-1510-chain-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
