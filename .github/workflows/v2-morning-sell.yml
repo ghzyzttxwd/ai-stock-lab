@@ -7,13 +7,12 @@ on:
     paths:
       - 'shadow_state/v2/.morning-trigger'
   schedule:
-    - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
-    - cron: '50 1 * * 1-5'  # 09:50 retry for 09:40 only; runner rejects if >10m stale
-    - cron: '30 2 * * 1-5'  # 10:30 checkpoint
-    - cron: '20 3 * * 1-5'  # 11:20 checkpoint
-    - cron: '30 5 * * 1-5'  # 13:30 checkpoint
-    - cron: '30 6 * * 1-5'  # 14:30 checkpoint
-    - cron: '55 6 * * 1-5'  # 14:55 checkpoint / max-hold exit
+    - cron: '40 1 * * 1-5'  # 09:40 Beijing
+    - cron: '30 2 * * 1-5'  # 10:30 Beijing
+    - cron: '20 3 * * 1-5'  # 11:20 Beijing
+    - cron: '30 5 * * 1-5'  # 13:30 Beijing
+    - cron: '30 6 * * 1-5'  # 14:30 Beijing
+    - cron: '55 6 * * 1-5'  # 14:55 Beijing / max-hold exit
 
 permissions:
   contents: write
@@ -43,7 +42,7 @@ jobs:
           PY
           )
           case "${{ github.event.schedule }}" in
-            '40 1 * * 1-5'|'50 1 * * 1-5') slot='09:40' ;;
+            '40 1 * * 1-5') slot='09:40' ;;
             '30 2 * * 1-5') slot='10:30' ;;
             '20 3 * * 1-5') slot='11:20' ;;
             '30 5 * * 1-5') slot='13:30' ;;
