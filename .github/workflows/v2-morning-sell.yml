@@ -117,8 +117,8 @@ jobs:
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 conditional-exit isolation invariant violated')
-          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session','outside_session_window','stale_checkpoint_skipped'}:
-              raise SystemExit(f'unexpected V2 conditional-exit status: {r.get("status")}')
+          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}:
+              raise SystemExit(f'V2 checkpoint was not operationally completed: {r.get("status")}')
           if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
               raise SystemExit('V2 intraday path is not conditional-plan model')
           print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('scheduled_time'),r.get('fills'),r.get('executed_at'))
