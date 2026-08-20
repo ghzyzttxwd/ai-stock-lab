@@ -15,7 +15,7 @@ permissions:
   id-token: write
 concurrency:
   group: ai-stock-daily
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 jobs:
   trade:
     runs-on: ubuntu-latest
