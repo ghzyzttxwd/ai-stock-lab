@@ -29,6 +29,13 @@ _install_v1_current_bar_history()
 from .exact_critical_snapshot import install as _install_v1_exact_critical_snapshot
 _install_v1_exact_critical_snapshot()
 
+# The remaining auxiliary providers (exchange-calendar HTTP, benchmark index history and
+# minute-level trigger-time evidence) must never be able to consume the whole 30-minute job.
+# Their failures are either fail-closed (calendar) or explicitly degraded metadata
+# (benchmarks/trigger minute), matching the existing semantics without unbounded waits.
+from .bounded_aux_providers import install as _install_v1_bounded_aux_providers
+_install_v1_bounded_aux_providers()
+
 # Production safety belt: scheduled intraday checkpoints are only valid near their
 # declared time. GitHub Actions can start scheduled jobs late; never convert a
 # 10:42 quote into a fictitious 09:40 fill. This wrapper is active only when the
