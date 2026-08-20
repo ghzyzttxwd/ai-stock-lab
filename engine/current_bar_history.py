@@ -61,6 +61,7 @@ def _append_current_qfq(rows: list[dict], bar: dict, trade_date: str, history_li
         'isST': str(bar.get('isST') or '0'),
         'history_bridge_source': str(bar.get('source') or 'current-bar'),
         'history_bridge_bar_date': str(bar.get('bar_date') or bar.get('trade_date'))[:10],
+        'history_bridge_date_evidence': str(bar.get('bar_date_evidence') or ''),
         'history_bridge_scale': round(scale, 8),
     }
     merged = rows + [current]
@@ -134,7 +135,15 @@ def install() -> None:
             if not item:
                 continue
             _, rows = item
-            bar = execution.get(sym)
+            raw_bar = execution.get(sym)
+            bar = None
+            if raw_bar:
+                # execution_bars only returns a symbol after locating a record whose source
+                # date equals trade_date. Stamp that verified invariant here; generic spot
+                # rows never pass through this path and therefore remain ineligible.
+                bar = dict(raw_bar)
+                bar['bar_date'] = trade_date
+                bar['bar_date_evidence'] = 'execution_bars_exact_date_match'
             merged = _append_current_qfq(rows, bar, trade_date, self.history_limit) if bar else None
             if merged and merged[-1]['date'] == trade_date:
                 out[sym] = merged
