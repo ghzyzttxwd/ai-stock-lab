@@ -40,33 +40,76 @@ jobs:
       - name: Run all V2 regression tests
         working-directory: v2
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Assert six checkpoints and stale-run safety are wired on main
+      - name: Assert six checkpoints, stale failure, and audit ordering are wired
+        id: invariants
         run: |
+          set -euo pipefail
           python - <<'PY'
+          import json
+          import os
+          import unittest
           from pathlib import Path
-          text=Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
-          runner=Path('v2/engine_v2/morning_sell_run.py').read_text(encoding='utf-8')
-          expected=(
+
+          workflow = Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
+          guard = Path('main/.github/workflows/v2-checkpoint-guard.yml').read_text(encoding='utf-8')
+          runner = Path('v2/engine_v2/morning_sell_run.py').read_text(encoding='utf-8')
+          reporting = Path('v2/engine_v2/shadow_reporting.py').read_text(encoding='utf-8')
+          ordering_test = Path('v2/tests/test_v2_audit_order.py')
+
+          expected = (
               "'40 1 * * 1-5'", "'30 2 * * 1-5'", "'20 3 * * 1-5'",
               "'30 5 * * 1-5'", "'30 6 * * 1-5'", "'55 6 * * 1-5'",
           )
-          missing=[x for x in expected if x not in text]
+          missing = [x for x in expected if x not in workflow]
           if missing:
               raise SystemExit(f'missing V2 checkpoints: {missing}')
           for obsolete in ("'50 1 * * 1-5'", "'0 2 * * 1-5'"):
-              if obsolete in text:
+              if obsolete in workflow:
                   raise SystemExit(f'obsolete retry cron still wired: {obsolete}')
-          if 'cancel-in-progress: false' not in text:
+          if 'cancel-in-progress: false' not in workflow:
               raise SystemExit('V2 checkpoints may still cancel an in-flight run')
-          if '--scheduled-time' not in text:
+          if '--scheduled-time' not in workflow:
               raise SystemExit('V2 workflow does not pass logical checkpoint to runner')
-          if 'stale_checkpoint_skipped' not in text or 'stale_checkpoint_skipped' not in runner:
-              raise SystemExit('stale checkpoint status is not wired end to end')
+
+          # The runner must still produce a stale status, but the production workflows
+          # must reject it instead of treating it as a green/verified outcome.
+          if 'stale_checkpoint_skipped' not in runner:
+              raise SystemExit('runner no longer exposes stale checkpoint status')
           if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in runner:
               raise SystemExit('10-minute freshness limit missing from V2 runner')
           if "'reads_market_quotes': False" not in runner or "'mutates_v2_ledger': False" not in runner:
               raise SystemExit('stale V2 run is not proven fail-closed before quotes/state mutation')
-          print('V2 SIX CHECKPOINT + STALE SAFETY WIRING PASS')
+          if 'V2 checkpoint was not operationally completed' not in workflow:
+              raise SystemExit('canonical workflow does not explicitly fail a non-operational checkpoint')
+          if 'V2 checkpoint is not operationally valid' not in guard:
+              raise SystemExit('guard workflow does not explicitly fail a non-operational checkpoint')
+          if 'stale checkpoint must never be reported as green' not in guard:
+              raise SystemExit('guard workflow does not explicitly reject stale green status')
+
+          if '_ordered_audit_events' not in reporting:
+              raise SystemExit('V2 audit verification still relies on filename ordering')
+          if not ordering_test.exists():
+              raise SystemExit('V2 audit parent-link ordering regression test is missing')
+
+          suite = unittest.defaultTestLoader.discover('v2/tests', pattern='test_v2*.py')
+          test_count = suite.countTestCases()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f'test_count={test_count}\n')
+          print(f'V2 CHECKPOINT + STALE FAILURE + AUDIT ORDERING WIRING PASS tests={test_count}')
+          PY
+      - name: Verify current V2 audit and ledger chain
+        id: audit
+        working-directory: v2
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          from engine_v2.shadow_reporting import verify_audit_chain
+          result = verify_audit_chain(Path('shadow_state/v2'))
+          print(f"status={result['status']}")
+          print(f"head={result['head']}")
+          print(f"events={result['events']}")
+          print(f"last_date={result['last_date']}")
           PY
       - name: Persist verification receipt to main
         run: |
@@ -74,28 +117,42 @@ jobs:
           cd main
           actual_v2_sha="$(git -C ../v2 rev-parse HEAD)"
           export ACTUAL_V2_SHA="$actual_v2_sha"
+          export TEST_COUNT="${{ steps.invariants.outputs.test_count }}"
+          export AUDIT_STATUS="${{ steps.audit.outputs.status }}"
+          export AUDIT_HEAD="${{ steps.audit.outputs.head }}"
+          export AUDIT_EVENTS="${{ steps.audit.outputs.events }}"
+          export AUDIT_LAST_DATE="${{ steps.audit.outputs.last_date }}"
           python - <<'PY'
           import json, os
           from datetime import datetime, timezone
-          receipt={
-              'status':'verified',
-              'v2_source_commit':os.environ['ACTUAL_V2_SHA'],
-              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'tests':"python -m unittest discover -s tests -p 'test_v2*.py' -v",
-              'checkpoints':['09:40','10:30','11:20','13:30','14:30','14:55'],
-              'max_checkpoint_lateness_minutes':10,
-              'obsolete_0950_retry_removed':True,
-              'obsolete_1000_retry_removed':True,
-              'cancel_in_progress':False,
-              'stale_run_reads_market_quotes':False,
-              'stale_run_mutates_v2_ledger':False,
-              'trailing_uses_intraday_high':True,
-              'max_hold_1455_reachable':True,
-              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          receipt = {
+              'status': 'verified',
+              'v2_source_commit': os.environ['ACTUAL_V2_SHA'],
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'tests': "python -m unittest discover -s tests -p 'test_v2*.py' -v",
+              'test_count': int(os.environ['TEST_COUNT']),
+              'checkpoints': ['09:40','10:30','11:20','13:30','14:30','14:55'],
+              'max_checkpoint_lateness_minutes': 10,
+              'obsolete_0950_retry_removed': True,
+              'obsolete_1000_retry_removed': True,
+              'cancel_in_progress': False,
+              'stale_run_reads_market_quotes': False,
+              'stale_run_mutates_v2_ledger': False,
+              'stale_checkpoint_is_workflow_failure': True,
+              'audit_parent_link_ordering': True,
+              'audit_chain_status': os.environ['AUDIT_STATUS'],
+              'audit_head': os.environ['AUDIT_HEAD'],
+              'audit_events': int(os.environ['AUDIT_EVENTS']),
+              'audit_last_event': os.environ['AUDIT_LAST_DATE'],
+              'trailing_uses_intraday_high': True,
+              'max_hold_1455_reachable': True,
+              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
-          os.makedirs('state',exist_ok=True)
-          open('state/v2_code_regression_verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          os.makedirs('state', exist_ok=True)
+          open('state/v2_code_regression_verification.json','w',encoding='utf-8').write(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n'
+          )
           PY
           git config user.name "v2-code-ci-bot"
           git config user.email "v2-code-ci-bot@users.noreply.github.com"
