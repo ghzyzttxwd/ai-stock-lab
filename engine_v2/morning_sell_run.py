@@ -35,6 +35,16 @@ def _checkpoint_delay_minutes(now: datetime, scheduled_time: str) -> float:
     return (now - scheduled).total_seconds() / 60.0
 
 
+def _readonly_noop_safety() -> dict:
+    return {
+        'writes_v1_ledger': False,
+        'calls_sol': False,
+        'forced_clock_sell': False,
+        'reads_market_quotes': False,
+        'mutates_v2_ledger': False,
+    }
+
+
 def _execution_snapshot(
     state: dict,
     bars: dict[str, dict],
@@ -82,7 +92,10 @@ def _already_done(state_root: Path, trade_date: str, scheduled_time: str) -> dic
             'event_hash': event.get('event_hash'), 'audit_path': str(daily),
             'scheduled_time': source_ref.get('scheduled_time'),
             'executed_at': source_ref.get('executed_at'),
+            'actual_clock': source_ref.get('actual_clock'),
+            'delay_minutes': source_ref.get('delay_minutes'),
             'execution_model': source_ref.get('execution_model'),
+            'plan_version': source_ref.get('plan_version'),
         }
 
     path = _audit_path(state_root, trade_date, scheduled_time)
@@ -105,7 +118,10 @@ def _already_done(state_root: Path, trade_date: str, scheduled_time: str) -> dic
         'event_hash': claimed, 'audit_path': str(path),
         'scheduled_time': source_ref.get('scheduled_time') or scheduled_time,
         'executed_at': source_ref.get('executed_at'),
+        'actual_clock': source_ref.get('actual_clock'),
+        'delay_minutes': source_ref.get('delay_minutes'),
         'execution_model': source_ref.get('execution_model'),
+        'plan_version': source_ref.get('plan_version'),
     }
 
 
@@ -113,13 +129,10 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
     """Check one declared V2 intraday exit checkpoint without forcing a clock-based sale."""
     now = datetime.now(ZoneInfo('Asia/Shanghai'))
     scheduled_time = str(scheduled_time or now.strftime('%H:%M'))
-    existing = _already_done(state_root, trade_date, scheduled_time)
-    if existing:
-        return existing
 
     if scheduled_time in CHECKPOINTS:
         delay_minutes = _checkpoint_delay_minutes(now, scheduled_time)
-        if delay_minutes < 0 or delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+        if delay_minutes < 0:
             return {
                 'status': 'stale_checkpoint_skipped',
                 'trade_date': trade_date,
@@ -131,16 +144,53 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
                 'rejected_orders': {},
                 'execution_model': EXECUTION_MODEL,
                 'plan_version': PLAN_VERSION,
-                'safety': {
-                    'writes_v1_ledger': False,
-                    'calls_sol': False,
-                    'forced_clock_sell': False,
-                    'reads_market_quotes': False,
-                    'mutates_v2_ledger': False,
-                },
+                'safety': _readonly_noop_safety(),
             }
     else:
         delay_minutes = 0.0
+
+    existing = _already_done(state_root, trade_date, scheduled_time)
+    if existing:
+        if scheduled_time in CHECKPOINTS and delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+            return {
+                'status': 'late_duplicate_noop',
+                'trade_date': trade_date,
+                'scheduled_time': scheduled_time,
+                'executed_at': now.isoformat(timespec='seconds'),
+                'actual_clock': now.strftime('%H:%M'),
+                'delay_minutes': round(delay_minutes, 2),
+                'fills': {},
+                'rejected_orders': {},
+                'execution_model': existing.get('execution_model') or EXECUTION_MODEL,
+                'plan_version': existing.get('plan_version') or PLAN_VERSION,
+                'event_hash': existing.get('event_hash'),
+                'existing_checkpoint': {
+                    'status': existing.get('status'),
+                    'event_hash': existing.get('event_hash'),
+                    'audit_path': existing.get('audit_path'),
+                    'scheduled_time': existing.get('scheduled_time'),
+                    'executed_at': existing.get('executed_at'),
+                    'actual_clock': existing.get('actual_clock'),
+                    'delay_minutes': existing.get('delay_minutes'),
+                },
+                'safety': _readonly_noop_safety(),
+            }
+        return existing
+
+    if scheduled_time in CHECKPOINTS and delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+        return {
+            'status': 'stale_checkpoint_skipped',
+            'trade_date': trade_date,
+            'scheduled_time': scheduled_time,
+            'executed_at': now.isoformat(timespec='seconds'),
+            'actual_clock': now.strftime('%H:%M'),
+            'delay_minutes': round(delay_minutes, 2),
+            'fills': {},
+            'rejected_orders': {},
+            'execution_model': EXECUTION_MODEL,
+            'plan_version': PLAN_VERSION,
+            'safety': _readonly_noop_safety(),
+        }
 
     in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
     final_slot_grace = scheduled_time == '14:55' and dt_time(15, 0) < now.time() <= dt_time(15, 5)
@@ -150,11 +200,13 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
             'trade_date': trade_date,
             'scheduled_time': scheduled_time,
             'executed_at': now.isoformat(timespec='seconds'),
+            'actual_clock': now.strftime('%H:%M'),
+            'delay_minutes': round(delay_minutes, 2),
             'fills': {},
             'rejected_orders': {},
             'execution_model': EXECUTION_MODEL,
             'plan_version': PLAN_VERSION,
-            'safety': {'writes_v1_ledger': False, 'calls_sol': False, 'forced_clock_sell': False},
+            'safety': _readonly_noop_safety(),
         }
 
     import akshare as ak
@@ -163,8 +215,12 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
             'status': 'not_exchange_session', 'trade_date': trade_date,
             'fills': {}, 'rejected_orders': {},
             'scheduled_time': scheduled_time,
+            'executed_at': now.isoformat(timespec='seconds'),
+            'actual_clock': now.strftime('%H:%M'),
+            'delay_minutes': round(delay_minutes, 2),
             'execution_model': EXECUTION_MODEL,
-            'safety': {'writes_v1_ledger': False, 'calls_sol': False},
+            'plan_version': PLAN_VERSION,
+            'safety': _readonly_noop_safety(),
         }
     previous_trade_date = previous_exchange_session(ak, trade_date)
     if not previous_trade_date:
@@ -203,7 +259,6 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
         snapshot = _execution_snapshot(
             state, bars, trade_date, execution.get('fees', 0.0), executed_at, scheduled_time,
         )
-        # Keep the old date marker for report compatibility; scan_key distinguishes checkpoints.
         state['morning_sell_date'] = trade_date
         state['conditional_exit_date'] = trade_date
         state['last_conditional_scan_key'] = scan_key
