@@ -26,6 +26,13 @@ from .split_execution import execute_conditional_exit_scan
 
 SCHEDULED_MORNING_TIME = '09:40'
 CHECKPOINTS = ('09:40', '10:30', '11:20', '13:30', '14:30', '14:55')
+MAX_CHECKPOINT_LATENESS_MINUTES = 10
+
+
+def _checkpoint_delay_minutes(now: datetime, scheduled_time: str) -> float:
+    hour, minute = (int(x) for x in scheduled_time.split(':', 1))
+    scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return (now - scheduled).total_seconds() / 60.0
 
 
 def _execution_snapshot(
@@ -110,6 +117,31 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
     if existing:
         return existing
 
+    if scheduled_time in CHECKPOINTS:
+        delay_minutes = _checkpoint_delay_minutes(now, scheduled_time)
+        if delay_minutes < 0 or delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+            return {
+                'status': 'stale_checkpoint_skipped',
+                'trade_date': trade_date,
+                'scheduled_time': scheduled_time,
+                'executed_at': now.isoformat(timespec='seconds'),
+                'actual_clock': now.strftime('%H:%M'),
+                'delay_minutes': round(delay_minutes, 2),
+                'fills': {},
+                'rejected_orders': {},
+                'execution_model': EXECUTION_MODEL,
+                'plan_version': PLAN_VERSION,
+                'safety': {
+                    'writes_v1_ledger': False,
+                    'calls_sol': False,
+                    'forced_clock_sell': False,
+                    'reads_market_quotes': False,
+                    'mutates_v2_ledger': False,
+                },
+            }
+    else:
+        delay_minutes = 0.0
+
     in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
     final_slot_grace = scheduled_time == '14:55' and dt_time(15, 0) < now.time() <= dt_time(15, 5)
     if not (in_session or final_slot_grace):
@@ -147,7 +179,7 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
 
     critical = critical_symbols(states)
     bars, quote_source = live_execution_bars(ak, critical)
-    executed_at = now.isoformat(timespec='seconds')
+    executed_at = datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(timespec='seconds')
     execution_clock = executed_at.split('T', 1)[1][:5]
     scan_key = f'{trade_date}T{scheduled_time}'
     bars = {normalize_symbol(k): v for k, v in bars.items()}
@@ -164,6 +196,10 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
         execution = execute_conditional_exit_scan(
             state, bars, trade_date, clock=scheduled_time, pending=pending,
         )
+        for fill in execution.get('fills') or []:
+            fill['scheduled_time'] = scheduled_time
+            fill['actual_execution_time'] = executed_at
+            fill['actual_clock'] = execution_clock
         snapshot = _execution_snapshot(
             state, bars, trade_date, execution.get('fees', 0.0), executed_at, scheduled_time,
         )
@@ -198,6 +234,8 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
             'scheduled_time': scheduled_time,
             'executed_at': executed_at,
             'actual_clock': execution_clock,
+            'delay_minutes': round(delay_minutes, 2),
+            'freshness_limit_minutes': MAX_CHECKPOINT_LATENESS_MINUTES,
             'execution_model': EXECUTION_MODEL,
             'plan_version': PLAN_VERSION,
             'note': (
@@ -243,6 +281,7 @@ def run_morning_sell(trade_date: str, state_root: Path, scheduled_time: str | No
         'scheduled_time': scheduled_time,
         'executed_at': executed_at,
         'actual_clock': execution_clock,
+        'delay_minutes': round(delay_minutes, 2),
         'execution_model': EXECUTION_MODEL,
         'plan_version': PLAN_VERSION,
         'event_hash': event_hash,
