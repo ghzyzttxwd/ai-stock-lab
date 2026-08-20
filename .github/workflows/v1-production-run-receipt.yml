@@ -1,0 +1,68 @@
+name: V1 production run receipt
+
+on:
+  workflow_run:
+    workflows: ['Daily 15:10 conditional-plan settlement']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v1-production-run-receipt
+  cancel-in-progress: false
+
+jobs:
+  receipt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write production run receipt
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          STATUS: ${{ github.event.workflow_run.status }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_NAME: ${{ github.event.workflow_run.event }}
+          CREATED_AT: ${{ github.event.workflow_run.created_at }}
+          UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+          HTML_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload={
+              'workflow':'Daily 15:10 conditional-plan settlement',
+              'status':os.environ.get('STATUS'),
+              'conclusion':os.environ.get('CONCLUSION'),
+              'run_id':os.environ.get('RUN_ID'),
+              'run_number':os.environ.get('RUN_NUMBER'),
+              'run_attempt':os.environ.get('RUN_ATTEMPT'),
+              'head_sha':os.environ.get('HEAD_SHA'),
+              'event':os.environ.get('EVENT_NAME'),
+              'created_at':os.environ.get('CREATED_AT'),
+              'updated_at':os.environ.get('UPDATED_AT'),
+              'html_url':os.environ.get('HTML_URL'),
+              'receipt_written_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          Path('state/v1_production_run_receipt.json').write_text(
+              json.dumps(payload,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'
+          )
+          PY
+
+      - name: Persist production run receipt
+        run: |
+          set -euo pipefail
+          git config user.name "v1-production-receipt-bot"
+          git config user.email "v1-production-receipt-bot@users.noreply.github.com"
+          git add state/v1_production_run_receipt.json
+          git diff --cached --quiet || git commit -m "ops: persist V1 production run receipt"
+          git pull --rebase origin main
+          git push origin HEAD:main
