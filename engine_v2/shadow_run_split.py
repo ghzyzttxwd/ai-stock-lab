@@ -35,6 +35,7 @@ from .shadow_run import (
 )
 from .split_execution import execute_conditional_buy_side
 from .targets import build_shadow_targets
+from .trade_price_time import annotate_conditional_buy_fills
 
 
 def _empty_execution(trade_date: str, decision_date: str | None = None, **extra) -> dict:
@@ -52,6 +53,7 @@ def run_shadow_session_split(
     previous_trade_date: str | None = None,
     supplemental_bars: dict[str, dict] | None = None,
     allow_network_bars: bool = True,
+    annotate_price_times: bool = False,
 ) -> dict:
     trade_date = str(enriched.get('trade_date') or '')[:10]
     if not trade_date or str(snapshot.get('trade_date') or '')[:10] != trade_date:
@@ -89,6 +91,14 @@ def run_shadow_session_split(
     previous_heads = {fund_id: state.get('audit_head') for fund_id, state in states.items()}
     opening_state_hashes = {fund_id: ledger_content_hash(state) for fund_id, state in states.items()}
 
+    ak = None
+    if annotate_price_times:
+        try:
+            import akshare as ak_module
+            ak = ak_module
+        except Exception as exc:
+            print(f'[V2 PRICE TIME] minute evidence provider unavailable: {exc}')
+
     for fund_id, state in states.items():
         pending = state.get('pending_decision')
         if pending:
@@ -104,6 +114,13 @@ def run_shadow_session_split(
                         execution[fund_id] = execute_conditional_buy_side(
                             state, pending, bars, trade_date,
                         )
+                        if ak is not None and execution[fund_id].get('fills'):
+                            annotate_conditional_buy_fills(
+                                ak,
+                                execution[fund_id]['fills'],
+                                list(pending.get('targets') or []),
+                                trade_date,
+                            )
                     else:
                         execution[fund_id] = _empty_execution(
                             trade_date, decision_date, no_trade_plan=True,
@@ -251,7 +268,11 @@ def main() -> None:
     snapshot = json.loads(Path(args.snapshot).read_text(encoding='utf-8'))
     enriched = json.loads(Path(args.enriched).read_text(encoding='utf-8'))
     report = run_shadow_session_split(
-        snapshot, enriched, Path(args.state_root), previous_trade_date=args.previous_trade_date,
+        snapshot,
+        enriched,
+        Path(args.state_root),
+        previous_trade_date=args.previous_trade_date,
+        annotate_price_times=True,
     )
     Path(args.report).write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False, indent=2))
