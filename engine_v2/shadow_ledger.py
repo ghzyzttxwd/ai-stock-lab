@@ -143,7 +143,7 @@ def immutable_write(path: Path, payload: dict) -> bool:
         raise RuntimeError(f'refusing to rewrite immutable V2 audit event: {path}')
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(text, encoding='utf-8') + '\n'
+    tmp.write_text(text, encoding='utf-8')
     tmp.replace(path)
     return True
 
