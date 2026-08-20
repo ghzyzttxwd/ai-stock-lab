@@ -1,4 +1,4 @@
-name: V2 terminal recheck trigger
+name: V2 2026-08-20 terminal acceptance
 
 on:
   push:
@@ -8,27 +8,270 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: write
   actions: write
-  contents: read
+
+concurrency:
+  group: v2-terminal-acceptance-20260820
+  cancel-in-progress: false
 
 jobs:
-  dispatch:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Dispatch canonical V2 restatement terminal verifier
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate canonical V2 state and main artifact
+        id: canonical
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "TERMINAL_STAGE=canonical_state" >> "$GITHUB_ENV"
+          git fetch origin main v2-shadow
+          git reset --hard origin/main
+          rm -rf /tmp/v2-terminal-shadow
+          git worktree add --detach /tmp/v2-terminal-shadow origin/v2-shadow
+          MAIN_SHA="$(git rev-parse origin/main)"
+          V2_SHA="$(git rev-parse origin/v2-shadow)"
+          export MAIN_SHA V2_SHA
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+
+          shadow_repo=Path('/tmp/v2-terminal-shadow')
+          sys.path.insert(0,str(shadow_repo))
+          from engine_v2.shadow_ledger import FUND_NAMES, sha256_json
+          from engine_v2.shadow_reporting import verify_audit_chain
+
+          td='2026-08-20'
+          bad_hash='ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7'
+          root=shadow_repo/'shadow_state/v2'
+          result=verify_audit_chain(root)
+          if result.get('status')!='PASS':
+              raise SystemExit(f'audit chain not PASS: {result}')
+
+          correction_path=root/'audit'/f'{td}~conditional-execution-restatement.json'
+          correction=json.loads(correction_path.read_text(encoding='utf-8'))
+          body=dict(correction); claimed=body.pop('event_hash',None)
+          if not claimed or sha256_json(body)!=claimed:
+              raise SystemExit('restatement audit hash invalid')
+          if result.get('head')!=claimed:
+              raise SystemExit(f'restatement is not terminal audit head: {result.get("head")} != {claimed}')
+          if correction.get('event_kind')!='conditional_execution_restatement' or correction.get('trade_date')!=td:
+              raise SystemExit('unexpected restatement terminal event')
+          if correction.get('corrects_event_hash')!=bad_hash:
+              raise SystemExit('restatement does not correct the known invalid catch-up')
+          safety=correction.get('safety') or {}
+          if not safety.get('removes_invalid_legacy_catchup_economics') or not safety.get('history_preserved_append_only'):
+              raise SystemExit('restatement safety assertions missing')
+
+          for fid in FUND_NAMES:
+              state=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if str(state.get('last_processed_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: last_processed_date mismatch')
+              if str(state.get('last_execution_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: last_execution_date mismatch')
+              if state.get('audit_head')!=claimed:
+                  raise SystemExit(f'{fid}: audit_head mismatch')
+              if float(state.get('cash') or 0.0)<-1e-6:
+                  raise SystemExit(f'{fid}: negative cash')
+              pending=state.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: next-session conditional plan missing')
+              if pending.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or pending.get('plan_version')!='v2-conditional-plan-v1':
+                  raise SystemExit(f'{fid}: pending plan model/version mismatch')
+              for fill in state.get('fills') or []:
+                  if str(fill.get('trade_date') or '')[:10]==td and fill.get('note')=='V2 目标仓位再平衡':
+                      raise SystemExit(f'{fid}: invalid legacy catch-up fill survived in canonical ledger')
+
+          main_path=Path(os.environ['GITHUB_WORKSPACE'])/'web/v2/data.json'
+          shadow_path=shadow_repo/'web/v2/data.json'
+          main_bytes=main_path.read_bytes(); shadow_bytes=shadow_path.read_bytes()
+          main_hash=hashlib.sha256(main_bytes).hexdigest()
+          shadow_hash=hashlib.sha256(shadow_bytes).hexdigest()
+          if main_hash!=shadow_hash:
+              raise SystemExit(f'main/v2-shadow web hash mismatch: {main_hash} != {shadow_hash}')
+          web=json.loads(main_bytes)
+          if str(web.get('updated_at') or '')[:10]!=td:
+              raise SystemExit('main web/v2 updated_at mismatch')
+          if web.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or web.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('main web/v2 model/version mismatch')
+          if not ((web.get('source_ref') or {}).get('restatement') or {}).get('history_preserved_append_only'):
+              raise SystemExit('main web/v2 does not expose restatement provenance')
+          funds=web.get('funds') or {}
+          for fid in FUND_NAMES:
+              pending=(funds.get(fid) or {}).get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!=td:
+                  raise SystemExit(f'main web/v2 {fid}: pending plan missing')
+
+          meta={
+              'expected_sha256':main_hash,
+              'correction_event_hash':claimed,
+              'audit_head':result['head'],
+              'audit_events':result['events'],
+              'v2_shadow_source_commit':os.environ['V2_SHA'],
+              'main_source_commit':os.environ['MAIN_SHA'],
+          }
+          Path('/tmp/v2-terminal-meta.json').write_text(json.dumps(meta,indent=2)+'\n',encoding='utf-8')
+          print('CANONICAL V2 TERMINAL STATE PASS',json.dumps(meta,ensure_ascii=False))
+          PY
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          x=json.load(open('/tmp/v2-terminal-meta.json',encoding='utf-8'))
+          for k,v in x.items(): print(f'{k}={v}')
+          PY
+
+      - name: Dispatch canonical Pages deployment
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          code=$(curl -sS -o /tmp/dispatch.txt -w '%{http_code}' \
+          echo "TERMINAL_STAGE=pages_dispatch" >> "$GITHUB_ENV"
+          code=$(curl -sS -o /tmp/v2-terminal-dispatch.txt -w '%{http_code}' \
             -X POST \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/v2-correct-20260820-catchup.yml/dispatches" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
             -d '{"ref":"main"}')
-          cat /tmp/dispatch.txt || true
+          cat /tmp/v2-terminal-dispatch.txt || true
           echo "dispatch_http_code=$code"
           test "$code" = "204"
 
-# merged-PR terminal recheck trigger 2026-08-21
+      - name: Verify public Pages byte-for-byte
+        id: public
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ steps.canonical.outputs.expected_sha256 }}
+        run: |
+          set -euo pipefail
+          echo "TERMINAL_STAGE=public_hash" >> "$GITHUB_ENV"
+          for i in $(seq 1 60); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?terminal=${GITHUB_RUN_ID}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-terminal.json; then
+              actual="$(sha256sum /tmp/live-v2-terminal.json | awk '{print $1}')"
+              echo "attempt=$i public_sha256=$actual expected=$EXPECTED_SHA256"
+              if [ "$actual" = "$EXPECTED_SHA256" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-terminal.json',encoding='utf-8'))
+          if str(live.get('updated_at') or '')[:10]!='2026-08-20':
+              raise SystemExit('public V2 date mismatch')
+          if live.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or live.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('public V2 model/version mismatch')
+          if not ((live.get('source_ref') or {}).get('restatement') or {}).get('history_preserved_append_only'):
+              raise SystemExit('public V2 restatement provenance missing')
+          for fid,fund in (live.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!='2026-08-20':
+                  raise SystemExit(f'public V2 {fid}: next-session plan missing')
+          print('PUBLIC V2 BYTE HASH + SEMANTICS PASS')
+          PY
+                echo "public_sha256=$actual" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo 'Public Pages did not converge to canonical V2 artifact.' >&2
+          exit 1
+
+      - name: Persist terminal PASS receipts
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ steps.canonical.outputs.expected_sha256 }}
+          PUBLIC_SHA256: ${{ steps.public.outputs.public_sha256 }}
+          CORRECTION_HASH: ${{ steps.canonical.outputs.correction_event_hash }}
+          AUDIT_HEAD: ${{ steps.canonical.outputs.audit_head }}
+          AUDIT_EVENTS: ${{ steps.canonical.outputs.audit_events }}
+          V2_SHADOW_SHA: ${{ steps.canonical.outputs.v2_shadow_source_commit }}
+          MAIN_SOURCE_SHA: ${{ steps.canonical.outputs.main_source_commit }}
+        run: |
+          set -euo pipefail
+          echo "TERMINAL_STAGE=receipt_write" >> "$GITHUB_ENV"
+          test "$EXPECTED_SHA256" = "$PUBLIC_SHA256"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          receipt={
+              'status':'verified',
+              'daily_complete':True,
+              'end_to_end_verified':True,
+              'trade_date':'2026-08-20',
+              'execution_model':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version':'v2-conditional-plan-v1',
+              'buy_reference':'predeclared_price_condition',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
+              'ledger_restatement':True,
+              'history_preserved_append_only':True,
+              'corrected_invalid_execution_catchup_hash':'ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7',
+              'correction_event_hash':os.environ['CORRECTION_HASH'],
+              'audit_head':os.environ['AUDIT_HEAD'],
+              'audit_events':int(os.environ['AUDIT_EVENTS']),
+              'expected_sha256':os.environ['EXPECTED_SHA256'],
+              'public_sha256':os.environ['PUBLIC_SHA256'],
+              'v2_shadow_source_commit':os.environ['V2_SHADOW_SHA'],
+              'main_source_commit':os.environ['MAIN_SOURCE_SHA'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-1510.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          open('/tmp/v2-restatement.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          status={'status':'verified','stage':'complete','workflow_run_id':receipt['workflow_run_id'],'verified_at_utc':receipt['verified_at_utc']}
+          open('/tmp/v2-terminal-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
+          PY
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-1510.json state/v2_1510_chain_verification.json
+            cp /tmp/v2-restatement.json state/v2_20260820_restatement_verification.json
+            cp /tmp/v2-terminal-status.json state/v2_terminal_recheck_status.json
+            git config user.name "v2-terminal-verifier"
+            git config user.email "v2-terminal-verifier@users.noreply.github.com"
+            git add state/v2_1510_chain_verification.json state/v2_20260820_restatement_verification.json state/v2_terminal_recheck_status.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: verify corrected V2 2026-08-20 terminal chain"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
+
+      - name: Persist terminal failure status
+        if: failure()
+        shell: bash
+        env:
+          FAILED_STAGE: ${{ env.TERMINAL_STAGE }}
+        run: |
+          set +e
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          x={
+              'status':'failed',
+              'stage':os.environ.get('FAILED_STAGE') or 'unknown',
+              'workflow_run_id':os.environ.get('GITHUB_RUN_ID'),
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'failed_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-terminal-failed.json','w',encoding='utf-8').write(json.dumps(x,ensure_ascii=False,indent=2)+'\n')
+          PY
+          for attempt in 1 2 3 4; do
+            git fetch origin main || continue
+            git reset --hard origin/main || continue
+            mkdir -p state
+            cp /tmp/v2-terminal-failed.json state/v2_terminal_recheck_status.json
+            git config user.name "v2-terminal-verifier"
+            git config user.email "v2-terminal-verifier@users.noreply.github.com"
+            git add state/v2_terminal_recheck_status.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: record failed V2 terminal recheck" || continue
+            git push origin HEAD:main && exit 0
+          done
+          exit 0
