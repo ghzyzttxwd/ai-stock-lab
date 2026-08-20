@@ -1,5 +1,5 @@
 name: Final V2 stale-checkpoint verification
-# trigger: 2026-08-20 11:18 Asia/Shanghai
+# trigger: 2026-08-20 11:22 Asia/Shanghai
 
 on:
   workflow_dispatch:
@@ -32,6 +32,35 @@ jobs:
           ref: main
           path: main
           fetch-depth: 0
+      - name: Record verification start
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          status={
+              'status':'started',
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'started_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-final-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
+          PY
+          cd main
+          git config user.name 'v2-final-ci-bot'
+          git config user.email 'v2-final-ci-bot@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-final-job-status.json state/v2_final_job_status.json
+            git add state/v2_final_job_status.json
+            if git diff --cached --quiet; then break; fi
+            git commit -m 'ops: V2 final verification started'
+            if git push origin HEAD:main; then break; fi
+          done
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -79,6 +108,8 @@ jobs:
           v2_sha="$(git -C v2 rev-parse HEAD)"
           export V2_SHA="$v2_sha"
           cd main
+          git fetch origin main
+          git reset --hard origin/main
           python - <<'PY'
           import json, os
           from datetime import datetime, timezone
@@ -106,3 +137,37 @@ jobs:
           git commit -m 'ops: persist final V2 stale-checkpoint verification'
           git pull --rebase origin main
           git push origin HEAD:main
+      - name: Persist final job status
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          status={
+              'status':os.environ['JOB_STATUS'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          open('/tmp/v2-final-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
+          PY
+          cd main
+          git config user.name 'v2-final-ci-bot'
+          git config user.email 'v2-final-ci-bot@users.noreply.github.com'
+          pushed=0
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-final-job-status.json state/v2_final_job_status.json
+            git add state/v2_final_job_status.json
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "ops: V2 final verification ${JOB_STATUS}"
+            if git push origin HEAD:main; then pushed=1; break; fi
+          done
+          test "$pushed" = "1"
