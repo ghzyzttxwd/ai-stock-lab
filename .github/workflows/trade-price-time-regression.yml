@@ -45,6 +45,8 @@ jobs:
           done
           grep -q 'first_trigger_minute' engine/trade_price_time.py
           grep -q 'annotate_conditional_buy_fills' engine/evening_split_run.py
+          grep -q "market_reference_time.*quote_clock" engine/morning_run.py
+          grep -q "market_reference_time_basis.*snapshot_capture_minute" engine/morning_run.py
       - name: Persist regression receipt
         run: |
           set -euo pipefail
@@ -52,12 +54,13 @@ jobs:
           import hashlib, json
           from datetime import datetime, timezone
           from pathlib import Path
-          files = ['web/d/app.js','web/e/app.js','web/v2/app.js','engine/trade_price_time.py','engine/evening_split_run.py']
+          files = ['web/d/app.js','web/e/app.js','web/v2/app.js','engine/trade_price_time.py','engine/evening_split_run.py','engine/morning_run.py']
           receipt = {
               'status': 'verified',
               'workflow_run_id': __import__('os').environ['GITHUB_RUN_ID'],
               'source_commit': __import__('os').environ['GITHUB_SHA'],
               'price_time_rule': 'market reference time only; never workflow completion time',
+              'conditional_sell_time_rule': 'quote snapshot capture minute, stored separately from job start and scheduled checkpoint',
               'conditional_buy_time_rule': 'first trigger minute from 1-minute market data; 09:30 for open-based trigger',
               'unknown_time_rule': 'explicitly unavailable; never guessed',
               'reference_vs_simulated_price_separated': True,
