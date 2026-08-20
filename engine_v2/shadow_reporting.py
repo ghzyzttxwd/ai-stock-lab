@@ -10,37 +10,87 @@ from .conditional_plan import EXECUTION_MODEL, PLAN_VERSION
 from .shadow_ledger import FUND_NAMES, ledger_content_hash, sha256_json
 
 
+def _ordered_audit_events(state_root: Path) -> list[tuple[Path, dict]]:
+    files = sorted((state_root / 'audit').glob('*.json'))
+    if not files:
+        raise RuntimeError('V2 audit chain is empty')
+
+    by_hash: dict[str, tuple[Path, dict]] = {}
+    parent_by_hash: dict[str, str | None] = {}
+    children: dict[str | None, list[str]] = defaultdict(list)
+
+    for path in files:
+        event = json.loads(path.read_text(encoding='utf-8'))
+        claimed = event.get('event_hash')
+        body = dict(event)
+        body.pop('event_hash', None)
+        actual = sha256_json(body)
+        if claimed != actual:
+            raise RuntimeError(f'V2 audit event hash mismatch: {path}')
+        if not claimed:
+            raise RuntimeError(f'V2 audit event missing hash: {path}')
+        if claimed in by_hash:
+            raise RuntimeError(f'V2 duplicate audit event hash: {claimed}')
+
+        parents = set((event.get('previous_event_hashes') or {}).values())
+        if len(parents) != 1:
+            raise RuntimeError(f'V2 audit event must have one shared parent: {path} parents={parents}')
+        parent = next(iter(parents))
+        by_hash[claimed] = (path, event)
+        parent_by_hash[claimed] = parent
+        children[parent].append(claimed)
+
+    roots = children.get(None, [])
+    if len(roots) != 1:
+        raise RuntimeError(f'V2 audit chain must have exactly one root: roots={roots}')
+
+    for claimed, parent in parent_by_hash.items():
+        if parent is not None and parent not in by_hash:
+            path = by_hash[claimed][0]
+            raise RuntimeError(f'V2 audit parent not found: {path} parent={parent}')
+
+    ordered: list[tuple[Path, dict]] = []
+    seen: set[str] = set()
+    current = roots[0]
+    while current is not None:
+        if current in seen:
+            raise RuntimeError(f'V2 audit cycle detected at {current}')
+        seen.add(current)
+        ordered.append(by_hash[current])
+        next_children = children.get(current, [])
+        if len(next_children) > 1:
+            raise RuntimeError(f'V2 audit chain branches at {current}: children={next_children}')
+        current = next_children[0] if next_children else None
+
+    if len(seen) != len(by_hash):
+        missing = sorted(set(by_hash) - seen)
+        raise RuntimeError(f'V2 audit chain is disconnected: unreachable={missing}')
+    return ordered
+
+
 def _audit_events(state_root: Path) -> list[tuple[Path, dict]]:
-    return [(path, json.loads(path.read_text(encoding='utf-8'))) for path in sorted((state_root/'audit').glob('*.json'))]
+    return _ordered_audit_events(state_root)
 
 
 def verify_audit_chain(state_root: Path) -> dict:
-    files=sorted((state_root/'audit').glob('*.json'))
-    if not files:
-        raise RuntimeError('V2 audit chain is empty')
-    previous=None
-    last_event=None
-    for path in files:
-        event=json.loads(path.read_text(encoding='utf-8'))
-        claimed=event.get('event_hash')
-        body=dict(event)
-        body.pop('event_hash',None)
-        actual=sha256_json(body)
-        if claimed != actual:
-            raise RuntimeError(f'V2 audit event hash mismatch: {path}')
-        parents=set((event.get('previous_event_hashes') or {}).values())
-        if parents != {previous}:
-            raise RuntimeError(f'V2 audit parent mismatch: {path} parents={parents} expected={previous}')
-        previous=claimed
-        last_event=event
+    events = _ordered_audit_events(state_root)
+    first_path, _ = events[0]
+    last_path, last_event = events[-1]
+    head = last_event.get('event_hash')
     for fund_id in FUND_NAMES:
-        state=json.loads((state_root/'ledgers'/f'{fund_id}.json').read_text(encoding='utf-8'))
-        if state.get('audit_head') != previous:
+        state = json.loads((state_root / 'ledgers' / f'{fund_id}.json').read_text(encoding='utf-8'))
+        if state.get('audit_head') != head:
             raise RuntimeError(f'V2 ledger head mismatch: {fund_id}')
-        expected=((last_event.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
+        expected = ((last_event.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
         if ledger_content_hash(state) != expected:
             raise RuntimeError(f'V2 ledger content hash mismatch: {fund_id}')
-    return {'status':'PASS','events':len(files),'head':previous,'first_date':files[0].stem,'last_date':files[-1].stem}
+    return {
+        'status': 'PASS',
+        'events': len(events),
+        'head': head,
+        'first_date': first_path.stem,
+        'last_date': last_path.stem,
+    }
 
 
 def _summary_source_ref(current_audit: dict) -> dict | None:
