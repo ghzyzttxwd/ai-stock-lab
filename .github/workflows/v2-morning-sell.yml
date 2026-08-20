@@ -8,8 +8,7 @@ on:
       - 'shadow_state/v2/.morning-trigger'
   schedule:
     - cron: '40 1 * * 1-5'  # 09:40 Beijing primary
-    - cron: '50 1 * * 1-5'  # 09:50 retry for 09:40 only
-    - cron: '0 2 * * 1-5'   # 10:00 final retry for 09:40 only
+    - cron: '50 1 * * 1-5'  # 09:50 retry for 09:40 only; runner rejects if >10m stale
     - cron: '30 2 * * 1-5'  # 10:30 checkpoint
     - cron: '20 3 * * 1-5'  # 11:20 checkpoint
     - cron: '30 5 * * 1-5'  # 13:30 checkpoint
@@ -22,7 +21,7 @@ permissions:
 
 concurrency:
   group: v2-morning-sell
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   morning-sell:
@@ -44,7 +43,7 @@ jobs:
           PY
           )
           case "${{ github.event.schedule }}" in
-            '40 1 * * 1-5'|'50 1 * * 1-5'|'0 2 * * 1-5') slot='09:40' ;;
+            '40 1 * * 1-5'|'50 1 * * 1-5') slot='09:40' ;;
             '30 2 * * 1-5') slot='10:30' ;;
             '20 3 * * 1-5') slot='11:20' ;;
             '30 5 * * 1-5') slot='13:30' ;;
@@ -119,7 +118,7 @@ jobs:
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 conditional-exit isolation invariant violated')
-          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session','outside_session_window'}:
+          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session','outside_session_window','stale_checkpoint_skipped'}:
               raise SystemExit(f'unexpected V2 conditional-exit status: {r.get("status")}')
           if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
               raise SystemExit('V2 intraday path is not conditional-plan model')
@@ -213,6 +212,7 @@ jobs:
               'status':'verified','trade_date':os.environ['TRADE_DATE'],
               'conditional_exit_status':report.get('status'),'event_hash':report.get('event_hash'),
               'scheduled_time':report.get('scheduled_time'),'executed_at':report.get('executed_at'),
+              'actual_clock':report.get('actual_clock'),'delay_minutes':report.get('delay_minutes'),
               'execution_model':report.get('execution_model'),'plan_version':report.get('plan_version'),
               'forced_clock_sell':False,'expected_sha256':os.environ['EXPECTED_SHA256'],'public_sha256':os.environ['PUBLIC_SHA256'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
