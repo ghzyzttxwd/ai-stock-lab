@@ -5,39 +5,53 @@ import json
 import os
 from pathlib import Path
 
-from .shadow_ledger import FUND_NAMES, ledger_content_hash
+from .shadow_ledger import FUND_NAMES, ledger_content_hash, sha256_json
 
 
-def _correction_for(state_root: Path, trade_date: str, daily_event_hash: str) -> dict | None:
-    # '~' sorts after '.json', so the correction remains the final event for that trade date
-    # while still sorting before the next calendar date.
-    path = state_root / 'audit' / f'{trade_date}~buy-price-correction.json'
-    if not path.exists():
-        return None
+_NON_TERMINAL_ACCOUNTING_KINDS = {
+    'execution_catchup',
+    'conditional_exit_scan',
+    'morning_sell',
+}
+
+
+def _valid_event(path: Path) -> dict | None:
     try:
-        correction = json.loads(path.read_text(encoding='utf-8'))
+        event = json.loads(path.read_text(encoding='utf-8'))
     except Exception:
         return None
-    if correction.get('event_kind') != 'buy_price_correction':
+    claimed = event.get('event_hash')
+    if not claimed:
         return None
-    if correction.get('corrects_event_hash') != daily_event_hash:
+    body = dict(event)
+    body.pop('event_hash', None)
+    if sha256_json(body) != claimed:
         return None
-    if not correction.get('event_hash'):
-        return None
-    return correction
+    return event
+
+
+def _event_for_hash(state_root: Path, event_hash: str) -> tuple[Path, dict] | None:
+    for path in (state_root / 'audit').glob('*.json'):
+        event = _valid_event(path)
+        if event and event.get('event_hash') == event_hash:
+            return path, event
+    return None
 
 
 def processed_session(state_root: Path, trade_date: str) -> dict | None:
+    """Return a completed session only when the persisted ledgers prove its terminal event.
+
+    Completion is derived from the aligned ledger head and that event's content hashes.  This
+    intentionally supports append-only correction/restatement events instead of hard-coding one
+    correction filename.  Execution-only/checkpoint events can never masquerade as a full day.
+    """
     audit_path = state_root / 'audit' / f'{trade_date}.json'
-    if not audit_path.exists():
-        return None
-    audit = json.loads(audit_path.read_text(encoding='utf-8'))
-    event_hash = audit.get('event_hash')
-    if not event_hash:
+    audit = _valid_event(audit_path) if audit_path.exists() else None
+    if not audit or str(audit.get('trade_date') or '')[:10] != trade_date:
         return None
 
-    correction = _correction_for(state_root, trade_date, event_hash)
-    expected_head = correction.get('event_hash') if correction else event_hash
+    states: dict[str, dict] = {}
+    heads = set()
     for fund_id in FUND_NAMES:
         path = state_root / 'ledgers' / f'{fund_id}.json'
         try:
@@ -46,21 +60,40 @@ def processed_session(state_root: Path, trade_date: str) -> dict | None:
             return None
         if str(state.get('last_processed_date') or '')[:10] != trade_date:
             return None
-        if state.get('audit_head') != expected_head:
+        head = state.get('audit_head')
+        if not head:
             return None
-        if correction:
-            expected_content = ((correction.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
-            if not expected_content or expected_content != ledger_content_hash(state):
-                return None
+        states[fund_id] = state
+        heads.add(head)
 
+    if len(heads) != 1:
+        return None
+    expected_head = next(iter(heads))
+    terminal_match = _event_for_hash(state_root, expected_head)
+    if not terminal_match:
+        return None
+    terminal_path, terminal = terminal_match
+    if str(terminal.get('trade_date') or '')[:10] != trade_date:
+        return None
+    if terminal.get('event_kind') in _NON_TERMINAL_ACCOUNTING_KINDS:
+        return None
+
+    for fund_id, state in states.items():
+        expected_content = ((terminal.get('funds') or {}).get(fund_id) or {}).get('closing_ledger_content_sha256')
+        if not expected_content or expected_content != ledger_content_hash(state):
+            return None
+
+    base_event_hash = audit.get('event_hash')
+    corrected = expected_head != base_event_hash
     return {
         'status': 'already_processed',
         'trade_date': trade_date,
         'event_hash': expected_head,
-        'base_event_hash': event_hash,
-        'correction_event_hash': correction.get('event_hash') if correction else None,
-        'audit_path': str(audit_path),
-        'safety': (correction or audit).get('safety') or {},
+        'base_event_hash': base_event_hash,
+        'correction_event_hash': expected_head if corrected else None,
+        'terminal_event_kind': terminal.get('event_kind'),
+        'audit_path': str(terminal_path if corrected else audit_path),
+        'safety': terminal.get('safety') or {},
     }
 
 
