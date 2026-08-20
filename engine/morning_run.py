@@ -299,6 +299,8 @@ def main() -> None:
     }
     critical = _critical_symbols(states)
     bars, source = _live_bars(market, critical)
+    quote_captured_at = datetime.now(ZoneInfo('Asia/Shanghai'))
+    quote_clock = quote_captured_at.strftime('%H:%M')
 
     for fid, state in states.items():
         if state.get('last_conditional_scan_key') == scan_key:
@@ -309,6 +311,9 @@ def main() -> None:
             fill['scheduled_time'] = slot
             fill['actual_execution_time'] = actual_execution_at
             fill['actual_clock'] = actual_clock
+            fill['market_reference_time'] = quote_clock
+            fill['market_reference_time_basis'] = 'snapshot_capture_minute'
+            fill['market_reference_source'] = source
         state.setdefault('fills', []).extend(fills)
         state['last_conditional_scan_key'] = scan_key
         state['last_conditional_scan_at'] = actual_execution_at
@@ -318,6 +323,7 @@ def main() -> None:
             'slot': slot,
             'scheduled_time': slot,
             'actual_clock': actual_clock,
+            'quote_clock': quote_clock,
             'delay_minutes': round(delay_minutes, 2),
             'at': state['last_conditional_scan_at'],
             'fills': len(fills),
@@ -327,12 +333,12 @@ def main() -> None:
             del log[:-30]
         _portfolio_snapshot(state,bars)
         save_state(STATE_ROOT / f'{fid}.json', state)
-        print(f'[conditional-scan] {fid} slot={slot} actual={actual_clock} fills={len(fills)} checks={len(checks)}')
+        print(f'[conditional-scan] {fid} slot={slot} actual={actual_clock} quote={quote_clock} fills={len(fills)} checks={len(checks)}')
 
     _refresh_public_snapshots(states, bars, source, trade_date, actual_clock, slot)
     print(
         f'[conditional-scan] completed {trade_date} slot={slot} actual={now.strftime("%H:%M:%S")} '
-        f'delay={delay_minutes:.1f}m source={source} holdings={len(critical)} bars={len(bars)}'
+        f'quote={quote_clock} delay={delay_minutes:.1f}m source={source} holdings={len(critical)} bars={len(bars)}'
     )
 
 
