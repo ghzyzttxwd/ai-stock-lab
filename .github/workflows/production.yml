@@ -111,6 +111,13 @@ jobs:
                       raise SystemExit(f'{fid}: legacy fixed-price target survived')
           print('conditional-plan invariant OK')
           PY
+      - name: Assert V1 settlement freshness before persistence
+        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_date="$(TZ=Asia/Shanghai date +%F)"
+          python -m engine.v1_freshness --date "$expected_date"
       - name: Persist portfolio ledger and public snapshots
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         run: |
@@ -122,18 +129,36 @@ jobs:
           git pull --rebase origin main
           git push
       - name: Refresh latest committed web before deploy
+        id: deployed_source
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
+        shell: bash
         run: |
+          set -euo pipefail
           git fetch origin main
           git reset --hard origin/main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Assert persisted V1 settlement freshness before deploy
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_date="$(TZ=Asia/Shanghai date +%F)"
+          python -m engine.v1_freshness --date "$expected_date"
       - uses: actions/configure-pages@v5
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         with:
           path: web
       - id: deployment
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         uses: actions/deploy-pages@v4
       - name: Verify public D and E data match this deployment
         id: verify_public
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         shell: bash
+        env:
+          DEPLOYED_SOURCE_SHA: ${{ steps.deployed_source.outputs.sha }}
         run: |
           set -euo pipefail
           d_expected="$(sha256sum web/d/data.json | awk '{print $1}')"
@@ -151,15 +176,24 @@ jobs:
                 python - <<'PY'
           import json, os
           from datetime import datetime, timezone
+          from zoneinfo import ZoneInfo
+
+          expected_date=datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
           for path in ('/tmp/live-d.json','/tmp/live-e.json'):
               x=json.load(open(path,encoding='utf-8'))
               if x.get('execution_model') != 'CONDITIONAL_PLAN_V1':
                   raise SystemExit(f'public {path} is not conditional-plan model')
+              actual_date=str(x.get('updated_at') or '')[:10]
+              if actual_date != expected_date:
+                  raise SystemExit(
+                      f'public {path} is stale: updated_at={actual_date or "missing"}, expected={expected_date}'
+                  )
           receipt={
               'status':'verified',
+              'settlement_date':expected_date,
               'execution_model':'CONDITIONAL_PLAN_V1',
               'plan_version':'conditional-plan-v1',
-              'source_commit':os.environ['GITHUB_SHA'],
+              'source_commit':os.environ['DEPLOYED_SOURCE_SHA'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],
               'd_expected_sha256':os.environ['D_EXPECTED'],
               'd_public_sha256':os.environ['D_ACTUAL'],
@@ -170,7 +204,7 @@ jobs:
               'public_e_url':'https://ghzyzttxwd.github.io/ai-stock-lab/e/data.json',
           }
           open('/tmp/conditional-pages-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
-          print('PUBLIC CONDITIONAL PLAN VERIFIED')
+          print(f'PUBLIC CONDITIONAL PLAN VERIFIED settlement_date={expected_date}')
           PY
                 echo "d_sha256=$d_actual" >> "$GITHUB_OUTPUT"
                 echo "e_sha256=$e_actual" >> "$GITHUB_OUTPUT"
@@ -179,9 +213,10 @@ jobs:
             fi
             sleep 5
           done
-          echo "Public D/E data did not converge to committed deployment"
+          echo "Public D/E data did not converge to committed fresh deployment"
           exit 1
       - name: Persist conditional-plan public verification receipt
+        if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
