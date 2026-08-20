@@ -5,15 +5,15 @@ from zoneinfo import ZoneInfo
 
 from .broker import execute_conditional_buys
 from .daily_run import FUNDS, STATE_ROOT, _pending_decision_date, export_web, run_real
+from .exchange_calendar import exchange_calendar_previous_session
 from .state import load_state, save_state
 from .trade_price_time import annotate_conditional_buy_fills
 from .trading_plan import EXECUTION_MODEL, PLAN_VERSION, pending_is_conditional
 
 
-def _previous_session(market, trade_date: str) -> str | None:
-    frame = market.ak.stock_zh_index_daily_tx(symbol='sh000001')
-    dates = sorted({str(x)[:10] for x in frame['date'].tolist() if str(x)[:10] < trade_date})
-    return dates[-1] if dates else None
+def _previous_session(market, trade_date: str) -> str:
+    """Resolve yesterday's actual exchange session without quote/history inference."""
+    return exchange_calendar_previous_session(trade_date, market.ak)
 
 
 def _critical_symbols(states: dict[str, dict]) -> dict[str, str]:
@@ -64,7 +64,7 @@ def settle_previous_conditional_entries(requested_date: str) -> str:
         if not pending:
             continue
         decision_date = _pending_decision_date(state)
-        if not previous or decision_date != previous:
+        if decision_date != previous:
             continue
 
         if pending_is_conditional(pending):
