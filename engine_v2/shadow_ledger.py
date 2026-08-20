@@ -143,7 +143,7 @@ def immutable_write(path: Path, payload: dict) -> bool:
         raise RuntimeError(f'refusing to rewrite immutable V2 audit event: {path}')
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(text, encoding='utf-8')
+    tmp.write_text(text, encoding='utf-8') + '\n'
     tmp.replace(path)
     return True
 
@@ -405,15 +405,29 @@ def compact_target(target: dict) -> dict:
     keys = (
         'symbol', 'raw_code', 'name', 'industry', 'industry_code', 'target_weight',
         'v2_score', 'thesis', 'invalidation', 'fundamental_ready', 'limit_status',
+        'opportunity_score', 'setup',
     )
     item = {key: target.get(key) for key in keys if key in target}
     item['symbol'] = normalize_symbol(target.get('symbol') or target.get('code') or target.get('raw_code'))
     item['target_weight'] = round(float(target.get('target_weight') or 0.0), 6)
+    if 'trade_plan' in target:
+        item['trade_plan'] = copy.deepcopy(target.get('trade_plan'))
     return item
 
 
 def build_pending_decision(fund_id: str, targets_payload: dict, source_ref: dict) -> dict:
     targets = [compact_target(x) for x in (targets_payload.get('targets') or {}).get(fund_id, [])]
+    plan_version = str(targets_payload.get('plan_version') or '')
+    if plan_version:
+        missing = [
+            str(target.get('symbol') or '?')
+            for target in targets
+            if ((target.get('trade_plan') or {}).get('plan_version') != plan_version)
+        ]
+        if missing:
+            raise RuntimeError(
+                f'V2 pending decision would drop or mismatch conditional trade plans for {fund_id}: {missing}'
+            )
     return {
         'decision_date': targets_payload.get('trade_date'),
         'execute_on': 'next_trading_session_open',
