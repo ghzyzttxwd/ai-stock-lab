@@ -15,12 +15,13 @@
     ]
   },
   "source_ref": {
-    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
-    "execution_model": "V2_CONDITIONAL_PLAN_V1",
-    "plan_version": "v2-conditional-plan-v1",
-    "economics_mutated": false,
-    "historical_fills_rewritten": false,
-    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
+    "invalidated_audit_path": "shadow_state/v2/audit/2026-08-20-execution-0940.json",
+    "invalidated_event_hash": "82e966bcb74a2afbb4d149a6feae73a6a7d40803cbf9609243adfcd9ffa123b1",
+    "scheduled_time": "09:40",
+    "actual_clock": "10:42",
+    "delay_minutes": 62,
+    "freshness_limit_minutes": 10,
+    "reason": "09:40 checkpoint was evaluated 62 minutes late; restored economics must remain authoritative."
   },
   "target_diagnostics": {
     "stats": {
@@ -970,7 +971,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+      "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
       "concentration_flags": []
     },
     "B": {
@@ -1647,7 +1648,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+      "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
       "concentration_flags": []
     },
     "C": {
@@ -2217,7 +2218,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+      "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
       "concentration_flags": []
     },
     "D": {
@@ -2960,7 +2961,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+      "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
       "concentration_flags": []
     },
     "L": {
@@ -3727,17 +3728,17 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+      "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
       "concentration_flags": []
     }
   },
-  "audit_head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+  "audit_head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
   "audit_verification": {
     "status": "PASS",
-    "events": 9,
-    "head": "91b89b83d1054fadee3c8f638b8cf7c50b42fd3db7644d525e350fc430f4f458",
+    "events": 11,
+    "head": "d19b13a8121a4b3f2a56dc42a15a8fc07097ac5d8459f9597dda97263ad616c9",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-19~conditional-plan-migration"
+    "last_date": "2026-08-20~late-checkpoint-correction"
   },
   "safety": {
     "calls_sol": false,
@@ -3745,7 +3746,7 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_plan_migration",
+  "audit_event_kind": "late_checkpoint_correction",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
