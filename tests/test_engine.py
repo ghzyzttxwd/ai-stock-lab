@@ -143,23 +143,21 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(_decision_diary(state,'2026-08-14'),'今天真实决策日记')
         self.assertEqual(_decision_diary(state,'2026-08-15'),'当日已处理')
 
-    def test_trading_date_falls_back_to_tencent_index(self):
+    def test_trading_date_uses_exchange_calendar_not_tencent_index(self):
         class FakeAk:
+            def tool_trade_date_hist_sina(self):
+                return pd.DataFrame({
+                    'trade_date':['2026-08-13','2026-08-14','2026-08-17']
+                })
             def stock_zh_a_hist_tx(self, **_kwargs):
-                raise RuntimeError('stock calendar unavailable')
+                raise AssertionError('quote-derived trading date must not be consulted')
             def stock_zh_index_daily_tx(self, symbol):
-                self.symbol=symbol
-                return pd.DataFrame([
-                    {'date':'2026-08-13','close':100.0},
-                    {'date':'2026-08-14','close':101.0},
-                    {'date':'2026-08-17','close':102.0},
-                ])
+                raise AssertionError(f'index-derived trading date must not be consulted: {symbol}')
         market=AKShareMarket.__new__(AKShareMarket)
         market.ak=FakeAk()
-        with patch('engine.real_market.time.sleep',return_value=None):
-            td=market.latest_trade_date('2026-08-16')
+        td=market.latest_trade_date('2026-08-16')
         self.assertEqual(td,'2026-08-14')
-        self.assertEqual(market.ak.symbol,'sh000001')
+        self.assertEqual(market._resolved_trade_date,'2026-08-14')
 
     def test_tencent_amount_normalization_handles_yuan_or_hands(self):
         self.assertEqual(_tx_amount_mode(500_000_000,10.0,520_000_000),'yuan')
