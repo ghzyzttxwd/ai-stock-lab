@@ -2,6 +2,7 @@ import unittest
 
 import pandas as pd
 
+from engine.current_bar_history import _append_current_qfq
 from engine.real_market import AKShareMarket
 
 
@@ -53,13 +54,6 @@ class _FakeAk:
         raise AssertionError(f'unexpected adjust={adjust!r}')
 
 
-class _NoRawFakeAk(_FakeAk):
-    def stock_zh_a_hist_tx(self, *, adjust, **kwargs):
-        if adjust == '':
-            raise AssertionError('unadjusted history should not be fetched when snapshot OHLC is complete')
-        return super().stock_zh_a_hist_tx(adjust=adjust, **kwargs)
-
-
 class CurrentBarHistoryBridgeTests(unittest.TestCase):
     def _market(self, ak):
         market = AKShareMarket.__new__(AKShareMarket)
@@ -67,18 +61,21 @@ class CurrentBarHistoryBridgeTests(unittest.TestCase):
         market.history_limit = 120
         return market
 
-    def test_stale_qfq_is_bridged_from_complete_current_snapshot_row(self):
-        market = self._market(_NoRawFakeAk())
+    def test_complete_spot_snapshot_cannot_bypass_exact_date_daily_bar(self):
+        ak = _FakeAk()
+        market = self._market(ak)
         selected = [{
             'code': 'sh.600000',
             'name': '浦发银行',
             'source': 'sina',
-            'open': 10.1,
-            'high': 10.6,
-            'low': 10.0,
-            'close': 10.5,
-            'preclose': 10.0,
-            'amount': 1_300_000,
+            # Deliberately bogus but structurally complete spot OHLC. If the bridge ever
+            # trusts undated spot rows again, this test will expose the regression.
+            'open': 99.1,
+            'high': 99.6,
+            'low': 99.0,
+            'close': 99.5,
+            'preclose': 99.0,
+            'amount': 9_900_000,
             'turn': 0.8,
             'tradestatus': '1',
         }]
@@ -86,12 +83,15 @@ class CurrentBarHistoryBridgeTests(unittest.TestCase):
         histories = market.histories(selected, '2026-08-20')
         row = histories['sh.600000'][-1]
 
+        self.assertGreaterEqual(ak.unadjusted_calls, 1)
         self.assertEqual(row['date'], '2026-08-20')
+        self.assertAlmostEqual(row['open'], 10.1)
         self.assertAlmostEqual(row['close'], 10.5)
-        self.assertEqual(row['history_bridge_source'], 'sina')
-        self.assertEqual(row['history_bridge_scale'], 1.0)
+        self.assertEqual(row['history_bridge_source'], 'tencent-execution')
+        self.assertEqual(row['history_bridge_bar_date'], '2026-08-20')
+        self.assertEqual(row['history_bridge_date_evidence'], 'execution_bars_exact_date_match')
 
-    def test_stale_qfq_uses_verified_unadjusted_current_bar_when_snapshot_has_no_ohlc(self):
+    def test_stale_qfq_uses_verified_unadjusted_current_bar(self):
         ak = _FakeAk()
         market = self._market(ak)
         selected = [{
@@ -115,6 +115,31 @@ class CurrentBarHistoryBridgeTests(unittest.TestCase):
         self.assertAlmostEqual(row['open'], 10.1)
         self.assertAlmostEqual(row['close'], 10.5)
         self.assertEqual(row['history_bridge_source'], 'tencent-execution')
+        self.assertEqual(row['history_bridge_bar_date'], '2026-08-20')
+
+    def test_undated_bar_is_rejected(self):
+        rows = [{
+            'date': '2026-08-19',
+            'code': 'sh.600000',
+            'name': '浦发银行',
+            'open': 9.9,
+            'high': 10.2,
+            'low': 9.8,
+            'close': 10.0,
+            'amount': 1_100_000,
+        }]
+        undated = {
+            'code': 'sh.600000',
+            'name': '浦发银行',
+            'source': 'sina',
+            'open': 10.1,
+            'high': 10.6,
+            'low': 10.0,
+            'close': 10.5,
+            'preclose': 10.0,
+            'amount': 1_300_000,
+        }
+        self.assertIsNone(_append_current_qfq(rows, undated, '2026-08-20', 120))
 
     def test_basis_mismatch_is_rejected_and_coverage_fails_closed(self):
         ak = _FakeAk(raw_preclose=20.0)
@@ -132,7 +157,7 @@ class CurrentBarHistoryBridgeTests(unittest.TestCase):
             'tradestatus': '1',
         }]
 
-        with self.assertRaisesRegex(RuntimeError, 'coverage too low after qfq bridge'):
+        with self.assertRaisesRegex(RuntimeError, 'coverage too low after dated qfq bridge'):
             market.histories(selected, '2026-08-20')
 
 
