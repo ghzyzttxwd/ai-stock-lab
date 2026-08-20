@@ -33,7 +33,9 @@ def _minute_frame(ak, symbol: str, trade_date: str):
     except Exception as exc:
         errors.append(f'hist_min={type(exc).__name__}: {exc}')
     try:
-        frame = ak.stock_zh_a_hist_pre_min_em(symbol=code, start_time=start, end_time=end)
+        frame = ak.stock_zh_a_hist_pre_min_em(
+            symbol=code, start_time='09:30:00', end_time='15:00:00',
+        )
         if frame is not None and not frame.empty:
             return frame, 'eastmoney-pre-1m'
     except Exception as exc:
