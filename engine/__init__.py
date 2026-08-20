@@ -19,9 +19,15 @@ _install_v1_exchange_calendar_market()
 
 # Tencent qfq daily bars can publish the completed session later than unadjusted/current
 # market data. Keep historical features on the qfq basis, but bridge only a verified
-# completed-session OHLC bar. Basis mismatches fail closed instead of fabricating a bar.
+# exact-date completed-session daily bar. Basis mismatches fail closed.
 from .current_bar_history import install as _install_v1_current_bar_history
 _install_v1_current_bar_history()
+
+# Full-market spot rows are intentionally not trusted for accounting-critical OHLC because
+# the normalized rows do not carry an explicit session date. Always overlay holdings and
+# pending-order symbols with exact-date daily bars after a session has been resolved.
+from .exact_critical_snapshot import install as _install_v1_exact_critical_snapshot
+_install_v1_exact_critical_snapshot()
 
 # Production safety belt: scheduled intraday checkpoints are only valid near their
 # declared time. GitHub Actions can start scheduled jobs late; never convert a
