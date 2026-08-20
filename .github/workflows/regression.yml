@@ -1,0 +1,44 @@
+name: Full code regression
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'engine/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'engine/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Run complete unit regression
+        run: python -m unittest discover -s tests -v
+      - name: Smoke-check persisted V1 production invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_date="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          state=json.loads(Path('state/D_MAIN.json').read_text(encoding='utf-8'))
+          print(str(state.get('last_processed_date') or '')[:10])
+          PY
+          )"
+          test -n "$expected_date"
+          python -m engine.v1_production_gate --date "$expected_date"
