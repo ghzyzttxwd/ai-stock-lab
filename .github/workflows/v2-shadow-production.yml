@@ -1,227 +1,83 @@
-name: V2 shadow daily production
+name: V2 shadow daily production fallback
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/v2-shadow-production.yml'
   schedule:
-    - cron: '40 9 * * 1-5'   # 17:40 Beijing
+    - cron: '40 9 * * 1-5'   # 17:40 Beijing fallback
     - cron: '40 10 * * 1-5'  # 18:40 Beijing retry
     - cron: '40 11 * * 1-5'  # 19:40 Beijing final retry
 
 permissions:
-  contents: write
+  contents: read
   actions: write
 
-# Catch-up is persisted before slow providers, so a newer production run may safely replace stale snapshot work.
+# This workflow is deliberately not an accounting implementation.  There is exactly one
+# production settlement path: v2-evening-split.yml.  Late retries only dispatch and wait for it.
 concurrency:
-  group: v2-shadow-production
-  cancel-in-progress: true
+  group: v2-shadow-production-fallback
+  cancel-in-progress: false
 
 jobs:
-  shadow-ledgers:
+  dispatch-canonical-settlement:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
-      - name: Checkout isolated V2 branch
-        uses: actions/checkout@v4
-        with:
-          ref: v2-shadow
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install pinned dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run V2 tests before accounting
-        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-
-      - name: Resolve latest completed A-share session
-        id: td
-        shell: bash
-        run: |
-          TD=$(python - <<'PY'
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
-          from engine_v2.data_validation import _safe_requested_date
-          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
-          PY
-          )
-          echo "date=$TD" >> "$GITHUB_OUTPUT"
-          echo "trade_date=$TD"
-
-      - name: Skip provider calls when full session is already audited
-        id: guard
-        run: |
-          python -m engine_v2.shadow_guard \
-            --state-root shadow_state/v2 \
-            --trade-date "${{ steps.td.outputs.date }}" \
-            --report /tmp/v2-shadow-run.json
-
-      - name: Assert isolated branch checkout
-        shell: bash
-        run: test "$(git branch --show-current)" = "v2-shadow"
-
-      - name: Execute previous-session pending targets first
-        if: steps.guard.outputs.done != 'true'
-        run: |
-          python -m engine_v2.execution_catchup \
-            --date "${{ steps.td.outputs.date }}" \
-            --state-root shadow_state/v2 \
-            --report /tmp/v2-shadow-run.json
-
-      - name: Publish caught-up execution state immediately
-        if: steps.guard.outputs.done != 'true'
-        shell: bash
-        run: |
-          python -m engine_v2.shadow_reporting \
-            --state-root shadow_state/v2 \
-            --output shadow_state/v2/summary.json \
-            --web-output web/v2/data.json
-          git config user.name "v2-shadow-bot"
-          git config user.email "v2-shadow-bot@users.noreply.github.com"
-          git add shadow_state/v2 web/v2/data.json
-          git diff --cached --quiet || git commit -m "v2-data: catch up prior-session executions"
-          git pull --rebase origin v2-shadow
-          git push origin HEAD:v2-shadow
-
-      - name: Restore bounded Tencent history cache
-        if: steps.guard.outputs.done != 'true'
-        uses: actions/cache@v4
-        with:
-          path: .cache/v2-history
-          key: v2-history-${{ runner.os }}-${{ steps.td.outputs.date }}-${{ hashFiles('requirements.txt', 'engine_v2/history_cache.py') }}
-          restore-keys: |
-            v2-history-${{ runner.os }}-
-
-      - name: Build resilient market snapshot for new decisions
-        id: snapshot
-        if: steps.guard.outputs.done != 'true'
-        continue-on-error: true
-        run: python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v2-normalized-snapshot.json
-
-      - name: Enrich candidates with cached histories
-        if: steps.guard.outputs.done != 'true' && steps.snapshot.outcome == 'success'
-        env:
-          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
-          V2_HISTORY_WORKERS: '3'
-        run: python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
-
-      - name: Complete close valuation and build next-session targets
-        if: steps.guard.outputs.done != 'true' && steps.snapshot.outcome == 'success'
-        run: |
-          python -m engine_v2.shadow_run \
-            --snapshot /tmp/v2-normalized-snapshot.json \
-            --enriched /tmp/v2-enriched-candidates.json \
-            --state-root shadow_state/v2 \
-            --report /tmp/v2-shadow-run.json
-
-      - name: Rebuild public V2 summary
-        run: |
-          python -m engine_v2.shadow_reporting \
-            --state-root shadow_state/v2 \
-            --output shadow_state/v2/summary.json \
-            --web-output web/v2/data.json
-
-      - name: Assert V2 isolation and schema
-        shell: bash
-        run: |
-          git diff --quiet -- state web/d web/e
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          report=json.load(open('/tmp/v2-shadow-run.json',encoding='utf-8'))
-          safety=report.get('safety') or {}
-          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 isolation invariant violated')
-          web=json.load(open('web/v2/data.json',encoding='utf-8'))
-          if web.get('summary_version') != 'v2-shadow-summary-1.1' or set(web.get('funds') or {}) != {'A','B','C','D','L'}:
-              raise SystemExit('V2 web snapshot schema mismatch')
-          web_safety=web.get('safety') or {}
-          if web_safety.get('calls_sol') or web_safety.get('reads_v1_ledger') or web_safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 web isolation invariant violated')
-          status=report.get('status')
-          if status == 'processed':
-              for fund_id in ('A','B','C','D','L'):
-                  state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
-                  if state.get('initial_cash') != 1_000_000 or state.get('last_processed_date') != report.get('trade_date'):
-                      raise SystemExit(f'{fund_id} daily state mismatch')
-                  pending=state.get('pending_decision') or {}
-                  if pending.get('decision_date') != report.get('trade_date') or not pending.get('targets'):
-                      raise SystemExit(f'{fund_id} next-session decision missing')
-          elif status in ('execution_caught_up','already_execution_caught_up'):
-              if safety.get('generates_new_targets'):
-                  raise SystemExit('execution catch-up unexpectedly generated targets')
-              for fund_id in ('A','B','C','D','L'):
-                  state=json.load(open(f'shadow_state/v2/ledgers/{fund_id}.json',encoding='utf-8'))
-                  if state.get('initial_cash') != 1_000_000 or state.get('last_execution_date') != report.get('trade_date'):
-                      raise SystemExit(f'{fund_id} execution catch-up state mismatch')
-          if report.get('audit_path') and not Path(report['audit_path']).exists():
-              raise SystemExit('V2 audit event missing')
-          print('[V2]', status, report.get('trade_date'), report.get('event_hash'))
-          PY
-          changed=$(git status --short | awk '{print $2}' | grep -Ev '^(shadow_state/v2/|web/v2/data.json$)' || true)
-          if [ -n "$changed" ]; then
-            echo "Unexpected paths changed by V2 run:"
-            echo "$changed"
-            exit 1
-          fi
-
-      - name: Persist any new decision state
-        if: success()
-        shell: bash
-        run: |
-          git config user.name "v2-shadow-bot"
-          git config user.email "v2-shadow-bot@users.noreply.github.com"
-          git add shadow_state/v2 web/v2/data.json
-          git diff --cached --quiet || git commit -m "v2-data: complete daily shadow run"
-          git pull --rebase origin v2-shadow
-          git push origin HEAD:v2-shadow
-
-      - name: Sync V2 snapshot to Pages and require terminal verification
-        if: success()
+      - name: Dispatch canonical V2 conditional settlement
+        id: dispatch
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          v2_sha="$(git rev-parse HEAD)"
-          echo "dispatching verified Pages sync for v2_sha=$v2_sha"
-          gh workflow run 336283049 --ref v2-shadow
+          before="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow v2-evening-split.yml \
+            --branch main \
+            --event workflow_dispatch \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')"
+
+          gh workflow run v2-evening-split.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
 
           run_id=""
           for i in $(seq 1 30); do
-            run_id="$(gh run list --workflow 336283049 --branch v2-shadow --event workflow_dispatch --limit 20 --json databaseId,headSha,status --jq ".[] | select(.headSha == \"$v2_sha\") | .databaseId" | head -n 1)"
-            if [ -n "$run_id" ]; then
+            candidate="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow v2-evening-split.yml \
+              --branch main \
+              --event workflow_dispatch \
+              --limit 5 \
+              --json databaseId \
+              --jq '.[0].databaseId // empty')"
+            if [ -n "$candidate" ] && [ "$candidate" != "$before" ]; then
+              run_id="$candidate"
               break
             fi
             sleep 2
           done
+
           if [ -z "$run_id" ]; then
-            echo "Could not locate verified Pages sync run for v2_sha=$v2_sha"
+            echo 'Canonical V2 settlement was dispatched but its workflow run could not be located.'
             exit 1
           fi
-          echo "v2_pages_sync_run_id=$run_id"
-          gh run watch "$run_id" --exit-status
-          echo "V2 Pages sync and public verification completed successfully."
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "canonical_v2_run_id=$run_id"
 
-      - name: Upload reproducibility artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: v2-shadow-daily-${{ steps.td.outputs.date }}
-          path: |
-            /tmp/v2-normalized-snapshot.json
-            /tmp/v2-enriched-candidates.json
-            /tmp/v2-shadow-run.json
-            shadow_state/v2/audit/${{ steps.td.outputs.date }}.json
-            shadow_state/v2/audit/${{ steps.td.outputs.date }}-execution.json
-          if-no-files-found: warn
-          retention-days: 30
+      - name: Require canonical settlement terminal success
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh run watch "$RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status
+          echo "Canonical V2 settlement completed successfully: $RUN_ID"
+
+      - name: Assert fallback contains no accounting implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Fallback is dispatcher-only; all accounting and terminal verification live in v2-evening-split.yml.'
