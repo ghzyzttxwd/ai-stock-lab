@@ -40,11 +40,12 @@ jobs:
       - name: Run all V2 regression tests
         working-directory: v2
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Assert six live checkpoints are wired on main
+      - name: Assert live checkpoints and stale-run safety are wired on main
         run: |
           python - <<'PY'
           from pathlib import Path
           text=Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
+          runner=Path('v2/engine_v2/morning_sell_run.py').read_text(encoding='utf-8')
           expected=(
               "'40 1 * * 1-5'", "'30 2 * * 1-5'", "'20 3 * * 1-5'",
               "'30 5 * * 1-5'", "'30 6 * * 1-5'", "'55 6 * * 1-5'",
@@ -52,13 +53,21 @@ jobs:
           missing=[x for x in expected if x not in text]
           if missing:
               raise SystemExit(f'missing V2 checkpoints: {missing}')
+          if "'0 2 * * 1-5'" in text:
+              raise SystemExit('obsolete 10:00 retry still wired')
+          if 'cancel-in-progress: false' not in text:
+              raise SystemExit('V2 retries may still cancel an in-flight checkpoint')
           if '--scheduled-time' not in text:
               raise SystemExit('V2 workflow does not pass logical checkpoint to runner')
-          print('V2 CHECKPOINT WIRING PASS')
+          if 'stale_checkpoint_skipped' not in text or 'stale_checkpoint_skipped' not in runner:
+              raise SystemExit('stale checkpoint status is not wired end to end')
+          if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in runner:
+              raise SystemExit('10-minute freshness limit missing from V2 runner')
+          if "'reads_market_quotes': False" not in runner or "'mutates_v2_ledger': False" not in runner:
+              raise SystemExit('stale V2 run is not proven fail-closed before quotes/state mutation')
+          print('V2 CHECKPOINT + STALE SAFETY WIRING PASS')
           PY
       - name: Persist verification receipt to main
-        env:
-          V2_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           cd main
@@ -74,6 +83,11 @@ jobs:
               'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
               'tests':"python -m unittest discover -s tests -p 'test_v2*.py' -v",
               'checkpoints':['09:40','10:30','11:20','13:30','14:30','14:55'],
+              'max_checkpoint_lateness_minutes':10,
+              'obsolete_1000_retry_removed':True,
+              'cancel_in_progress':False,
+              'stale_run_reads_market_quotes':False,
+              'stale_run_mutates_v2_ledger':False,
               'trailing_uses_intraday_high':True,
               'max_hold_1455_reachable':True,
               'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
