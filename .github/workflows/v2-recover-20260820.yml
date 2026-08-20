@@ -1,0 +1,311 @@
+name: Recover V2 2026-08-20 terminal chain
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v2-recover-20260820.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: v2-snapshot-smoke
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout V2 shadow branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: Assert exact recovery preconditions
+        id: pre
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          td='2026-08-20'
+          root=Path('shadow_state/v2')
+          daily=root/'audit'/f'{td}.json'
+          execution=root/'audit'/f'{td}-execution.json'
+          if daily.exists():
+              event=json.loads(daily.read_text(encoding='utf-8'))
+              if event.get('trade_date') != td or event.get('event_kind') != 'conditional_entries_and_decision':
+                  raise SystemExit('existing V2 daily audit is not the expected completed conditional session')
+              mode='already_complete'
+          else:
+              if not execution.exists():
+                  raise SystemExit('missing 2026-08-20 execution catch-up audit; refusing to invent history')
+              event=json.loads(execution.read_text(encoding='utf-8'))
+              if event.get('trade_date') != td or event.get('event_kind') != 'execution_catchup':
+                  raise SystemExit('unexpected V2 execution catch-up audit')
+              for fid in ('A','B','C','D','L'):
+                  s=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+                  if str(s.get('last_execution_date') or '')[:10] != td:
+                      raise SystemExit(f'{fid}: last_execution_date is not {td}')
+                  if str(s.get('last_processed_date') or '')[:10] == td:
+                      raise SystemExit(f'{fid}: partial processed state without daily audit')
+                  if s.get('pending_decision') is not None:
+                      raise SystemExit(f'{fid}: execution catch-up should have cleared prior pending decision')
+              mode='resume_after_execution_catchup'
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f'mode={mode}\n')
+          print('V2 recovery precondition mode=',mode)
+          PY
+
+      - name: Build exact 2026-08-20 decision snapshot
+        if: steps.pre.outputs.mode == 'resume_after_execution_catchup'
+        run: |
+          python -m engine_v2.resilient_snapshot \
+            --date 2026-08-20 \
+            --output /tmp/v2-recovery-snapshot.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/v2-recovery-snapshot.json',encoding='utf-8'))
+          if str(x.get('trade_date') or '')[:10] != '2026-08-20':
+              raise SystemExit('recovery snapshot date mismatch')
+          s=x.get('safety') or {}
+          if s.get('stock_universe_grade') != 'full' or not s.get('eligible_for_shadow_decision'):
+              raise SystemExit('recovery snapshot is not decision-grade full-market data')
+          detail=((x.get('market') or {}).get('sentiment_detail') or {})
+          if str(detail.get('trade_date') or '')[:10] != '2026-08-20':
+              raise SystemExit('recovery sentiment detail is not exact-session 2026-08-20')
+          print('V2 exact-session recovery snapshot verified')
+          PY
+
+      - name: Enrich exact recovery snapshot
+        if: steps.pre.outputs.mode == 'resume_after_execution_catchup'
+        env:
+          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history
+          V2_HISTORY_WORKERS: '3'
+        run: |
+          python -m engine_v2.enrichment_resilient \
+            --snapshot /tmp/v2-recovery-snapshot.json \
+            --output /tmp/v2-recovery-enriched.json
+
+      - name: Complete missing 2026-08-20 decision phase without re-executing catch-up
+        if: steps.pre.outputs.mode == 'resume_after_execution_catchup'
+        run: |
+          python -m engine_v2.shadow_run_split \
+            --snapshot /tmp/v2-recovery-snapshot.json \
+            --enriched /tmp/v2-recovery-enriched.json \
+            --state-root shadow_state/v2 \
+            --previous-trade-date 2026-08-19 \
+            --report /tmp/v2-recovery-run.json
+
+      - name: Build final V2 summary and web artifact
+        run: |
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+
+      - name: Run V2 regression suite
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+
+      - name: Assert completed 2026-08-20 conditional state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          td='2026-08-20'
+          root=Path('shadow_state/v2')
+          event=json.loads((root/'audit'/f'{td}.json').read_text(encoding='utf-8'))
+          if event.get('trade_date') != td or event.get('event_kind') != 'conditional_entries_and_decision':
+              raise SystemExit('V2 2026-08-20 daily audit is incomplete')
+          if event.get('safety',{}).get('forced_clock_buy') or event.get('safety',{}).get('forced_clock_sell'):
+              raise SystemExit('V2 recovery introduced forced-clock trading')
+          for fid in ('A','B','C','D','L'):
+              s=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if str(s.get('last_processed_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: last_processed_date mismatch')
+              if str(s.get('last_execution_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: last_execution_date mismatch')
+              if s.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or s.get('plan_version') != 'v2-conditional-plan-v1':
+                  raise SystemExit(f'{fid}: execution model/version mismatch')
+              pending=s.get('pending_decision')
+              if not pending or str(pending.get('decision_date') or '')[:10] != td:
+                  raise SystemExit(f'{fid}: missing 2026-08-20 next-session conditional decision')
+              if pending.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or pending.get('plan_version') != 'v2-conditional-plan-v1':
+                  raise SystemExit(f'{fid}: pending plan model/version mismatch')
+              if float(s.get('cash') or 0) < -1e-6:
+                  raise SystemExit(f'{fid}: negative cash')
+          web=json.load(open('web/v2/data.json',encoding='utf-8'))
+          if str(web.get('updated_at') or '')[:10] != td:
+              raise SystemExit('web/v2 updated_at mismatch')
+          if web.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or web.get('plan_version') != 'v2-conditional-plan-v1':
+              raise SystemExit('web/v2 model/version mismatch')
+          print('V2 2026-08-20 recovered state invariants PASS')
+          PY
+
+      - name: Persist repaired V2 shadow state
+        id: persist_v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "v2-recovery-bot"
+          git config user.email "v2-recovery-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "v2-data: complete 2026-08-20 conditional decision phase"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
+          git fetch origin v2-shadow
+          echo "sha=$(git rev-parse origin/v2-shadow)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync recovered V2 artifact to main
+        id: sync_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp web/v2/data.json /tmp/v2-recovered-data.json
+          expected="$(sha256sum /tmp/v2-recovered-data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
+          rm -rf /tmp/v2-recovery-main
+          git fetch origin main
+          git worktree add --detach /tmp/v2-recovery-main origin/main
+          cd /tmp/v2-recovery-main
+          git config user.name "v2-recovery-bot"
+          git config user.email "v2-recovery-bot@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/v2-recovered-data.json web/v2/data.json
+            git add web/v2/data.json
+            if git diff --cached --quiet; then
+              pushed=1
+              break
+            fi
+            git commit -m "v2-data: publish recovered 2026-08-20 settlement"
+            if git push origin HEAD:main; then
+              pushed=1
+              break
+            fi
+          done
+          test "$pushed" = "1"
+          git fetch origin main
+          actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
+          test "$actual" = "$expected"
+          echo "main_sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch canonical Pages deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/v2-recovery-dispatch.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
+            -d '{"ref":"main"}')
+          echo "dispatch_http_code=$code"
+          test "$code" = "204"
+
+      - name: Verify public V2 equals recovered settlement artifact
+        id: verify_public
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ steps.sync_main.outputs.expected_sha256 }}"
+          for i in $(seq 1 60); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?v2_recovery=${GITHUB_RUN_ID}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-recovery.json; then
+              actual="$(sha256sum /tmp/live-v2-recovery.json | awk '{print $1}')"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-recovery.json',encoding='utf-8'))
+          if str(live.get('updated_at') or '')[:10] != '2026-08-20':
+              raise SystemExit('public V2 trade date mismatch')
+          if live.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1' or live.get('plan_version') != 'v2-conditional-plan-v1':
+              raise SystemExit('public V2 model/version mismatch')
+          print('PUBLIC V2 2026-08-20 RECOVERY VERIFIED')
+          PY
+                echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public V2 did not converge to recovered settlement artifact"
+          exit 1
+
+      - name: Persist machine terminal receipt
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
+          PUBLIC_SHA256: ${{ steps.verify_public.outputs.actual_sha256 }}
+          V2_SHADOW_SHA: ${{ steps.persist_v2.outputs.sha }}
+          MAIN_SOURCE_SHA: ${{ steps.sync_main.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          receipt={
+              'status':'verified',
+              'trade_date':'2026-08-20',
+              'execution_model':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version':'v2-conditional-plan-v1',
+              'buy_reference':'predeclared_price_condition',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
+              'expected_sha256':os.environ['EXPECTED_SHA256'],
+              'public_sha256':os.environ['PUBLIC_SHA256'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'recovery':True,
+              'recovery_reason':'2026-08-20 execution catch-up existed but conditional decision/public terminal receipt was incomplete',
+              'v2_shadow_source_commit':os.environ['V2_SHADOW_SHA'],
+              'main_source_commit':os.environ['MAIN_SOURCE_SHA'],
+          }
+          open('/tmp/v2-1510-chain-verification.json','w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          PY
+          cd /tmp/v2-recovery-main
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-1510-chain-verification.json state/v2_1510_chain_verification.json
+            git add state/v2_1510_chain_verification.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: verify recovered V2 2026-08-20 terminal chain"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-20260820-recovery-${{ github.run_id }}
+          path: |
+            /tmp/v2-recovery-snapshot.json
+            /tmp/v2-recovery-enriched.json
+            /tmp/v2-recovery-run.json
+            /tmp/live-v2-recovery.json
+          if-no-files-found: warn
+          retention-days: 30
