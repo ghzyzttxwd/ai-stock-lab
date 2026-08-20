@@ -1,0 +1,114 @@
+name: V2 terminal public probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'state/.v2-terminal-probe-trigger'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate canonical state and probe public Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main v2-shadow
+          MAIN_SHA="$(git rev-parse origin/main)"
+          V2_SHA="$(git rev-parse origin/v2-shadow)"
+          git show origin/main:web/v2/data.json > /tmp/main-v2.json
+          git show origin/v2-shadow:web/v2/data.json > /tmp/shadow-v2.json
+          rm -rf /tmp/v2-probe-shadow
+          git worktree add --detach /tmp/v2-probe-shadow origin/v2-shadow
+          export MAIN_SHA V2_SHA
+
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          shadow_repo=Path('/tmp/v2-probe-shadow')
+          sys.path.insert(0,str(shadow_repo))
+          from engine_v2.shadow_ledger import FUND_NAMES, sha256_json
+          from engine_v2.shadow_reporting import verify_audit_chain
+
+          td='2026-08-20'
+          bad_hash='ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7'
+          root=shadow_repo/'shadow_state/v2'
+          result=verify_audit_chain(root)
+          if result.get('status')!='PASS': raise SystemExit(f'audit chain failed: {result}')
+          correction=json.loads((root/'audit'/f'{td}~conditional-execution-restatement.json').read_text(encoding='utf-8'))
+          body=dict(correction); claimed=body.pop('event_hash',None)
+          if not claimed or sha256_json(body)!=claimed: raise SystemExit('correction hash invalid')
+          if result.get('head')!=claimed: raise SystemExit('correction is not terminal audit head')
+          if correction.get('event_kind')!='conditional_execution_restatement' or correction.get('corrects_event_hash')!=bad_hash:
+              raise SystemExit('wrong terminal correction event')
+          for fid in FUND_NAMES:
+              s=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if str(s.get('last_processed_date') or '')[:10]!=td or str(s.get('last_execution_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: terminal dates mismatch')
+              if s.get('audit_head')!=claimed or float(s.get('cash') or 0)<-1e-6:
+                  raise SystemExit(f'{fid}: ledger head/cash invalid')
+              p=s.get('pending_decision')
+              if not isinstance(p,dict) or str(p.get('decision_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: next plan missing')
+              for fill in s.get('fills') or []:
+                  if str(fill.get('trade_date') or '')[:10]==td and fill.get('note')=='V2 目标仓位再平衡':
+                      raise SystemExit(f'{fid}: invalid legacy catch-up fill survived')
+
+          main=Path('/tmp/main-v2.json').read_bytes(); shadow=Path('/tmp/shadow-v2.json').read_bytes()
+          mh=hashlib.sha256(main).hexdigest(); sh=hashlib.sha256(shadow).hexdigest()
+          if mh!=sh: raise SystemExit(f'main/shadow hash mismatch {mh} != {sh}')
+          web=json.loads(main)
+          if str(web.get('updated_at') or '')[:10]!=td: raise SystemExit('main V2 date mismatch')
+          if (web.get('execution_model'),web.get('plan_version'))!=('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('main V2 model mismatch')
+          if not ((web.get('source_ref') or {}).get('restatement') or {}).get('history_preserved_append_only'):
+              raise SystemExit('main V2 restatement provenance missing')
+          for fid in FUND_NAMES:
+              p=((web.get('funds') or {}).get(fid) or {}).get('pending_decision')
+              if not isinstance(p,dict) or str(p.get('decision_date') or '')[:10]!=td:
+                  raise SystemExit(f'main V2 {fid}: next plan missing')
+          Path('/tmp/probe-meta.json').write_text(json.dumps({'expected_sha256':mh,'audit_head':claimed,'audit_events':result['events'],'main_sha':os.environ['MAIN_SHA'],'v2_sha':os.environ['V2_SHA']},indent=2)+'\n')
+          print('CANONICAL_STATE_PASS expected_sha256='+mh+' audit_head='+claimed)
+          PY
+
+          EXPECTED="$(python -c 'import json;print(json.load(open("/tmp/probe-meta.json"))["expected_sha256"])')"
+          for i in $(seq 1 12); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?probe=${GITHUB_RUN_ID}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/public-v2.json; then
+              ACTUAL="$(sha256sum /tmp/public-v2.json | awk '{print $1}')"
+              echo "PUBLIC_ATTEMPT=$i EXPECTED_SHA256=$EXPECTED PUBLIC_SHA256=$ACTUAL"
+              if [ "$ACTUAL" = "$EXPECTED" ]; then
+                python - <<'PY'
+          import json
+          x=json.load(open('/tmp/public-v2.json',encoding='utf-8'))
+          if str(x.get('updated_at') or '')[:10]!='2026-08-20': raise SystemExit('public date mismatch')
+          if (x.get('execution_model'),x.get('plan_version'))!=('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('public model mismatch')
+          if not ((x.get('source_ref') or {}).get('restatement') or {}).get('history_preserved_append_only'):
+              raise SystemExit('public restatement provenance missing')
+          for fid,fund in (x.get('funds') or {}).items():
+              p=fund.get('pending_decision')
+              if not isinstance(p,dict) or str(p.get('decision_date') or '')[:10]!='2026-08-20':
+                  raise SystemExit(f'public {fid}: next plan missing')
+          print('PUBLIC_SEMANTICS_PASS')
+          PY
+                META="$(cat /tmp/probe-meta.json | tr '\n' ' ')"
+                echo "TERMINAL_PROBE_PASS EXPECTED_SHA256=$EXPECTED PUBLIC_SHA256=$ACTUAL META=$META"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "TERMINAL_PROBE_FAIL public Pages hash never matched canonical main hash $EXPECTED" >&2
+          exit 1
