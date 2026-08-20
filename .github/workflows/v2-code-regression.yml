@@ -40,7 +40,7 @@ jobs:
       - name: Run all V2 regression tests
         working-directory: v2
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Assert live checkpoints and stale-run safety are wired on main
+      - name: Assert six checkpoints and stale-run safety are wired on main
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -53,10 +53,11 @@ jobs:
           missing=[x for x in expected if x not in text]
           if missing:
               raise SystemExit(f'missing V2 checkpoints: {missing}')
-          if "'0 2 * * 1-5'" in text:
-              raise SystemExit('obsolete 10:00 retry still wired')
+          for obsolete in ("'50 1 * * 1-5'", "'0 2 * * 1-5'"):
+              if obsolete in text:
+                  raise SystemExit(f'obsolete retry cron still wired: {obsolete}')
           if 'cancel-in-progress: false' not in text:
-              raise SystemExit('V2 retries may still cancel an in-flight checkpoint')
+              raise SystemExit('V2 checkpoints may still cancel an in-flight run')
           if '--scheduled-time' not in text:
               raise SystemExit('V2 workflow does not pass logical checkpoint to runner')
           if 'stale_checkpoint_skipped' not in text or 'stale_checkpoint_skipped' not in runner:
@@ -65,7 +66,7 @@ jobs:
               raise SystemExit('10-minute freshness limit missing from V2 runner')
           if "'reads_market_quotes': False" not in runner or "'mutates_v2_ledger': False" not in runner:
               raise SystemExit('stale V2 run is not proven fail-closed before quotes/state mutation')
-          print('V2 CHECKPOINT + STALE SAFETY WIRING PASS')
+          print('V2 SIX CHECKPOINT + STALE SAFETY WIRING PASS')
           PY
       - name: Persist verification receipt to main
         run: |
@@ -84,6 +85,7 @@ jobs:
               'tests':"python -m unittest discover -s tests -p 'test_v2*.py' -v",
               'checkpoints':['09:40','10:30','11:20','13:30','14:30','14:55'],
               'max_checkpoint_lateness_minutes':10,
+              'obsolete_0950_retry_removed':True,
               'obsolete_1000_retry_removed':True,
               'cancel_in_progress':False,
               'stale_run_reads_market_quotes':False,
