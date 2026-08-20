@@ -11,6 +11,12 @@ except Exception as _v1_market_patch_error:
     # production market path will fail closed rather than fabricating data.
     print(f'[V1] Tencent full-market fallback install warning: {_v1_market_patch_error}')
 
+# Session classification is a safety invariant, not an optional market fallback.
+# Install this after the Tencent wrapper so every V1 engine path resolves the exchange
+# session from the calendar instead of inferring it from a possibly-lagging quote feed.
+from .exchange_calendar_market import install as _install_v1_exchange_calendar_market
+_install_v1_exchange_calendar_market()
+
 # Production safety belt: scheduled intraday checkpoints are only valid near their
 # declared time. GitHub Actions can start scheduled jobs late; never convert a
 # 10:42 quote into a fictitious 09:40 fill. This wrapper is active only when the
