@@ -17,6 +17,12 @@ except Exception as _v1_market_patch_error:
 from .exchange_calendar_market import install as _install_v1_exchange_calendar_market
 _install_v1_exchange_calendar_market()
 
+# Tencent qfq daily bars can publish the completed session later than unadjusted/current
+# market data. Keep historical features on the qfq basis, but bridge only a verified
+# completed-session OHLC bar. Basis mismatches fail closed instead of fabricating a bar.
+from .current_bar_history import install as _install_v1_current_bar_history
+_install_v1_current_bar_history()
+
 # Production safety belt: scheduled intraday checkpoints are only valid near their
 # declared time. GitHub Actions can start scheduled jobs late; never convert a
 # 10:42 quote into a fictitious 09:40 fill. This wrapper is active only when the
