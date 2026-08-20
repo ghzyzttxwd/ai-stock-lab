@@ -40,14 +40,23 @@ jobs:
       - name: Run all V2 regression tests
         working-directory: v2
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
-      - name: Assert six checkpoints, stale failure, and audit ordering are wired
-        id: invariants
+      - name: Count discovered V2 regression tests
+        id: tests
+        working-directory: v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(python - <<'PY'
+          import unittest
+          print(unittest.defaultTestLoader.discover('tests', pattern='test_v2*.py').countTestCases())
+          PY
+          )
+          echo "test_count=$count" >> "$GITHUB_OUTPUT"
+          test "$count" -ge 61
+      - name: Assert six checkpoints, stale failure, audit ordering, and core durability are wired
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
-          import unittest
           from pathlib import Path
 
           workflow = Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
@@ -71,8 +80,6 @@ jobs:
           if '--scheduled-time' not in workflow:
               raise SystemExit('V2 workflow does not pass logical checkpoint to runner')
 
-          # The runner must still produce a stale status, but the production workflows
-          # must reject it instead of treating it as a green/verified outcome.
           if 'stale_checkpoint_skipped' not in runner:
               raise SystemExit('runner no longer exposes stale checkpoint status')
           if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in runner:
@@ -91,11 +98,18 @@ jobs:
           if not ordering_test.exists():
               raise SystemExit('V2 audit parent-link ordering regression test is missing')
 
-          suite = unittest.defaultTestLoader.discover('v2/tests', pattern='test_v2*.py')
-          test_count = suite.countTestCases()
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
-              fh.write(f'test_count={test_count}\n')
-          print(f'V2 CHECKPOINT + STALE FAILURE + AUDIT ORDERING WIRING PASS tests={test_count}')
+          canonical_core = 'Persist V2 audit and ledger core before derived reporting'
+          guard_core = 'Persist V2 audit and ledger core before derived reporting'
+          if canonical_core not in workflow or workflow.index(canonical_core) > workflow.index('Build intraday V2 summary'):
+              raise SystemExit('canonical workflow does not persist core before derived reporting')
+          if guard_core not in guard or guard.index(guard_core) > guard.index('Build intraday V2 summary'):
+              raise SystemExit('guard workflow does not persist core before derived reporting')
+          for text, label in ((workflow, 'canonical'), (guard, 'guard')):
+              for marker in ('checkpoint_durable', 'end_to_end_verified'):
+                  if marker not in text:
+                      raise SystemExit(f'{label} workflow status lacks {marker}')
+
+          print('V2 CHECKPOINT + STALE FAILURE + AUDIT ORDERING + CORE DURABILITY WIRING PASS')
           PY
       - name: Verify current V2 audit and ledger chain
         id: audit
@@ -117,7 +131,7 @@ jobs:
           cd main
           actual_v2_sha="$(git -C ../v2 rev-parse HEAD)"
           export ACTUAL_V2_SHA="$actual_v2_sha"
-          export TEST_COUNT="${{ steps.invariants.outputs.test_count }}"
+          export TEST_COUNT="${{ steps.tests.outputs.test_count }}"
           export AUDIT_STATUS="${{ steps.audit.outputs.status }}"
           export AUDIT_HEAD="${{ steps.audit.outputs.head }}"
           export AUDIT_EVENTS="${{ steps.audit.outputs.events }}"
@@ -141,6 +155,8 @@ jobs:
               'stale_run_mutates_v2_ledger': False,
               'stale_checkpoint_is_workflow_failure': True,
               'audit_parent_link_ordering': True,
+              'core_persisted_before_derived_reporting': True,
+              'status_distinguishes_durable_and_end_to_end': True,
               'audit_chain_status': os.environ['AUDIT_STATUS'],
               'audit_head': os.environ['AUDIT_HEAD'],
               'audit_events': int(os.environ['AUDIT_EVENTS']),
