@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .board_policy import sanitize_pending_for_retail
+from .conditional_plan import EXECUTION_MODEL, PLAN_VERSION, pending_is_conditional
 from .shadow_ledger import (
     AUDIT_SCHEMA_VERSION,
     EXECUTION_POLICY_VERSION,
@@ -88,6 +89,26 @@ def _pending_decision_date(states: dict[str, dict], trade_date: str) -> str | No
     return decision_date
 
 
+def _uses_conditional_execution(state: dict) -> bool:
+    """Return True when a ledger has crossed into the conditional-plan execution model.
+
+    The legacy catch-up executor rebalances target weights at the session open.  Once V2 is
+    conditional, that behaviour is economically incompatible with the declared entry/exit
+    conditions and must never be used as a recovery path.
+    """
+    pending = state.get('pending_decision') or {}
+    if state.get('execution_model') == EXECUTION_MODEL or state.get('plan_version') == PLAN_VERSION:
+        return True
+    if pending.get('execution_model') == EXECUTION_MODEL or pending.get('plan_version') == PLAN_VERSION:
+        return True
+    if pending_is_conditional(pending):
+        return True
+    return any(
+        (plan or {}).get('plan_version') == PLAN_VERSION
+        for plan in (state.get('exit_plans') or {}).values()
+    )
+
+
 def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
     existing = _already_done(state_root, trade_date)
     if existing:
@@ -100,6 +121,14 @@ def run_execution_catchup(trade_date: str, state_root: Path) -> dict:
     processed = {str(x.get('last_processed_date') or '')[:10] == trade_date for x in states.values()}
     if True in processed:
         raise RuntimeError(f'partial V2 daily processing detected for {trade_date}; refusing execution catch-up')
+
+    conditional_funds = sorted(fid for fid, state in states.items() if _uses_conditional_execution(state))
+    if conditional_funds:
+        raise RuntimeError(
+            'legacy V2 execution catch-up is forbidden for conditional-plan state; '
+            f'funds={conditional_funds}. Use engine_v2.shadow_run_split so declared conditional '
+            'entry/exit semantics are preserved.'
+        )
 
     # The pending ledgers are the authoritative source for the decision session. This avoids
     # an unnecessary market-index network request before we can execute already-fixed orders.
