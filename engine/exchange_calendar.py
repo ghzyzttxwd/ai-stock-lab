@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 
-def exchange_calendar_latest_session(requested_date: str, ak=None) -> str:
-    """Resolve the latest exchange session on or before ``requested_date``.
-
-    This deliberately does not infer whether a date is a trading session from quote or
-    daily-bar freshness. Those data feeds may lag after the close; the exchange calendar is
-    the authority for session classification. Calendar lookup failures are fatal so callers
-    fail closed instead of silently publishing stale data.
-    """
+def _calendar_dates(requested_date: str, ak=None) -> list[str]:
     date.fromisoformat(requested_date)
     if ak is None:
         import akshare as ak
@@ -30,8 +23,28 @@ def exchange_calendar_latest_session(requested_date: str, ak=None) -> str:
         raise RuntimeError(
             f'Exchange trading calendar ends at {dates[-1]} and cannot classify {requested_date}'
         )
+    return dates
 
+
+def exchange_calendar_latest_session(requested_date: str, ak=None) -> str:
+    """Resolve the latest exchange session on or before ``requested_date``.
+
+    Session classification is deliberately independent from quote and daily-bar freshness.
+    Data feeds may lag after the close; the exchange calendar is the authority. Calendar
+    lookup failures are fatal so callers fail closed instead of silently processing stale data.
+    """
+    dates = _calendar_dates(requested_date, ak)
     valid = [value for value in dates if value <= requested_date]
     if not valid:
         raise RuntimeError(f'Exchange trading calendar has no session on or before {requested_date}')
     return valid[-1]
+
+
+def exchange_calendar_previous_session(trade_date: str, ak=None) -> str:
+    """Resolve the exchange session immediately before ``trade_date``.
+
+    Do not call a quote/history endpoint merely to infer the previous session. That endpoint
+    can lag or hang independently of the exchange calendar, which would block settlement.
+    """
+    current = date.fromisoformat(trade_date)
+    return exchange_calendar_latest_session((current - timedelta(days=1)).isoformat(), ak)
