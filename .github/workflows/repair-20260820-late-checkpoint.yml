@@ -1,0 +1,402 @@
+name: Repair 2026-08-20 late checkpoint execution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'state/.repair-20260820-late-checkpoint-trigger'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: repair-20260820-late-checkpoint
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Patch stale-checkpoint guards on V1 and V2 workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('engine/morning_run.py')
+          s=p.read_text(encoding='utf-8')
+          anchor="CHECKPOINTS = {'09:40', '10:30', '11:20', '13:30', '14:30', '14:55'}\n\n\ndef _symbol"
+          block="""CHECKPOINTS = {'09:40', '10:30', '11:20', '13:30', '14:30', '14:55'}
+          MAX_CHECKPOINT_LATENESS_MINUTES = 10
+
+
+          def _checkpoint_delay_minutes(now: datetime, slot: str) -> float:
+              hour, minute = (int(x) for x in slot.split(':', 1))
+              scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+              return (now - scheduled).total_seconds() / 60.0
+
+
+          def _symbol"""
+          block='\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
+          if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in s:
+              if anchor not in s: raise SystemExit('V1 guard anchor missing')
+              s=s.replace(anchor,block,1)
+
+          old="""    if slot not in CHECKPOINTS:
+                  slot = now.strftime('%H:%M')
+              in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+          """
+          old='\n'.join(line[4:] if line.startswith('    ') else line for line in old.splitlines())
+          new="""    if slot not in CHECKPOINTS:
+                  slot = now.strftime('%H:%M')
+              delay_minutes = _checkpoint_delay_minutes(now, slot)
+              if delay_minutes < 0 or delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+                  print(f'[conditional-scan] stale checkpoint {slot}: actual={now.strftime("%H:%M:%S")} delay={delay_minutes:.1f}m; skip without trading')
+                  return
+              actual_execution_at = now.isoformat(timespec='seconds')
+              actual_clock = now.strftime('%H:%M')
+              in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+          """
+          new='\n'.join(line[4:] if line.startswith('    ') else line for line in new.splitlines())
+          if 'stale checkpoint {slot}' not in s:
+              if old not in s: raise SystemExit('V1 main guard anchor missing')
+              s=s.replace(old,new,1)
+
+          old="""        fills, checks = execute_conditional_sells(state, bars, trade_date, clock=slot)
+                  state.setdefault('fills', []).extend(fills)
+          """
+          old='\n'.join(line[8:] if line.startswith('        ') else line for line in old.splitlines())
+          new="""        fills, checks = execute_conditional_sells(state, bars, trade_date, clock=slot)
+                  for fill in fills:
+                      fill['scheduled_time'] = slot
+                      fill['actual_execution_time'] = actual_execution_at
+                      fill['actual_clock'] = actual_clock
+                  state.setdefault('fills', []).extend(fills)
+          """
+          new='\n'.join(line[8:] if line.startswith('        ') else line for line in new.splitlines())
+          if "fill['actual_execution_time']" not in s:
+              if old not in s: raise SystemExit('V1 fill timing anchor missing')
+              s=s.replace(old,new,1)
+
+          old="log.append({'slot':slot,'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})"
+          new="log.append({'slot':slot,'scheduled_time':slot,'actual_clock':actual_clock,'delay_minutes':round(delay_minutes,2),'at':state['last_conditional_scan_at'],'fills':len(fills),'checks':checks})"
+          s=s.replace(old,new)
+          s=s.replace("_refresh_public_snapshots(states, bars, source, trade_date, slot)","_refresh_public_snapshots(states, bars, source, trade_date, actual_clock)")
+          p.write_text(s,encoding='utf-8')
+
+          wf=Path('.github/workflows/v2-morning-sell.yml')
+          w=wf.read_text(encoding='utf-8')
+          w=w.replace("    - cron: '0 2 * * 1-5'   # 10:00 final retry for 09:40 only\n",'')
+          w=w.replace("'40 1 * * 1-5'|'50 1 * * 1-5'|'0 2 * * 1-5') slot='09:40' ;;","'40 1 * * 1-5'|'50 1 * * 1-5') slot='09:40' ;;")
+          w=w.replace('  cancel-in-progress: true','  cancel-in-progress: false')
+          w=w.replace("'outside_session_window'}:","'outside_session_window','stale_checkpoint_skipped'}:")
+          wf.write_text(w,encoding='utf-8')
+
+          Path('tests/test_checkpoint_timing.py').write_text('''from datetime import datetime\nimport unittest\nfrom zoneinfo import ZoneInfo\nfrom engine.morning_run import _checkpoint_delay_minutes, MAX_CHECKPOINT_LATENESS_MINUTES\n\nclass CheckpointTimingTests(unittest.TestCase):\n    def test_fresh_checkpoint(self):\n        now=datetime(2026,8,20,9,49,tzinfo=ZoneInfo("Asia/Shanghai"))\n        self.assertLessEqual(_checkpoint_delay_minutes(now,"09:40"),MAX_CHECKPOINT_LATENESS_MINUTES)\n\n    def test_stale_checkpoint(self):\n        now=datetime(2026,8,20,10,42,tzinfo=ZoneInfo("Asia/Shanghai"))\n        self.assertGreater(_checkpoint_delay_minutes(now,"09:40"),MAX_CHECKPOINT_LATENESS_MINUTES)\n\nif __name__ == "__main__": unittest.main()\n''',encoding='utf-8')
+          PY
+          python -m unittest discover -s tests -v
+          git config user.name "ai-stock-repair-bot"
+          git config user.email "ai-stock-repair-bot@users.noreply.github.com"
+          git add engine/morning_run.py .github/workflows/v2-morning-sell.yml tests/test_checkpoint_timing.py
+          git commit -m "fix: reject stale intraday checkpoints" || true
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep 3
+          done
+
+      - name: Patch V2 runner guard and timing audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin v2-shadow
+          rm -rf /tmp/v2-repair
+          git worktree add -B repair-v2 /tmp/v2-repair origin/v2-shadow
+          cd /tmp/v2-repair
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('engine_v2/morning_sell_run.py')
+          s=p.read_text(encoding='utf-8')
+          anchor="CHECKPOINTS = ('09:40', '10:30', '11:20', '13:30', '14:30', '14:55')\n\n\ndef _execution_snapshot"
+          block="""CHECKPOINTS = ('09:40', '10:30', '11:20', '13:30', '14:30', '14:55')
+          MAX_CHECKPOINT_LATENESS_MINUTES = 10
+
+
+          def _checkpoint_delay_minutes(now: datetime, scheduled_time: str) -> float:
+              hour, minute = (int(x) for x in scheduled_time.split(':', 1))
+              scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+              return (now - scheduled).total_seconds() / 60.0
+
+
+          def _execution_snapshot"""
+          block='\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
+          if 'MAX_CHECKPOINT_LATENESS_MINUTES = 10' not in s:
+              if anchor not in s: raise SystemExit('V2 guard anchor missing')
+              s=s.replace(anchor,block,1)
+
+          old="""    existing = _already_done(state_root, trade_date, scheduled_time)
+              if existing:
+                  return existing
+
+              in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+          """
+          old='\n'.join(line[4:] if line.startswith('    ') else line for line in old.splitlines())
+          new="""    existing = _already_done(state_root, trade_date, scheduled_time)
+              if existing:
+                  return existing
+
+              delay_minutes = _checkpoint_delay_minutes(now, scheduled_time)
+              if delay_minutes < 0 or delay_minutes > MAX_CHECKPOINT_LATENESS_MINUTES:
+                  return {
+                      'status': 'stale_checkpoint_skipped',
+                      'trade_date': trade_date,
+                      'scheduled_time': scheduled_time,
+                      'executed_at': now.isoformat(timespec='seconds'),
+                      'actual_clock': now.strftime('%H:%M'),
+                      'delay_minutes': round(delay_minutes, 2),
+                      'fills': {}, 'rejected_orders': {},
+                      'execution_model': EXECUTION_MODEL, 'plan_version': PLAN_VERSION,
+                      'safety': {'writes_v1_ledger': False, 'calls_sol': False, 'forced_clock_sell': False},
+                  }
+
+              in_session = dt_time(9, 30) <= now.time() <= dt_time(15, 0)
+          """
+          new='\n'.join(line[4:] if line.startswith('    ') else line for line in new.splitlines())
+          if "'stale_checkpoint_skipped'" not in s:
+              if old not in s: raise SystemExit('V2 stale guard insertion anchor missing')
+              s=s.replace(old,new,1)
+
+          old="""        execution = execute_conditional_exit_scan(
+                      state, bars, trade_date, clock=scheduled_time, pending=pending,
+                  )
+                  snapshot = _execution_snapshot(
+          """
+          old='\n'.join(line[8:] if line.startswith('        ') else line for line in old.splitlines())
+          new="""        execution = execute_conditional_exit_scan(
+                      state, bars, trade_date, clock=scheduled_time, pending=pending,
+                  )
+                  for fill in execution.get('fills') or []:
+                      fill['scheduled_time'] = scheduled_time
+                      fill['actual_execution_time'] = executed_at
+                      fill['actual_clock'] = execution_clock
+                  snapshot = _execution_snapshot(
+          """
+          new='\n'.join(line[8:] if line.startswith('        ') else line for line in new.splitlines())
+          if "fill['actual_execution_time']" not in s:
+              if old not in s: raise SystemExit('V2 fill timing anchor missing')
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          Path('tests/test_v2_checkpoint_timing.py').write_text('''from datetime import datetime\nimport unittest\nfrom zoneinfo import ZoneInfo\nfrom engine_v2.morning_sell_run import _checkpoint_delay_minutes, MAX_CHECKPOINT_LATENESS_MINUTES\n\nclass V2CheckpointTimingTests(unittest.TestCase):\n    def test_fresh_checkpoint(self):\n        now=datetime(2026,8,20,9,50,tzinfo=ZoneInfo("Asia/Shanghai"))\n        self.assertLessEqual(_checkpoint_delay_minutes(now,"09:40"),MAX_CHECKPOINT_LATENESS_MINUTES)\n\n    def test_stale_checkpoint(self):\n        now=datetime(2026,8,20,10,42,tzinfo=ZoneInfo("Asia/Shanghai"))\n        self.assertGreater(_checkpoint_delay_minutes(now,"09:40"),MAX_CHECKPOINT_LATENESS_MINUTES)\n\nif __name__ == "__main__": unittest.main()\n''',encoding='utf-8')
+          PY
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -p 'test_v2*.py' -v
+          git config user.name "v2-shadow-repair-bot"
+          git config user.email "v2-shadow-repair-bot@users.noreply.github.com"
+          git add engine_v2/morning_sell_run.py tests/test_v2_checkpoint_timing.py
+          git commit -m "fix: reject stale V2 intraday checkpoints" || true
+          for attempt in 1 2 3; do
+            git pull --rebase origin v2-shadow && git push origin HEAD:v2-shadow && break
+            sleep 3
+          done
+
+      - name: Let pre-fix queued runs drain
+        run: sleep 90
+
+      - name: Restore V1 economics before the invalid delayed scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=e83da53fda9c72b8c37c95632580bb2b599233ae
+          git fetch origin main
+          git reset --hard origin/main
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          funds=['A','B','C','D','D_MAIN','L']
+          counts={}
+          for fid in funds:
+              d=json.loads(Path(f'state/{fid}.json').read_text(encoding='utf-8'))
+              bad=[x for x in d.get('fills',[]) if str(x.get('trade_date'))[:10]=='2026-08-20' and x.get('scan_time')=='09:40']
+              counts[fid]=len(bad)
+          Path('/tmp/v1-bad-counts.json').write_text(json.dumps(counts,ensure_ascii=False),encoding='utf-8')
+          PY
+          git checkout "$BASE" -- state/A.json state/B.json state/C.json state/D.json state/D_MAIN.json state/L.json web/d/data.json web/e/data.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          counts=json.loads(Path('/tmp/v1-bad-counts.json').read_text())
+          report={
+            'status':'corrected','trade_date':'2026-08-20','scope':'V1 D/E funds',
+            'reason':'09:40 checkpoint executed around 10:42, beyond 10-minute freshness window',
+            'invalid_fill_counts':counts,
+            'restored_from_commit':'e83da53fda9c72b8c37c95632580bb2b599233ae',
+            'economics_restored':True,'historical_pre_2026_08_20_fills_preserved':True,
+            'corrected_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')
+          }
+          Path('state/20260820_late_checkpoint_correction_v1.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git add state/A.json state/B.json state/C.json state/D.json state/D_MAIN.json state/L.json web/d/data.json web/e/data.json state/20260820_late_checkpoint_correction_v1.json
+          git commit -m "data: invalidate delayed 2026-08-20 V1 checkpoint fills"
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep 3
+          done
+
+      - name: Restore V2 economics and append correction audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=48c8137d1329608c51ccffc36e7227a65a40fe90
+          cd /tmp/v2-repair
+          git fetch origin v2-shadow
+          git reset --hard origin/v2-shadow
+          python - <<'PY'
+          import json, glob
+          from pathlib import Path
+          invalid=[]
+          for raw in sorted(glob.glob('shadow_state/v2/audit/2026-08-20-execution-*.json')):
+              if raw.endswith('-correction.json'): continue
+              p=Path(raw); event=json.loads(p.read_text(encoding='utf-8'))
+              src=event.get('source_ref') or {}
+              sched=str(src.get('scheduled_time') or '')
+              actual=str(src.get('actual_clock') or '')
+              if not sched or not actual: raise SystemExit(f'missing timing in {raw}')
+              sh,sm=map(int,sched.split(':')); ah,am=map(int,actual.split(':'))
+              delay=(ah*60+am)-(sh*60+sm)
+              if delay <= 10:
+                  raise SystemExit(f'refusing blanket restore: {raw} was within freshness window ({delay}m)')
+              invalid.append({'path':raw,'event_hash':event.get('event_hash'),'scheduled_time':sched,'actual_clock':actual,'delay_minutes':delay})
+          if not invalid: raise SystemExit('no delayed V2 audit found to correct')
+          Path('/tmp/v2-invalid-events.json').write_text(json.dumps(invalid,ensure_ascii=False),encoding='utf-8')
+          PY
+          git checkout "$BASE" -- shadow_state/v2/ledgers/A.json shadow_state/v2/ledgers/B.json shadow_state/v2/ledgers/C.json shadow_state/v2/ledgers/D.json shadow_state/v2/ledgers/L.json shadow_state/v2/summary.json web/v2/data.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          invalid=json.loads(Path('/tmp/v2-invalid-events.json').read_text())
+          report={
+            'status':'corrected','trade_date':'2026-08-20','event_kind':'late_checkpoint_correction',
+            'reason':'scheduled intraday checkpoints executed more than 10 minutes late and are invalid as simulated fills',
+            'invalidated_events':invalid,
+            'restored_economic_state_from_commit':'48c8137d1329608c51ccffc36e7227a65a40fe90',
+            'immutable_invalid_audits_preserved':True,
+            'economic_effect_of_invalid_events_removed':True,
+            'corrected_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')
+          }
+          Path('shadow_state/v2/audit/2026-08-20-late-checkpoint-correction.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          Path('shadow_state/v2/20260820_late_checkpoint_correction.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          python -m unittest discover -s tests -p 'test_v2*.py' -v
+          git add shadow_state/v2 web/v2/data.json
+          git commit -m "v2-data: invalidate delayed 2026-08-20 checkpoint fills"
+          for attempt in 1 2 3; do
+            git pull --rebase origin v2-shadow && git push origin HEAD:v2-shadow && break
+            sleep 3
+          done
+
+      - name: Sync corrected V2 web snapshot to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/v2-repair/web/v2/data.json web/v2/data.json
+          cp /tmp/v2-repair/shadow_state/v2/20260820_late_checkpoint_correction.json state/20260820_late_checkpoint_correction_v2.json
+          git add web/v2/data.json state/20260820_late_checkpoint_correction_v2.json
+          git commit -m "data: sync corrected V2 checkpoint state to Pages"
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep 3
+          done
+
+      - name: Run final main regression tests
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+          python -m unittest discover -s tests -v
+
+      - name: Deploy corrected Pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/dispatch.txt -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
+            -d '{"ref":"main"}')
+          test "$code" = "204"
+
+      - name: Verify public corrected data hashes
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          d=$(git show origin/main:web/d/data.json | sha256sum | awk '{print $1}')
+          e=$(git show origin/main:web/e/data.json | sha256sum | awk '{print $1}')
+          v=$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')
+          for i in $(seq 1 90); do
+            curl -fsS --max-time 20 "https://ghzyzttxwd.github.io/ai-stock-lab/d/data.json?r=${GITHUB_RUN_ID}-${i}" -o /tmp/d.json || true
+            curl -fsS --max-time 20 "https://ghzyzttxwd.github.io/ai-stock-lab/e/data.json?r=${GITHUB_RUN_ID}-${i}" -o /tmp/e.json || true
+            curl -fsS --max-time 20 "https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?r=${GITHUB_RUN_ID}-${i}" -o /tmp/v.json || true
+            ad=$(sha256sum /tmp/d.json 2>/dev/null | awk '{print $1}' || true)
+            ae=$(sha256sum /tmp/e.json 2>/dev/null | awk '{print $1}' || true)
+            av=$(sha256sum /tmp/v.json 2>/dev/null | awk '{print $1}' || true)
+            if [ "$ad" = "$d" ] && [ "$ae" = "$e" ] && [ "$av" = "$v" ]; then
+              echo "d_sha=$d" >> "$GITHUB_OUTPUT"; echo "e_sha=$e" >> "$GITHUB_OUTPUT"; echo "v_sha=$v" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Persist end-to-end repair receipt
+        shell: bash
+        env:
+          D_SHA: ${{ steps.verify.outputs.d_sha }}
+          E_SHA: ${{ steps.verify.outputs.e_sha }}
+          V_SHA: ${{ steps.verify.outputs.v_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          receipt={
+            'status':'verified','trade_date':'2026-08-20','max_checkpoint_lateness_minutes':10,
+            'v1_economics_restored':True,'v2_economics_restored':True,
+            'stale_checkpoint_guard_enabled':True,'v2_cancel_in_progress':False,'v2_1000_retry_removed':True,
+            'public_sha256':{'d':os.environ['D_SHA'],'e':os.environ['E_SHA'],'v2':os.environ['V_SHA']},
+            'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+            'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')
+          }
+          Path('state/20260820_late_checkpoint_repair_verification.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git add state/20260820_late_checkpoint_repair_verification.json
+          git commit -m "ops: verify late checkpoint repair"
+          git pull --rebase origin main
+          git push origin HEAD:main
