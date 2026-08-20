@@ -101,6 +101,37 @@ jobs:
             exit 1
           fi
 
+      - name: 收盘后拒绝发布过期 V1 结算
+        id: v1_freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from datetime import datetime, time
+          from zoneinfo import ZoneInfo
+
+          from engine.schedule_guard import exchange_calendar_latest_session
+          from engine.v1_freshness import assert_v1_freshness
+
+          now=datetime.now(ZoneInfo('Asia/Shanghai'))
+          today=now.date().isoformat()
+          required=''
+          if now.time() >= time(15,5):
+              latest=exchange_calendar_latest_session(today)
+              if latest == today:
+                  assert_v1_freshness(today)
+                  required=today
+                  print(f'[deploy-freshness] current exchange session requires V1 date={today}')
+              else:
+                  print(f'[deploy-freshness] non-session day; latest exchange session={latest}')
+          else:
+              print('[deploy-freshness] before 15:05 Beijing; close-settlement freshness gate not active')
+
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f'required_date={required}\n')
+          PY
+
       - name: 准备 GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -118,6 +149,7 @@ jobs:
         shell: bash
         env:
           DEPLOYED_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          V1_REQUIRED_DATE: ${{ steps.v1_freshness.outputs.required_date }}
         run: |
           set -euo pipefail
           files=(
@@ -172,6 +204,15 @@ jobs:
           if (v2.get('execution_model'),v2.get('plan_version')) != ('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
               raise SystemExit('public V2 model mismatch')
 
+          required=os.environ.get('V1_REQUIRED_DATE','').strip()
+          if required:
+              for label,payload in (('D',d),('E',e)):
+                  actual=str(payload.get('updated_at') or '')[:10]
+                  if actual != required:
+                      raise SystemExit(
+                          f'public V1 {label} stale: updated_at={actual or "missing"}, required={required}'
+                      )
+
           d_js=Path('/tmp/live-d-app.js').read_text(encoding='utf-8')
           e_js=Path('/tmp/live-e-app.js').read_text(encoding='utf-8')
           v2_js=Path('/tmp/live-v2-app.js').read_text(encoding='utf-8')
@@ -195,6 +236,7 @@ jobs:
               'plan_version_v1':'conditional-plan-v1',
               'execution_model_v2':'V2_CONDITIONAL_PLAN_V1',
               'plan_version_v2':'v2-conditional-plan-v1',
+              'v1_required_date':required or None,
               'forced_clock_buy':False,
               'forced_clock_sell':False,
               'verified_files':{
