@@ -24,6 +24,12 @@ _install_v1_exchange_calendar_market()
 from .execution_bar_cache import install as _install_v1_execution_bar_cache
 _install_v1_execution_bar_cache()
 
+# Eastmoney/Sina are useful first-choice snapshot sources, but a hung provider must not burn
+# multiple minutes before Tencent can take over. Hard timeouts open an in-run circuit; fast
+# transient errors still get one retry, so fallback order and correctness semantics stay the same.
+from .snapshot_provider_circuit import install as _install_v1_snapshot_provider_circuit
+_install_v1_snapshot_provider_circuit()
+
 # Tencent qfq daily bars can publish the completed session later than unadjusted/current
 # market data. Keep historical features on the qfq basis, but bridge only a verified
 # exact-date completed-session daily bar. Basis mismatches fail closed.
