@@ -1,0 +1,75 @@
+name: Verify trade price-time transparency
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'state/.trade-price-time-ci-trigger'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trade-price-time-regression
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Run price-time and conditional execution regressions
+        run: |
+          python -m unittest tests.test_trade_price_time tests.test_split_execution -v
+      - name: Parse all public trade renderers
+        run: |
+          node --check web/d/app.js
+          node --check web/e/app.js
+          node --check web/v2/app.js
+      - name: Assert transparent trade labels are present
+        run: |
+          set -euo pipefail
+          for file in web/d/app.js web/e/app.js web/v2/app.js; do
+            grep -q '市场参考价' "$file"
+            grep -q '模拟成交价' "$file"
+            grep -q '价格分钟未留存' "$file"
+          done
+          grep -q 'first_trigger_minute' engine/trade_price_time.py
+          grep -q 'annotate_conditional_buy_fills' engine/evening_split_run.py
+      - name: Persist regression receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          files = ['web/d/app.js','web/e/app.js','web/v2/app.js','engine/trade_price_time.py','engine/evening_split_run.py']
+          receipt = {
+              'status': 'verified',
+              'workflow_run_id': __import__('os').environ['GITHUB_RUN_ID'],
+              'source_commit': __import__('os').environ['GITHUB_SHA'],
+              'price_time_rule': 'market reference time only; never workflow completion time',
+              'conditional_buy_time_rule': 'first trigger minute from 1-minute market data; 09:30 for open-based trigger',
+              'unknown_time_rule': 'explicitly unavailable; never guessed',
+              'reference_vs_simulated_price_separated': True,
+              'renderer_syntax_checked': True,
+              'files': {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in files},
+              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          Path('state/trade_price_time_verification.json').write_text(json.dumps(receipt, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+          PY
+          git config user.name "trade-price-time-ci-bot"
+          git config user.email "trade-price-time-ci-bot@users.noreply.github.com"
+          git add state/trade_price_time_verification.json
+          git commit -m 'ops: persist trade price-time verification' || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
