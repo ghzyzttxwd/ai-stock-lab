@@ -90,34 +90,13 @@ jobs:
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
         run: python -m engine.evening_split_run
-      - name: Run full regression before persistence
-        run: python -m unittest discover -s tests -v
-        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
-      - name: Assert new plans are conditional or intentionally empty
-        if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          for fid in ('D_MAIN','A','B','C','D','L'):
-              s=json.loads((Path('state')/f'{fid}.json').read_text(encoding='utf-8'))
-              if s.get('execution_model') != 'CONDITIONAL_PLAN_V1':
-                  raise SystemExit(f'{fid}: wrong execution_model')
-              if str(s.get('conditional_plan_date') or '')[:10] != str(s.get('last_processed_date') or '')[:10]:
-                  raise SystemExit(f'{fid}: conditional plan date mismatch')
-              for t in s.get('pending_targets') or []:
-                  p=t.get('trade_plan') or {}
-                  if p.get('plan_version') != 'conditional-plan-v1':
-                      raise SystemExit(f'{fid}: legacy fixed-price target survived')
-          print('conditional-plan invariant OK')
-          PY
-      - name: Assert V1 settlement freshness before persistence
+      - name: Run V1 production safety gate before persistence
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         shell: bash
         run: |
           set -euo pipefail
           expected_date="$(TZ=Asia/Shanghai date +%F)"
-          python -m engine.v1_freshness --date "$expected_date"
+          python -m engine.v1_production_gate --date "$expected_date"
       - name: Persist portfolio ledger and public snapshots
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         run: |
