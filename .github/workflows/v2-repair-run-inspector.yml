@@ -11,35 +11,18 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect V2 repair and historical correction runs
+      - name: Inspect latest V2 pending-plan v2 repair run
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-
-          echo '=== latest pending-plan repair ==='
-          run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/v2-pending-plan-restatement-20260820.yml/runs?per_page=1" --jq '.workflow_runs[0].id // empty')"
-          if [ -n "$run_id" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '{id,name,event,status,conclusion,created_at,updated_at,head_sha,html_url}'
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" --jq '.jobs[] | {id,name,status,conclusion,steps:[.steps[]|{name,status,conclusion}]}'
-            gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --log-failed || true
-          fi
-
-          echo '=== historical v2-correct runs ==='
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/v2-correct-20260820-catchup.yml/runs?per_page=100" \
-            --jq '.workflow_runs[] | [.id,.run_number,.run_attempt,.event,.status,(.conclusion//""),.created_at,.updated_at,.head_sha,.html_url] | @tsv' \
-            | head -n 100 | tee /tmp/v2-correct-runs.tsv
-
-          echo '=== artifacts for historical v2-correct runs ==='
-          while IFS=$'\t' read -r rid run_number run_attempt event status conclusion created updated head_sha html_url; do
-            [ -n "$rid" ] || continue
-            echo "--- RUN id=$rid number=$run_number attempt=$run_attempt event=$event status=$status conclusion=$conclusion created=$created head=$head_sha ---"
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${rid}/artifacts?per_page=100" \
-              --jq '.artifacts[] | [.id,.name,.size_in_bytes,.expired,.created_at,.expires_at] | @tsv' || true
-          done < /tmp/v2-correct-runs.tsv
-
-          echo '=== global artifact candidates containing v2/restatement/recovery ==='
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select((.name|ascii_downcase|contains("v2")) or (.name|ascii_downcase|contains("restatement")) or (.name|ascii_downcase|contains("recovery"))) | [.id,.name,.workflow_run.id,.expired,.created_at,.expires_at,.size_in_bytes] | @tsv' \
-            | head -n 300
+          workflow='v2-pending-plan-restatement-20260820-v2.yml'
+          run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?per_page=1" --jq '.workflow_runs[0].id // empty')"
+          test -n "$run_id"
+          echo "REPAIR_V2_RUN_ID=$run_id"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '{id,name,event,status,conclusion,created_at,updated_at,head_sha,html_url}'
+          echo '--- jobs ---'
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" --jq '.jobs[] | {id,name,status,conclusion,steps:[.steps[]|{name,status,conclusion}]}'
+          echo '--- failed log ---'
+          gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --log-failed || true
