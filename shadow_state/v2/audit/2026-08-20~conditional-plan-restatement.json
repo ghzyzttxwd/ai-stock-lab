@@ -1,0 +1,265 @@
+{
+  "schema_version": "v2-shadow-audit-1.0",
+  "event_kind": "conditional_plan_restatement",
+  "trade_date": "2026-08-20",
+  "previous_trade_date": "2026-08-19",
+  "execution_policy_version": "v1-parity-2026-08-14",
+  "source_ref": {
+    "snapshot_version": "v2-shadow-data-0.4",
+    "snapshot_sha256": "caaa35a5ee491658c40a356177fad406c44154eec15a993b0dce03b35d2c12e1",
+    "enrichment_version": "v2-history-0.1",
+    "enrichment_sha256": "d3b97e0063710898a4d2684cd3fd34bfb365656670225710059829f97578835b",
+    "target_version": "v2-shadow-targets-conditional-0.3",
+    "execution_model": "V2_CONDITIONAL_PLAN_V1",
+    "plan_version": "v2-conditional-plan-v1",
+    "board_policy": {
+      "version": "retail-mainboard-only-2026-08-19",
+      "scope": "SH_SZ_MAINBOARD_ONLY",
+      "excludes": [
+        "CHINEXT_300_301",
+        "STAR_688_689",
+        "BSE",
+        "B_SHARES"
+      ],
+      "input_candidates": 180,
+      "eligible_candidates": 180,
+      "excluded_non_mainboard_count": 0,
+      "excluded_non_mainboard_symbols": []
+    },
+    "data_quality": {
+      "snapshot_source": "tencent-full",
+      "snapshot_grade": null,
+      "industry_counts": {
+        "industries": 31,
+        "mainboard_stocks": 3193,
+        "component_rows_mainboard": 3193,
+        "duplicate_cross_industry_stocks": 0,
+        "component_failures": 0,
+        "history_failures": 0
+      },
+      "enrichment_coverage": {
+        "preselected": 180,
+        "tencent_current_histories": 180,
+        "eligible_technical_features": 180,
+        "history_ratio": 1.0,
+        "feature_ratio": 1.0,
+        "history_cache": {
+          "cache_version": "v2-tencent-qfq-1",
+          "workers": 3,
+          "selected": 180,
+          "current_histories": 180,
+          "cache_hits": 0,
+          "incremental_fetches": 0,
+          "adjustment_full_refreshes": 0,
+          "full_fetches": 180,
+          "failures": 0,
+          "elapsed_s": 204.43,
+          "sample_errors": []
+        }
+      },
+      "missing_critical_execution_bars": []
+    },
+    "restatement": {
+      "reason": "legacy execution_catchup used fixed open-price target rebalancing after V2 had migrated to conditional plans",
+      "invalid_execution_catchup_hash": "ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7",
+      "superseded_polluted_daily_hash": "777c5a7558d1f360912d360c690e28125ad3b7370df9665e3a1abf4939f6860b",
+      "clean_state_commit": "698d265dd1d669b33781cef5719c524da5346d42",
+      "canonical_replay_event_hash": "e169afdddc0c2c44192e9cf7bb7fb0dc36407206834fc4546f03955f92404d37",
+      "history_preserved_append_only": true
+    },
+    "pending_plan_restatement": {
+      "reason": "build_pending_decision compacted away per-target conditional trade_plan metadata",
+      "base_execution_restatement_hash": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+      "artifact_id": "9417412966",
+      "artifact_name": "v2-20260820-restatement-32396959662",
+      "snapshot_sha256": "caaa35a5ee491658c40a356177fad406c44154eec15a993b0dce03b35d2c12e1",
+      "enrichment_sha256": "d3b97e0063710898a4d2684cd3fd34bfb365656670225710059829f97578835b",
+      "target_payload_sha256": "03403376d3ade9afef52962ea94f0ae29d7252c06d5b739220feb3aadff5fe98",
+      "historical_target_diagnostics_exact_match": true,
+      "economics_unchanged": true,
+      "history_preserved_append_only": true
+    }
+  },
+  "regime": {
+    "label": "neutral",
+    "score": 61.51,
+    "confidence": 69.06,
+    "reasons": [
+      "上涨家数占优"
+    ]
+  },
+  "target_diagnostics": {
+    "stats": {
+      "A": {
+        "positions": 10,
+        "exposure": 0.608501,
+        "max_position": 0.074921,
+        "industry_weights": {
+          "银行": 0.2,
+          "农林牧渔": 0.139129,
+          "综合": 0.074921,
+          "非银金融": 0.067279,
+          "医药生物": 0.06532,
+          "传媒": 0.061852
+        },
+        "max_industry": 0.2,
+        "max_industry_share_of_invested": 0.328677,
+        "top2_industry_share_of_invested": 0.557319,
+        "industry_hhi": 0.209545,
+        "effective_industries": 4.7722
+      },
+      "B": {
+        "positions": 6,
+        "exposure": 0.723112,
+        "max_position": 0.17342,
+        "industry_weights": {
+          "石油石化": 0.300156,
+          "医药生物": 0.299999,
+          "煤炭": 0.122957
+        },
+        "max_industry": 0.300156,
+        "max_industry_share_of_invested": 0.415089,
+        "top2_industry_share_of_invested": 0.829961,
+        "industry_hhi": 0.373331,
+        "effective_industries": 2.6786
+      },
+      "C": {
+        "positions": 3,
+        "exposure": 0.472906,
+        "max_position": 0.162531,
+        "industry_weights": {
+          "石油石化": 0.162531,
+          "医药生物": 0.1571,
+          "农林牧渔": 0.153275
+        },
+        "max_industry": 0.162531,
+        "max_industry_share_of_invested": 0.343686,
+        "top2_industry_share_of_invested": 0.675887,
+        "industry_hhi": 0.333527,
+        "effective_industries": 2.9983
+      },
+      "D": {
+        "positions": 7,
+        "exposure": 0.612526,
+        "max_position": 0.102072,
+        "industry_weights": {
+          "银行": 0.28,
+          "石油石化": 0.170045,
+          "综合": 0.086673,
+          "医药生物": 0.075808
+        },
+        "max_industry": 0.28,
+        "max_industry_share_of_invested": 0.457123,
+        "top2_industry_share_of_invested": 0.734736,
+        "industry_hhi": 0.32137,
+        "effective_industries": 3.1117
+      },
+      "L": {
+        "positions": 8,
+        "exposure": 0.599999,
+        "max_position": 0.12,
+        "industry_weights": {
+          "农林牧渔": 0.24,
+          "银行": 0.239999,
+          "综合": 0.12
+        },
+        "max_industry": 0.24,
+        "max_industry_share_of_invested": 0.400001,
+        "top2_industry_share_of_invested": 0.8,
+        "industry_hhi": 0.36,
+        "effective_industries": 2.7778
+      }
+    },
+    "overlap_jaccard": {
+      "A-B": 0.0,
+      "A-C": 0.0,
+      "A-D": 0.2143,
+      "A-L": 0.5,
+      "B-C": 0.2857,
+      "B-D": 0.3,
+      "B-L": 0.0,
+      "C-D": 0.25,
+      "C-L": 0.0,
+      "D-L": 0.25
+    },
+    "high_overlap_pairs": {},
+    "concentration_flags": {
+      "B": [],
+      "C": []
+    },
+    "board_policy": {
+      "version": "retail-mainboard-only-2026-08-19",
+      "scope": "SH_SZ_MAINBOARD_ONLY",
+      "excludes": [
+        "CHINEXT_300_301",
+        "STAR_688_689",
+        "BSE",
+        "B_SHARES"
+      ],
+      "input_candidates": 180,
+      "eligible_candidates": 180,
+      "excluded_non_mainboard_count": 0,
+      "excluded_non_mainboard_symbols": []
+    },
+    "plan_version": "v2-conditional-plan-v1"
+  },
+  "previous_event_hashes": {
+    "A": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+    "B": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+    "C": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+    "D": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+    "L": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c"
+  },
+  "funds": {
+    "A": {
+      "previous_pending_decision_sha256": "52e888c2b709ccda334d5bbc0d115e98049eb2270bda5b59f8ec2d661ddcc53b",
+      "corrected_pending_decision_sha256": "bce5deb596bc86075da41c0392f36ab46a77848a83fa88c992dd00c8048197e2",
+      "target_count": 10,
+      "economics_unchanged": true,
+      "closing_ledger_content_sha256": "fef62f103c94296feca04b16e2a4059845c0ede38461cb35068b4f929aaf0f00"
+    },
+    "B": {
+      "previous_pending_decision_sha256": "7b7ab3d6294004e4e26ad887a8b60fd054a52231f9e9d6a4ffd82d51f8ad42b8",
+      "corrected_pending_decision_sha256": "f0265d9b23701e20e784dd7a2a02ae466c056d61221b9b8ff92463b3b7d79808",
+      "target_count": 6,
+      "economics_unchanged": true,
+      "closing_ledger_content_sha256": "49752e994939137f566a6374e67984251cf8e632e9ac48e17a8912499033f663"
+    },
+    "C": {
+      "previous_pending_decision_sha256": "6f6ce01a6a9891efbc1fc6181d47eff1f769fbebaf8814c5d4ce8ca6cd749362",
+      "corrected_pending_decision_sha256": "b706c5301e4c670726b5bd61175b0bcd5650286d93538c777ad7338589816513",
+      "target_count": 3,
+      "economics_unchanged": true,
+      "closing_ledger_content_sha256": "8e6c5ede96635dbee4ef3fcc62a984ea8b19397d6b2f8cfc26007be04411daac"
+    },
+    "D": {
+      "previous_pending_decision_sha256": "e0159e60eab26b80780642c3b7a2dfcff71c820d6e56d3fe3f5e07d21b037854",
+      "corrected_pending_decision_sha256": "09151eb8f53d70e620ae4e0b56e3ef3c4b38e7bff0ab4732ac315518d4da2e2b",
+      "target_count": 7,
+      "economics_unchanged": true,
+      "closing_ledger_content_sha256": "ac39b8dc129fd56ba647fc70784f19deb0f85a4608c8b76dc24cf78dd1bf40b6"
+    },
+    "L": {
+      "previous_pending_decision_sha256": "6af796ef2d198ec80c6d1067dd35be81d72bbc3fbd56e4888debe8a1a106a87e",
+      "corrected_pending_decision_sha256": "e952d9566f25937e4a128b63bfa6fa317645312571fcc320fb5d3110bef7bbfb",
+      "target_count": 8,
+      "economics_unchanged": true,
+      "closing_ledger_content_sha256": "fc9641ee24d7b77036e9c0d451a13476a3e1e3a10b72b69d45d0786d3fedd66c"
+    }
+  },
+  "supersedes_event_hash": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
+  "corrects_pending_plan_loss": true,
+  "safety": {
+    "calls_sol": false,
+    "reads_v1_ledger": false,
+    "writes_v1_ledger": false,
+    "forced_clock_buy": false,
+    "forced_clock_sell": false,
+    "changes_economic_history": false,
+    "pending_plan_only": true,
+    "repairs_missing_trade_plan": true,
+    "history_preserved_append_only": true,
+    "state_root": "shadow_state/v2"
+  },
+  "event_hash": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc"
+}
