@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from .broker import execute_conditional_buys
 from .daily_run import FUNDS, STATE_ROOT, _pending_decision_date, export_web, run_real
 from .state import load_state, save_state
+from .trade_price_time import annotate_conditional_buy_fills
 from .trading_plan import EXECUTION_MODEL, PLAN_VERSION, pending_is_conditional
 
 
@@ -71,6 +72,9 @@ def settle_previous_conditional_entries(requested_date: str) -> str:
                 state, pending, bars, trade_date,
                 note='上一交易日条件计划 · 15:10结算当日已触发买单',
             )
+            # Metadata only: preserve the first minute where the declared entry condition
+            # was actually touched. This never changes fill eligibility, price, size, or fees.
+            annotate_conditional_buy_fills(market.ak, fills, pending, trade_date)
             state.setdefault('fills', []).extend(fills)
             state['last_entry_settlement'] = {
                 'trade_date': trade_date,
@@ -78,6 +82,7 @@ def settle_previous_conditional_entries(requested_date: str) -> str:
                 'fills': len(fills),
                 'not_triggered_or_skipped': skipped,
                 'plan_version': PLAN_VERSION,
+                'price_time_evidence': 'first_trigger_minute_when_available',
             }
             print(f'[15:10-plan] {fid} triggered buys={len(fills)} skipped={len(skipped)}')
         else:
