@@ -1,0 +1,495 @@
+name: Correct V2 2026-08-20 legacy catch-up pollution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v2-correct-20260820-catchup.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: v2-daily-settlement
+  cancel-in-progress: false
+
+jobs:
+  restate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout current V2 shadow branch
+        uses: actions/checkout@v4
+        with:
+          ref: v2-shadow
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: Verify exact polluted-history preconditions
+        id: pre
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from engine_v2.shadow_ledger import FUND_NAMES, sha256_json
+
+          td='2026-08-20'
+          bad_hash='ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7'
+          root=Path('shadow_state/v2')
+          correction=root/'audit'/f'{td}~conditional-execution-restatement.json'
+
+          def load_valid(path):
+              x=json.loads(path.read_text(encoding='utf-8'))
+              body=dict(x); claimed=body.pop('event_hash',None)
+              if not claimed or sha256_json(body)!=claimed:
+                  raise SystemExit(f'invalid audit hash: {path}')
+              return x
+
+          if correction.exists():
+              event=load_valid(correction)
+              heads={
+                  json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8')).get('audit_head')
+                  for fid in FUND_NAMES
+              }
+              if heads != {event.get('event_hash')}:
+                  raise SystemExit(f'existing restatement is not the current ledger head: {heads}')
+              mode='already_corrected'
+              correction_hash=event['event_hash']
+          else:
+              bad=load_valid(root/'audit'/f'{td}-execution.json')
+              if bad.get('event_kind')!='execution_catchup' or bad.get('event_hash')!=bad_hash:
+                  raise SystemExit('refusing correction: unexpected legacy catch-up event')
+              daily=load_valid(root/'audit'/f'{td}.json')
+              if daily.get('event_kind')!='conditional_entries_and_decision':
+                  raise SystemExit('refusing correction: polluted recovery daily event missing')
+              parents=set((daily.get('previous_event_hashes') or {}).values())
+              if parents != {bad_hash}:
+                  raise SystemExit(f'refusing correction: daily event is not descended from bad catch-up: {parents}')
+              heads={
+                  json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8')).get('audit_head')
+                  for fid in FUND_NAMES
+              }
+              if heads != {daily.get('event_hash')}:
+                  raise SystemExit(f'refusing correction: current ledgers moved since polluted recovery: {heads}')
+              mode='needs_correction'
+              correction_hash=''
+
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f'mode={mode}\n')
+              f.write(f'correction_hash={correction_hash}\n')
+          print('V2 2026-08-20 correction mode=',mode)
+          PY
+
+      - name: Restore exact clean state immediately before invalid catch-up
+        if: steps.pre.outputs.mode == 'needs_correction'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_COMMIT=698d265dd1d669b33781cef5719c524da5346d42
+          rm -rf /tmp/v2-canonical-root
+          mkdir -p /tmp/v2-canonical-root
+          git cat-file -e "${CLEAN_COMMIT}^{commit}"
+          git archive "$CLEAN_COMMIT" shadow_state/v2 | tar -x -C /tmp/v2-canonical-root
+          test -f /tmp/v2-canonical-root/shadow_state/v2/audit/2026-08-20-execution-1455.json
+          test ! -f /tmp/v2-canonical-root/shadow_state/v2/audit/2026-08-20.json
+
+      - name: Build exact 2026-08-20 market snapshot for canonical replay
+        if: steps.pre.outputs.mode == 'needs_correction'
+        run: |
+          python -m engine_v2.resilient_snapshot \
+            --date 2026-08-20 \
+            --output /tmp/v2-restatement-snapshot.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/v2-restatement-snapshot.json',encoding='utf-8'))
+          if str(x.get('trade_date') or '')[:10] != '2026-08-20':
+              raise SystemExit('restatement snapshot date mismatch')
+          safety=x.get('safety') or {}
+          if safety.get('stock_universe_grade') != 'full' or not safety.get('eligible_for_shadow_decision'):
+              raise SystemExit('restatement snapshot is not full decision-grade data')
+          detail=((x.get('market') or {}).get('sentiment_detail') or {})
+          if str(detail.get('trade_date') or '')[:10] != '2026-08-20':
+              raise SystemExit('restatement sentiment is not exact 2026-08-20 session data')
+          PY
+
+      - name: Enrich canonical replay snapshot
+        if: steps.pre.outputs.mode == 'needs_correction'
+        env:
+          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v2-history-restatement
+          V2_HISTORY_WORKERS: '3'
+        run: |
+          python -m engine_v2.enrichment_resilient \
+            --snapshot /tmp/v2-restatement-snapshot.json \
+            --output /tmp/v2-restatement-enriched.json
+
+      - name: Replay canonical 15:10 conditional settlement from clean 14:55 state
+        if: steps.pre.outputs.mode == 'needs_correction'
+        run: |
+          python -m engine_v2.shadow_run_split \
+            --snapshot /tmp/v2-restatement-snapshot.json \
+            --enriched /tmp/v2-restatement-enriched.json \
+            --state-root /tmp/v2-canonical-root/shadow_state/v2 \
+            --previous-trade-date 2026-08-19 \
+            --report /tmp/v2-restatement-run.json
+
+      - name: Verify canonical replay did not repeat legacy open-price sells
+        if: steps.pre.outputs.mode == 'needs_correction'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from engine_v2.shadow_ledger import FUND_NAMES
+          from engine_v2.shadow_reporting import verify_audit_chain
+
+          bad=json.load(open('shadow_state/v2/audit/2026-08-20-execution.json',encoding='utf-8'))
+          clean_root=Path('/tmp/v2-canonical-root/shadow_state/v2')
+          result=verify_audit_chain(clean_root)
+          if result.get('status')!='PASS':
+              raise SystemExit(f'canonical replay audit failed: {result}')
+
+          removed=0
+          for fid in FUND_NAMES:
+              state=json.loads((clean_root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              bad_fills=((bad.get('funds') or {}).get(fid) or {}).get('execution',{}).get('fills') or []
+              bad_sells=[x for x in bad_fills if x.get('side')=='SELL']
+              removed += len(bad_sells)
+              current_fills=state.get('fills') or []
+              for fill in current_fills:
+                  if (
+                      str(fill.get('trade_date') or '')[:10]=='2026-08-20'
+                      and fill.get('note')=='V2 目标仓位再平衡'
+                  ):
+                      raise SystemExit(f'{fid}: legacy catch-up fill survived canonical replay: {fill}')
+              for bad_fill in bad_sells:
+                  symbol=bad_fill.get('symbol')
+                  if symbol not in (state.get('positions') or {}):
+                      raise SystemExit(f'{fid}: {symbol} was sold by invalid catch-up and was not restored')
+              if str(state.get('last_processed_date') or '')[:10] != '2026-08-20':
+                  raise SystemExit(f'{fid}: canonical replay did not finish 2026-08-20')
+              pending=state.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!='2026-08-20':
+                  raise SystemExit(f'{fid}: canonical next-session plan missing')
+          if removed == 0:
+              raise SystemExit('expected invalid catch-up sells were not found')
+          print('CANONICAL V2 REPLAY PASS; invalid legacy sells removed=',removed)
+          PY
+
+      - name: Append transparent restatement and install canonical ledgers
+        if: steps.pre.outputs.mode == 'needs_correction'
+        id: restate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import copy, json, os
+          from pathlib import Path
+          from engine_v2.shadow_ledger import (
+              FUND_NAMES, immutable_write, ledger_content_hash, save_ledger, sha256_json,
+          )
+
+          td='2026-08-20'
+          bad_hash='ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7'
+          clean_commit='698d265dd1d669b33781cef5719c524da5346d42'
+          root=Path('shadow_state/v2')
+          clean_root=Path('/tmp/v2-canonical-root/shadow_state/v2')
+          bad=json.loads((root/'audit'/f'{td}-execution.json').read_text(encoding='utf-8'))
+          polluted_daily=json.loads((root/'audit'/f'{td}.json').read_text(encoding='utf-8'))
+          canonical_daily=json.loads((clean_root/'audit'/f'{td}.json').read_text(encoding='utf-8'))
+
+          current_states={fid:json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8')) for fid in FUND_NAMES}
+          canonical_states={fid:json.loads((clean_root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8')) for fid in FUND_NAMES}
+          heads={state.get('audit_head') for state in current_states.values()}
+          if heads != {polluted_daily.get('event_hash')}:
+              raise SystemExit(f'polluted state moved before restatement: {heads}')
+          current_head=next(iter(heads))
+
+          source_ref=copy.deepcopy(canonical_daily.get('source_ref') or {})
+          source_ref['restatement']={
+              'reason':'legacy execution_catchup used fixed open-price target rebalancing after V2 had migrated to conditional plans',
+              'invalid_execution_catchup_hash':bad_hash,
+              'superseded_polluted_daily_hash':current_head,
+              'clean_state_commit':clean_commit,
+              'canonical_replay_event_hash':canonical_daily.get('event_hash'),
+              'history_preserved_append_only':True,
+          }
+
+          fund_events={}
+          for fid in FUND_NAMES:
+              canonical_state=canonical_states[fid]
+              item=copy.deepcopy(((canonical_daily.get('funds') or {}).get(fid) or {}))
+              invalid_fills=copy.deepcopy((((bad.get('funds') or {}).get(fid) or {}).get('execution') or {}).get('fills') or [])
+              item['restatement']={
+                  'polluted_ledger_content_sha256':ledger_content_hash(current_states[fid]),
+                  'invalid_catchup_fills_removed':invalid_fills,
+                  'invalid_catchup_fees_removed':round(sum(float(x.get('fees') or 0.0) for x in invalid_fills),2),
+                  'canonical_ledger_content_sha256':ledger_content_hash(canonical_state),
+              }
+              item['closing_ledger_content_sha256']=ledger_content_hash(canonical_state)
+              fund_events[fid]=item
+
+          event={
+              'schema_version':canonical_daily.get('schema_version'),
+              'event_kind':'conditional_execution_restatement',
+              'trade_date':td,
+              'previous_trade_date':canonical_daily.get('previous_trade_date'),
+              'execution_policy_version':canonical_daily.get('execution_policy_version'),
+              'source_ref':source_ref,
+              'regime':canonical_daily.get('regime'),
+              'target_diagnostics':canonical_daily.get('target_diagnostics'),
+              'previous_event_hashes':{fid:current_head for fid in FUND_NAMES},
+              'funds':fund_events,
+              'corrects_event_hash':bad_hash,
+              'supersedes_event_hash':current_head,
+              'canonical_replay_event_hash':canonical_daily.get('event_hash'),
+              'safety':{
+                  'calls_sol':False,
+                  'reads_v1_ledger':False,
+                  'writes_v1_ledger':False,
+                  'forced_clock_buy':False,
+                  'forced_clock_sell':False,
+                  'ledger_restatement':True,
+                  'removes_invalid_legacy_catchup_economics':True,
+                  'history_preserved_append_only':True,
+                  'state_root':'shadow_state/v2',
+              },
+          }
+          event_hash=sha256_json(event)
+          event['event_hash']=event_hash
+          correction_path=root/'audit'/f'{td}~conditional-execution-restatement.json'
+          immutable_write(correction_path,event)
+
+          for fid,state in canonical_states.items():
+              state['audit_head']=event_hash
+              save_ledger(root/'ledgers'/f'{fid}.json',state)
+
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f'correction_hash={event_hash}\n')
+          print('V2 restatement event=',event_hash)
+          PY
+
+      - name: Rebuild corrected V2 summary and web artifact
+        run: |
+          python -m engine_v2.shadow_reporting \
+            --state-root shadow_state/v2 \
+            --output shadow_state/v2/summary.json \
+            --web-output web/v2/data.json
+
+      - name: Run complete V2 regression suite against corrected state
+        run: python -m unittest discover -s tests -p 'test_v2*.py' -v
+
+      - name: Require corrected audit, ledgers and next-session plans
+        id: verify_state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          from engine_v2.shadow_guard import processed_session
+          from engine_v2.shadow_ledger import FUND_NAMES
+          from engine_v2.shadow_reporting import verify_audit_chain
+
+          td='2026-08-20'
+          root=Path('shadow_state/v2')
+          result=verify_audit_chain(root)
+          if result.get('status')!='PASS':
+              raise SystemExit(f'corrected V2 audit chain failed: {result}')
+          session=processed_session(root,td)
+          if not session or session.get('terminal_event_kind')!='conditional_execution_restatement':
+              raise SystemExit(f'corrected session is not terminally verified: {session}')
+          correction_hash=session['event_hash']
+          for fid in FUND_NAMES:
+              state=json.loads((root/'ledgers'/f'{fid}.json').read_text(encoding='utf-8'))
+              if str(state.get('last_processed_date') or '')[:10]!=td or str(state.get('last_execution_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: corrected dates mismatch')
+              pending=state.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!=td:
+                  raise SystemExit(f'{fid}: corrected next-session plan missing')
+              if float(state.get('cash') or 0.0)<-1e-6:
+                  raise SystemExit(f'{fid}: negative cash after restatement')
+          web=json.load(open('web/v2/data.json',encoding='utf-8'))
+          if str(web.get('updated_at') or '')[:10]!=td:
+              raise SystemExit('corrected web date mismatch')
+          if web.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or web.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('corrected web model/version mismatch')
+          print(f'correction_hash={correction_hash}')
+          print(f'audit_head={result["head"]}')
+          print(f'audit_events={result["events"]}')
+          PY
+
+      - name: Persist corrected V2 shadow state
+        id: persist_v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "v2-restatement-bot"
+          git config user.email "v2-restatement-bot@users.noreply.github.com"
+          git add shadow_state/v2 web/v2/data.json
+          if ! git diff --cached --quiet; then
+            git commit -m "v2-data: restate invalid 2026-08-20 legacy catch-up"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
+          git fetch origin v2-shadow
+          echo "sha=$(git rev-parse origin/v2-shadow)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync corrected V2 artifact into main
+        id: sync_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp web/v2/data.json /tmp/v2-corrected-data.json
+          expected="$(sha256sum /tmp/v2-corrected-data.json | awk '{print $1}')"
+          echo "expected_sha256=$expected" >> "$GITHUB_OUTPUT"
+          rm -rf /tmp/v2-correction-main
+          git fetch origin main
+          git worktree add --detach /tmp/v2-correction-main origin/main
+          cd /tmp/v2-correction-main
+          git config user.name "v2-restatement-bot"
+          git config user.email "v2-restatement-bot@users.noreply.github.com"
+          pushed=0
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/v2-corrected-data.json web/v2/data.json
+            git add web/v2/data.json
+            if git diff --cached --quiet; then pushed=1; break; fi
+            git commit -m "v2-data: publish corrected 2026-08-20 restatement"
+            if git push origin HEAD:main; then pushed=1; break; fi
+          done
+          test "$pushed" = "1"
+          git fetch origin main
+          actual="$(git show origin/main:web/v2/data.json | sha256sum | awk '{print $1}')"
+          test "$actual" = "$expected"
+          echo "main_sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch canonical Pages deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/v2-correction-dispatch.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-deploy.yml/dispatches" \
+            -d '{"ref":"main"}')
+          echo "dispatch_http_code=$code"
+          test "$code" = "204"
+
+      - name: Verify public V2 equals corrected restatement artifact
+        id: verify_public
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ steps.sync_main.outputs.expected_sha256 }}"
+          for i in $(seq 1 60); do
+            url="https://ghzyzttxwd.github.io/ai-stock-lab/v2/data.json?v2_restatement=${GITHUB_RUN_ID}-${i}"
+            if curl -fsS --connect-timeout 5 --max-time 20 "$url" -o /tmp/live-v2-restatement.json; then
+              actual="$(sha256sum /tmp/live-v2-restatement.json | awk '{print $1}')"
+              if [ "$actual" = "$expected" ]; then
+                python - <<'PY'
+          import json
+          live=json.load(open('/tmp/live-v2-restatement.json',encoding='utf-8'))
+          if str(live.get('updated_at') or '')[:10]!='2026-08-20':
+              raise SystemExit('public corrected V2 date mismatch')
+          if live.get('execution_model')!='V2_CONDITIONAL_PLAN_V1' or live.get('plan_version')!='v2-conditional-plan-v1':
+              raise SystemExit('public corrected V2 model/version mismatch')
+          for fid,fund in (live.get('funds') or {}).items():
+              pending=fund.get('pending_decision')
+              if not isinstance(pending,dict) or str(pending.get('decision_date') or '')[:10]!='2026-08-20':
+                  raise SystemExit(f'public corrected V2 {fid} next-session plan missing')
+          print('PUBLIC V2 RESTATEMENT VERIFIED')
+          PY
+                echo "actual_sha256=$actual" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo 'Public V2 did not converge to corrected restatement artifact.'
+          exit 1
+
+      - name: Persist terminal correction receipts only after public hash match
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ steps.sync_main.outputs.expected_sha256 }}
+          PUBLIC_SHA256: ${{ steps.verify_public.outputs.actual_sha256 }}
+          V2_SHADOW_SHA: ${{ steps.persist_v2.outputs.sha }}
+          MAIN_SOURCE_SHA: ${{ steps.sync_main.outputs.main_sha }}
+          CORRECTION_HASH: ${{ steps.verify_state.outputs.correction_hash }}
+          AUDIT_HEAD: ${{ steps.verify_state.outputs.audit_head }}
+          AUDIT_EVENTS: ${{ steps.verify_state.outputs.audit_events }}
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_SHA256" = "$PUBLIC_SHA256"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          receipt={
+              'status':'verified',
+              'daily_complete':True,
+              'end_to_end_verified':True,
+              'trade_date':'2026-08-20',
+              'execution_model':'V2_CONDITIONAL_PLAN_V1',
+              'plan_version':'v2-conditional-plan-v1',
+              'buy_reference':'predeclared_price_condition',
+              'forced_clock_buy':False,
+              'forced_clock_sell':False,
+              'ledger_restatement':True,
+              'history_preserved_append_only':True,
+              'corrected_invalid_execution_catchup_hash':'ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7',
+              'correction_event_hash':os.environ['CORRECTION_HASH'],
+              'audit_head':os.environ['AUDIT_HEAD'],
+              'audit_events':int(os.environ['AUDIT_EVENTS']),
+              'expected_sha256':os.environ['EXPECTED_SHA256'],
+              'public_sha256':os.environ['PUBLIC_SHA256'],
+              'v2_shadow_source_commit':os.environ['V2_SHADOW_SHA'],
+              'main_source_commit':os.environ['MAIN_SOURCE_SHA'],
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
+          for path in ('/tmp/v2-1510-chain-verification.json','/tmp/v2-20260820-restatement-verification.json'):
+              open(path,'w',encoding='utf-8').write(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+          PY
+          cd /tmp/v2-correction-main
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v2-1510-chain-verification.json state/v2_1510_chain_verification.json
+            cp /tmp/v2-20260820-restatement-verification.json state/v2_20260820_restatement_verification.json
+            git add state/v2_1510_chain_verification.json state/v2_20260820_restatement_verification.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "ops: verify corrected V2 2026-08-20 terminal chain"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-20260820-restatement-${{ github.run_id }}
+          path: |
+            /tmp/v2-restatement-snapshot.json
+            /tmp/v2-restatement-enriched.json
+            /tmp/v2-restatement-run.json
+            /tmp/live-v2-restatement.json
+            shadow_state/v2/audit/2026-08-20~conditional-execution-restatement.json
+          if-no-files-found: warn
+          retention-days: 30

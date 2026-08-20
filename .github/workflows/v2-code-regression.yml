@@ -52,33 +52,37 @@ jobs:
           PY
           )
           echo "test_count=$count" >> "$GITHUB_OUTPUT"
-          test "$count" -ge 62
-      - name: Assert checkpoint freshness, late duplicate no-op, audit ordering, durability and monotonic receipts
+          test "$count" -ge 63
+      - name: Assert checkpoint freshness, atomic settlement, audit ordering and fail-closed recovery
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
-          workflow = Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
+          morning = Path('main/.github/workflows/v2-morning-sell.yml').read_text(encoding='utf-8')
           guard = Path('main/.github/workflows/v2-checkpoint-guard.yml').read_text(encoding='utf-8')
+          settlement = Path('main/.github/workflows/v2-evening-split.yml').read_text(encoding='utf-8')
+          fallback = Path('main/.github/workflows/v2-shadow-production.yml').read_text(encoding='utf-8')
           runner = Path('v2/engine_v2/morning_sell_run.py').read_text(encoding='utf-8')
+          catchup = Path('v2/engine_v2/execution_catchup.py').read_text(encoding='utf-8')
           reporting = Path('v2/engine_v2/shadow_reporting.py').read_text(encoding='utf-8')
           ordering_test = Path('v2/tests/test_v2_audit_order.py')
           timing_test = Path('v2/tests/test_v2_checkpoint_timing.py').read_text(encoding='utf-8')
+          catchup_test = Path('v2/tests/test_v2_execution_catchup.py').read_text(encoding='utf-8')
 
           expected = (
               "'40 1 * * 1-5'", "'30 2 * * 1-5'", "'20 3 * * 1-5'",
               "'30 5 * * 1-5'", "'30 6 * * 1-5'", "'55 6 * * 1-5'",
           )
-          missing = [x for x in expected if x not in workflow]
+          missing = [x for x in expected if x not in morning]
           if missing:
               raise SystemExit(f'missing V2 checkpoints: {missing}')
           for obsolete in ("'50 1 * * 1-5'", "'0 2 * * 1-5'"):
-              if obsolete in workflow:
+              if obsolete in morning:
                   raise SystemExit(f'obsolete retry cron still wired: {obsolete}')
-          if 'cancel-in-progress: false' not in workflow:
+          if 'cancel-in-progress: false' not in morning:
               raise SystemExit('V2 checkpoints may still cancel an in-flight run')
-          if '--scheduled-time' not in workflow:
+          if '--scheduled-time' not in morning:
               raise SystemExit('V2 workflow does not pass logical checkpoint to runner')
 
           if 'stale_checkpoint_skipped' not in runner:
@@ -91,15 +95,15 @@ jobs:
               raise SystemExit('stale/late duplicate V2 run is not proven fail-closed')
           if 'test_late_duplicate_is_noop_and_never_claims_fresh_evaluation' not in timing_test:
               raise SystemExit('late duplicate regression test is missing')
-          if 'late_duplicate_noop' not in workflow:
-              raise SystemExit('canonical workflow does not understand late duplicate no-op')
-          if "evaluated_fresh=checkpoint_status=='conditional_exit_processed'" not in workflow:
+          if 'late_duplicate_noop' not in morning:
+              raise SystemExit('canonical checkpoint workflow does not understand late duplicate no-op')
+          if "evaluated_fresh=checkpoint_status=='conditional_exit_processed'" not in morning:
               raise SystemExit('canonical status can still label duplicate work as freshly evaluated')
-          if '[MONOTONIC RECEIPT]' not in workflow:
+          if '[MONOTONIC RECEIPT]' not in morning:
               raise SystemExit('canonical receipt can still roll back to an older checkpoint')
-          if '[MONOTONIC STATUS]' not in workflow:
+          if '[MONOTONIC STATUS]' not in morning:
               raise SystemExit('canonical status can still roll back to an older checkpoint')
-          if 'v2_morning_last_attempt.json' not in workflow:
+          if 'v2_morning_last_attempt.json' not in morning:
               raise SystemExit('late attempts are not preserved separately from monotonic checkpoint status')
 
           if '_ordered_audit_events' not in reporting:
@@ -109,16 +113,56 @@ jobs:
 
           canonical_core = 'Persist V2 audit and ledger core before derived reporting'
           guard_core = 'Persist V2 audit and ledger core before derived reporting'
-          if canonical_core not in workflow or workflow.index(canonical_core) > workflow.index('Build intraday V2 summary'):
-              raise SystemExit('canonical workflow does not persist core before derived reporting')
+          if canonical_core not in morning or morning.index(canonical_core) > morning.index('Build intraday V2 summary'):
+              raise SystemExit('canonical checkpoint workflow does not persist core before derived reporting')
           if guard_core not in guard or guard.index(guard_core) > guard.index('Build intraday V2 summary'):
               raise SystemExit('guard workflow does not persist core before derived reporting')
-          for text, label in ((workflow, 'canonical'), (guard, 'guard')):
+          for text, label in ((morning, 'canonical checkpoint'), (guard, 'guard')):
               for marker in ('checkpoint_durable', 'end_to_end_verified'):
                   if marker not in text:
                       raise SystemExit(f'{label} workflow status lacks {marker}')
 
-          print('V2 CHECKPOINT + LATE DUPLICATE NO-OP + MONOTONIC RECEIPT + AUDIT ORDERING + CORE DURABILITY PASS')
+          # The 15:10 settlement is the only accounting implementation after conditional migration.
+          if 'group: v2-daily-settlement' not in settlement or 'cancel-in-progress: false' not in settlement:
+              raise SystemExit('V2 15:10 settlement is not serialized fail-safe')
+          if 'engine_v2.shadow_run_split' not in settlement:
+              raise SystemExit('V2 15:10 settlement is not using conditional split accounting')
+          if 'engine_v2.execution_catchup' in settlement or 'python -m engine_v2.shadow_run \\' in settlement:
+              raise SystemExit('legacy V2 accounting survived in canonical settlement')
+          if 'continue-on-error: true' in settlement:
+              raise SystemExit('canonical V2 settlement can still hide a failed critical step')
+          for marker in (
+              'Require complete daily conditional state before persistence',
+              'last_processed_date', 'last_execution_date', 'next-session plan is missing',
+              'Verify public V2 data equals conditional-plan result', 'daily_complete',
+          ):
+              if marker not in settlement:
+                  raise SystemExit(f'canonical V2 terminal contract missing: {marker}')
+          if "v2-shadow-summary-1.2" not in settlement:
+              raise SystemExit('canonical V2 settlement validates an obsolete web schema')
+
+          # Late production retries must dispatch the canonical workflow, never mutate ledgers themselves.
+          if 'v2-evening-split.yml' not in fallback or 'gh run watch' not in fallback or '--exit-status' not in fallback:
+              raise SystemExit('V2 fallback does not dispatch and require canonical terminal success')
+          forbidden_fallback = (
+              'engine_v2.execution_catchup', 'engine_v2.shadow_run', 'engine_v2.shadow_run_split',
+              'shadow_state/v2/ledgers', 'continue-on-error: true',
+          )
+          survived = [x for x in forbidden_fallback if x in fallback]
+          if survived:
+              raise SystemExit(f'fallback still contains accounting/masked-failure logic: {survived}')
+          if 'cancel-in-progress: false' not in fallback:
+              raise SystemExit('fallback dispatch can cancel an in-flight retry')
+
+          # Keep the old module only for pre-conditional historical compatibility, fail closed otherwise.
+          if 'legacy V2 execution catch-up is forbidden for conditional-plan state' not in catchup:
+              raise SystemExit('legacy catch-up is not fail-closed for conditional V2')
+          if '_uses_conditional_execution' not in catchup or 'pending_is_conditional' not in catchup:
+              raise SystemExit('legacy catch-up does not recognize conditional ledgers/plans')
+          if 'test_conditional_state_refuses_legacy_catchup_before_market_call_or_mutation' not in catchup_test:
+              raise SystemExit('conditional catch-up regression test is missing')
+
+          print('V2 CHECKPOINT + ATOMIC SETTLEMENT + FAIL-CLOSED RECOVERY CONTRACT PASS')
           PY
       - name: Verify current V2 audit and ledger chain
         id: audit
@@ -172,6 +216,10 @@ jobs:
               'audit_parent_link_ordering': True,
               'core_persisted_before_derived_reporting': True,
               'status_distinguishes_durable_and_end_to_end': True,
+              'conditional_catchup_fail_closed': True,
+              'single_settlement_implementation': True,
+              'settlement_requires_complete_daily_state': True,
+              'fallback_dispatch_only': True,
               'audit_chain_status': os.environ['AUDIT_STATUS'],
               'audit_head': os.environ['AUDIT_HEAD'],
               'audit_events': int(os.environ['AUDIT_EVENTS']),
