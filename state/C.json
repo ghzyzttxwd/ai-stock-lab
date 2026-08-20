@@ -2,14 +2,35 @@
   "fund_id": "C",
   "name": "短线快攻基金",
   "initial_cash": 1000000.0,
-  "cash": 784476.36,
+  "cash": 129428.12,
   "positions": {
+    "sh.603259": {
+      "name": "药明康德",
+      "qty": 1300,
+      "avg_cost": 160.5129,
+      "acquired_date": "2026-08-17",
+      "last_price": 164.0
+    },
+    "sh.603228": {
+      "name": "景旺电子",
+      "qty": 2400,
+      "avg_cost": 95.9151,
+      "acquired_date": "2026-08-19",
+      "last_price": 88.11
+    },
+    "sz.002768": {
+      "name": "国恩股份",
+      "qty": 3400,
+      "avg_cost": 65.0515,
+      "acquired_date": "2026-08-19",
+      "last_price": 63.2
+    },
     "sz.000636": {
       "name": "风华高科",
       "qty": 3700,
       "avg_cost": 59.5479,
       "acquired_date": "2026-08-19",
-      "last_price": 55.98
+      "last_price": 56.11
     }
   },
   "fills": [
@@ -237,54 +258,6 @@
       "fees": 5.0,
       "note": "上一交易日决策 · 15:10结算买入/加仓（参考当日开盘价）",
       "execution_price_field": "open"
-    },
-    {
-      "symbol": "sh.603259",
-      "name": "药明康德",
-      "side": "SELL",
-      "trade_date": "2026-08-20",
-      "reference_price": 171.0,
-      "price": 170.915,
-      "qty": 1300,
-      "gross": 222189.5,
-      "fees": 177.75,
-      "note": "条件计划 · 09:40检查触发 rotation_exit_price_reached",
-      "execution_price_field": "live_conditional",
-      "plan_version": "conditional-plan-v1",
-      "exit_reason": "rotation_exit_price_reached",
-      "scan_time": "09:40"
-    },
-    {
-      "symbol": "sh.603228",
-      "name": "景旺电子",
-      "side": "SELL",
-      "trade_date": "2026-08-20",
-      "reference_price": 89.32,
-      "price": 89.275,
-      "qty": 2400,
-      "gross": 214260.0,
-      "fees": 171.41,
-      "note": "条件计划 · 09:40检查触发 rotation_exit_price_reached",
-      "execution_price_field": "live_conditional",
-      "plan_version": "conditional-plan-v1",
-      "exit_reason": "rotation_exit_price_reached",
-      "scan_time": "09:40"
-    },
-    {
-      "symbol": "sz.002768",
-      "name": "国恩股份",
-      "side": "SELL",
-      "trade_date": "2026-08-20",
-      "reference_price": 64.48,
-      "price": 64.448,
-      "qty": 3400,
-      "gross": 219123.2,
-      "fees": 175.3,
-      "note": "条件计划 · 09:40检查触发 trailing_stop",
-      "execution_price_field": "live_conditional",
-      "plan_version": "conditional-plan-v1",
-      "exit_reason": "trailing_stop",
-      "scan_time": "09:40"
     }
   ],
   "equity_curve": [
@@ -1312,6 +1285,54 @@
   ],
   "conditional_plan_date": "2026-08-19",
   "exit_plans": {
+    "sh.603259": {
+      "plan_version": "conditional-plan-v1",
+      "opened_date": "2026-08-17",
+      "entry_price": 160.5129,
+      "hard_stop_price": 156.62,
+      "take_profit_price": 169.74,
+      "trailing_activation_price": 167.28,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 164.0,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 1,
+      "rotation_exit": true,
+      "rotation_min_price": 164.492,
+      "setup": "legacy-migrated"
+    },
+    "sh.603228": {
+      "plan_version": "conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 95.9151,
+      "hard_stop_price": 84.145,
+      "take_profit_price": 97.833,
+      "trailing_activation_price": 96.874,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 95.9151,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 89.167,
+      "setup": "legacy-migrated"
+    },
+    "sz.002768": {
+      "plan_version": "conditional-plan-v1",
+      "opened_date": "2026-08-19",
+      "entry_price": 65.0515,
+      "hard_stop_price": 60.356,
+      "take_profit_price": 66.353,
+      "trailing_activation_price": 65.702,
+      "trailing_drawdown_pct": 0.025,
+      "highest_price": 65.0515,
+      "partial_taken": false,
+      "max_hold_days": 3,
+      "sessions_held": 0,
+      "rotation_exit": true,
+      "rotation_min_price": 63.958,
+      "setup": "legacy-migrated"
+    },
     "sz.000636": {
       "plan_version": "conditional-plan-v1",
       "opened_date": "2026-08-19",
@@ -1328,26 +1349,5 @@
       "rotation_min_price": 56.783,
       "setup": "legacy-migrated"
     }
-  },
-  "last_conditional_scan_key": "2026-08-20T09:40",
-  "last_conditional_scan_at": "2026-08-20T10:42:33+08:00",
-  "conditional_scan_log": [
-    {
-      "slot": "09:40",
-      "at": "2026-08-20T10:42:33+08:00",
-      "fills": 3,
-      "checks": [
-        {
-          "symbol": "sz.000636",
-          "action": "HOLD",
-          "reason": "conditions_not_met",
-          "price": 55.98,
-          "hard_stop": 53.585,
-          "take_profit": 60.739,
-          "trailing_stop": 58.059,
-          "rotation_min_price": 56.783
-        }
-      ]
-    }
-  ]
+  }
 }
