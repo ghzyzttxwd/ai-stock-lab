@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from .broker import execute_conditional_buys
 from .daily_run import FUNDS, STATE_ROOT, _pending_decision_date, export_web, run_real
 from .exchange_calendar import exchange_calendar_previous_session
+from .runtime_metrics import reset as reset_runtime_metrics, stage, write_github_summary
 from .state import load_state, save_state
 from .trade_price_time import annotate_conditional_buy_fills
 from .trading_plan import EXECUTION_MODEL, PLAN_VERSION, pending_is_conditional
@@ -67,54 +68,64 @@ def settle_previous_conditional_entries(requested_date: str) -> str:
         if decision_date != previous:
             continue
 
-        if pending_is_conditional(pending):
-            fills, skipped = execute_conditional_buys(
-                state, pending, bars, trade_date,
-                note='上一交易日条件计划 · 15:10结算当日已触发买单',
-            )
-            # Metadata only: preserve the first minute where the declared entry condition
-            # was actually touched. This never changes fill eligibility, price, size, or fees.
-            annotate_conditional_buy_fills(market.ak, fills, pending, trade_date)
-            state.setdefault('fills', []).extend(fills)
-            state['last_entry_settlement'] = {
-                'trade_date': trade_date,
-                'settled_at': settled_at,
-                'fills': len(fills),
-                'not_triggered_or_skipped': skipped,
-                'plan_version': PLAN_VERSION,
-                'price_time_evidence': 'first_trigger_minute_when_available',
-            }
-            print(f'[15:10-plan] {fid} triggered buys={len(fills)} skipped={len(skipped)}')
-        else:
-            # Migration safety: never execute an old target that has no declared price condition.
-            state['last_entry_settlement'] = {
-                'trade_date': trade_date,
-                'settled_at': settled_at,
-                'fills': 0,
-                'legacy_plan_cancelled': True,
-            }
-            print(f'[15:10-plan] {fid} cancelled legacy fixed-price pending targets')
+        with stage(f'settlement.fund.{fid}'):
+            if pending_is_conditional(pending):
+                fills, skipped = execute_conditional_buys(
+                    state, pending, bars, trade_date,
+                    note='上一交易日条件计划 · 15:10结算当日已触发买单',
+                )
+                # Metadata only: preserve the first minute where the declared entry condition
+                # was actually touched. This never changes fill eligibility, price, size, or fees.
+                annotate_conditional_buy_fills(market.ak, fills, pending, trade_date)
+                state.setdefault('fills', []).extend(fills)
+                state['last_entry_settlement'] = {
+                    'trade_date': trade_date,
+                    'settled_at': settled_at,
+                    'fills': len(fills),
+                    'not_triggered_or_skipped': skipped,
+                    'plan_version': PLAN_VERSION,
+                    'price_time_evidence': 'first_trigger_minute_when_available',
+                }
+                print(f'[15:10-plan] {fid} triggered buys={len(fills)} skipped={len(skipped)}')
+            else:
+                # Migration safety: never execute an old target that has no declared price condition.
+                state['last_entry_settlement'] = {
+                    'trade_date': trade_date,
+                    'settled_at': settled_at,
+                    'fills': 0,
+                    'legacy_plan_cancelled': True,
+                }
+                print(f'[15:10-plan] {fid} cancelled legacy fixed-price pending targets')
 
-        state['pending_targets'] = []
-        state.pop('pending_decision_date', None)
-        state['execution_model'] = EXECUTION_MODEL
-        save_state(STATE_ROOT / f'{fid}.json', state)
+            state['pending_targets'] = []
+            state.pop('pending_decision_date', None)
+            state['execution_model'] = EXECUTION_MODEL
+            save_state(STATE_ROOT / f'{fid}.json', state)
 
     return trade_date
 
 
 def main() -> None:
-    now = datetime.now(ZoneInfo('Asia/Shanghai'))
-    requested = now.date().isoformat()
-    settle_previous_conditional_entries(requested)
+    reset_runtime_metrics()
+    try:
+        with stage('job.total'):
+            now = datetime.now(ZoneInfo('Asia/Shanghai'))
+            requested = now.date().isoformat()
 
-    export_web._real_mode = True
-    trade_date, candidates, market_score, snapshots, benchmarks = run_real(requested)
-    export_web(trade_date, candidates, market_score, snapshots, benchmarks)
-    print(
-        f'[15:10-plan] completed {trade_date}; market_score={market_score}; '
-        'only pre-declared conditions can create buys; no trigger means cash remains cash'
-    )
+            with stage('job.settle_previous_entries'):
+                settle_previous_conditional_entries(requested)
+
+            export_web._real_mode = True
+            with stage('job.run_real'):
+                trade_date, candidates, market_score, snapshots, benchmarks = run_real(requested)
+            with stage('job.export_web'):
+                export_web(trade_date, candidates, market_score, snapshots, benchmarks)
+            print(
+                f'[15:10-plan] completed {trade_date}; market_score={market_score}; '
+                'only pre-declared conditions can create buys; no trigger means cash remains cash'
+            )
+    finally:
+        write_github_summary()
 
 
 if __name__ == '__main__':
