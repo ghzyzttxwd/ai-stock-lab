@@ -6,21 +6,25 @@ from datetime import date, timedelta
 from .real_market import _f, _tx_amount_and_volume, _tx_amount_mode, _tx_symbol
 
 
-def _valid_current_bar(row: dict | None) -> bool:
+def _valid_current_bar(row: dict | None, trade_date: str) -> bool:
     if not row:
+        return False
+    bar_date = str(row.get('bar_date') or row.get('trade_date') or '')[:10]
+    if bar_date != trade_date:
         return False
     return all(_f(row.get(key)) > 0 for key in ('open', 'high', 'low', 'close', 'preclose'))
 
 
 def _append_current_qfq(rows: list[dict], bar: dict, trade_date: str, history_limit: int) -> list[dict] | None:
-    """Append a verified current unadjusted bar onto a stale qfq series.
+    """Append one explicitly dated completed-session bar onto a stale qfq series.
 
-    Tencent's qfq endpoint can lag the completed session even when its unadjusted/current
-    market data is already available. The stale qfq series' final close and the current
-    bar's preclose must describe the same prior close. Their ratio is used as the qfq scale.
-    A >3% mismatch is treated as a possible corporate-action / basis mismatch and rejected.
+    Tencent's qfq endpoint can lag the completed session even when its unadjusted daily
+    endpoint already exposes that exact date. The bridge therefore accepts only a bar whose
+    own date was verified by ``execution_bars``. Undated spot snapshots are never promoted
+    into a historical session. The qfq tail and raw preclose must also share the same basis;
+    a >3% mismatch is treated as a possible corporate-action/basis mismatch and rejected.
     """
-    if not rows or not _valid_current_bar(bar):
+    if not rows or not _valid_current_bar(bar, trade_date):
         return None
     if str(rows[-1].get('date') or '')[:10] >= trade_date:
         return rows
@@ -56,6 +60,7 @@ def _append_current_qfq(rows: list[dict], bar: dict, trade_date: str, history_li
         'tradestatus': str(bar.get('tradestatus') or '1'),
         'isST': str(bar.get('isST') or '0'),
         'history_bridge_source': str(bar.get('source') or 'current-bar'),
+        'history_bridge_bar_date': str(bar.get('bar_date') or bar.get('trade_date'))[:10],
         'history_bridge_scale': round(scale, 8),
     }
     merged = rows + [current]
@@ -118,22 +123,13 @@ def install() -> None:
             except Exception as exc:
                 print(f'[market] tencent qfq history failed {x["code"]}: {exc}')
 
-        # Prefer the already-fetched completed-session snapshot when it contains full OHLC.
-        # Tencent full-market spot rows contain only close for most symbols, so request an
-        # unadjusted current daily bar only for stale symbols that still lack usable OHLC.
-        need_execution: dict[str, str] = {}
-        for sym, (meta, rows) in stale.items():
-            if _valid_current_bar(meta):
-                merged = _append_current_qfq(rows, meta, trade_date, self.history_limit)
-                if merged and merged[-1]['date'] == trade_date:
-                    out[sym] = merged
-                    continue
-            need_execution[sym] = meta.get('name', sym)
-
+        # Never turn an undated spot snapshot into a completed historical session. The
+        # exact-date unadjusted daily endpoint is the only source allowed to bridge stale qfq.
+        need_execution = {sym: meta.get('name', sym) for sym, (meta, _rows) in stale.items()}
         execution = self.execution_bars(need_execution, trade_date) if need_execution else {}
         bridged = 0
         rejected = 0
-        for sym, name in need_execution.items():
+        for sym in need_execution:
             item = stale.get(sym)
             if not item:
                 continue
@@ -151,12 +147,12 @@ def install() -> None:
         required = max(1, math.ceil(len(selected) * 0.75))
         if len(out) < required:
             raise RuntimeError(
-                f'Current-history coverage too low after qfq bridge: {len(out)}/{len(selected)}, '
+                f'Current-history coverage too low after dated qfq bridge: {len(out)}/{len(selected)}, '
                 f'require >= {required}; stale_qfq={len(stale)} execution_requested={len(need_execution)} '
                 f'bridge_rejected={rejected}'
             )
         print(
-            f'[market] historical source=tencent+current-bar current_symbols={len(out)}/{len(selected)} '
+            f'[market] historical source=tencent+dated-current-bar current_symbols={len(out)}/{len(selected)} '
             f'stale_qfq={len(stale)} execution_requested={len(need_execution)} bridged={bridged} '
             f'bridge_rejected={rejected} amount_mode_yuan={amount_modes["yuan"]} '
             f'amount_mode_hands={amount_modes["hands"]}'
