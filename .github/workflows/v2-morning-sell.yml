@@ -89,6 +89,12 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
+      - name: Refresh V2 branch before regression and mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin v2-shadow
+          git reset --hard origin/v2-shadow
       - name: Run V2 regression tests before mutation
         run: python -m unittest discover -s tests -p 'test_v2*.py' -v
       - name: Check protective and profit exit conditions at live quote
@@ -98,6 +104,49 @@ jobs:
             --scheduled-time "${{ steps.td.outputs.slot }}" \
             --state-root shadow_state/v2 \
             --report /tmp/v2-morning-sell.json
+      - name: Require an operationally valid checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/v2-morning-sell.json',encoding='utf-8'))
+          safety=r.get('safety') or {}
+          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
+              raise SystemExit('V2 conditional-exit isolation invariant violated')
+          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}:
+              raise SystemExit(f'V2 checkpoint was not operationally completed: {r.get("status")}')
+          if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
+              raise SystemExit('V2 intraday path is not conditional-plan model')
+          print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('scheduled_time'),r.get('fills'),r.get('executed_at'))
+          PY
+      - name: Verify mutated V2 audit and ledger core
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from engine_v2.shadow_reporting import verify_audit_chain
+          result=verify_audit_chain(Path('shadow_state/v2'))
+          if result.get('status')!='PASS':
+              raise SystemExit(f'V2 mutated core verification failed: {result}')
+          print('[V2 CORE VERIFIED]',result)
+          PY
+      - name: Persist V2 audit and ledger core before derived reporting
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "v2-shadow-bot"
+          git config user.email "v2-shadow-bot@users.noreply.github.com"
+          git add shadow_state/v2/audit shadow_state/v2/ledgers
+          if git diff --cached --quiet; then
+            echo "No V2 core mutation to persist."
+          else
+            git commit -m "v2-data: persist conditional-exit core"
+            git pull --rebase origin v2-shadow
+            git push origin HEAD:v2-shadow
+          fi
+          touch /tmp/v2-core-durable
       - name: Build intraday V2 summary
         run: |
           python -m engine_v2.shadow_reporting \
@@ -117,23 +166,20 @@ jobs:
           safety=r.get('safety') or {}
           if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
               raise SystemExit('V2 conditional-exit isolation invariant violated')
-          if r.get('status') not in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}:
-              raise SystemExit(f'V2 checkpoint was not operationally completed: {r.get("status")}')
-          if r.get('status') in {'conditional_exit_processed','already_conditional_exit_scan'} and r.get('execution_model')!='V2_CONDITIONAL_PLAN_V1':
-              raise SystemExit('V2 intraday path is not conditional-plan model')
-          print('[V2 CONDITIONAL EXIT]',r.get('status'),r.get('trade_date'),r.get('scheduled_time'),r.get('fills'),r.get('executed_at'))
+          if safety.get('forced_clock_sell'):
+              raise SystemExit('V2 conditional-exit attempted a forced clock sale')
           PY
-      - name: Persist only isolated V2 conditional-exit state
+      - name: Persist derived V2 summary and web data
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
-          git add shadow_state/v2 web/v2/data.json
+          git add shadow_state/v2/summary.json web/v2/data.json
           if git diff --cached --quiet; then
-            echo "No V2 conditional-exit state change."
+            echo "No derived V2 checkpoint state change."
           else
-            git commit -m "v2-data: conditional exit checkpoint"
+            git commit -m "v2-data: conditional exit checkpoint summary"
             git pull --rebase origin v2-shadow
             git push origin HEAD:v2-shadow
           fi
@@ -213,7 +259,8 @@ jobs:
               'scheduled_time':report.get('scheduled_time'),'executed_at':report.get('executed_at'),
               'actual_clock':report.get('actual_clock'),'delay_minutes':report.get('delay_minutes'),
               'execution_model':report.get('execution_model'),'plan_version':report.get('plan_version'),
-              'forced_clock_sell':False,'expected_sha256':os.environ['EXPECTED_SHA256'],'public_sha256':os.environ['PUBLIC_SHA256'],
+              'forced_clock_sell':False,'checkpoint_durable':True,'end_to_end_verified':True,
+              'expected_sha256':os.environ['EXPECTED_SHA256'],'public_sha256':os.environ['PUBLIC_SHA256'],
               'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
               'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
           }
@@ -250,7 +297,29 @@ jobs:
           python - <<'PY'
           import json, os
           from datetime import datetime, timezone
-          status={'status':os.environ['JOB_STATUS'],'workflow_run_id':os.environ['GITHUB_RUN_ID'],'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_sha':os.environ.get('GITHUB_SHA'),'scheduled_time':os.environ.get('CHECKPOINT'),'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds')}
+          from pathlib import Path
+          report={}
+          report_path=Path('/tmp/v2-morning-sell.json')
+          if report_path.exists():
+              report=json.loads(report_path.read_text(encoding='utf-8'))
+          operational=report.get('status') in {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}
+          durable=Path('/tmp/v2-core-durable').exists()
+          status={
+              'status':os.environ['JOB_STATUS'],
+              'checkpoint_status':report.get('status'),
+              'checkpoint_evaluated_fresh':operational,
+              'checkpoint_durable':durable,
+              'end_to_end_verified':os.environ['JOB_STATUS']=='success',
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'event_name':os.environ.get('GITHUB_EVENT_NAME'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'scheduled_time':os.environ.get('CHECKPOINT'),
+              'actual_clock':report.get('actual_clock'),
+              'delay_minutes':report.get('delay_minutes'),
+              'event_hash':report.get('event_hash'),
+              'finished_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+          }
           open('/tmp/v2-morning-job-status.json','w',encoding='utf-8').write(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
           PY
           if [ ! -d /tmp/main-status/.git ] && [ ! -f /tmp/main-status/.git ]; then
