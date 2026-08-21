@@ -147,25 +147,7 @@ jobs:
 
       - name: Require an operationally valid checkpoint
         if: steps.td.outputs.skip != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
-          status = report.get('status')
-          allowed = {'conditional_exit_processed','already_conditional_exit_scan','already_processed','not_exchange_session'}
-          if status not in allowed:
-              raise SystemExit(f'V2 checkpoint is not operationally valid: {status}; report={report}')
-          if status == 'stale_checkpoint_skipped':
-              raise SystemExit('stale checkpoint must never be reported as green')
-          safety = report.get('safety') or {}
-          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 checkpoint isolation invariant violated')
-          if safety.get('forced_clock_sell'):
-              raise SystemExit('V2 checkpoint attempted a forced clock sale')
-          print('[V2 GUARD]', status, report.get('scheduled_time'), report.get('actual_clock'), report.get('delay_minutes'))
-          PY
+        run: python -m engine_v2.ops validate-checkpoint --report /tmp/v2-checkpoint-guard.json
 
       - name: Verify mutated V2 audit and ledger core
         if: steps.td.outputs.skip != 'true'
@@ -216,15 +198,7 @@ jobs:
         run: |
           set -euo pipefail
           git diff --quiet -- state web/d web/e
-          python - <<'PY'
-          import json
-          report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
-          safety = report.get('safety') or {}
-          if safety.get('calls_sol') or safety.get('reads_v1_ledger') or safety.get('writes_v1_ledger'):
-              raise SystemExit('V2 checkpoint isolation invariant violated')
-          if safety.get('forced_clock_sell'):
-              raise SystemExit('V2 checkpoint attempted a forced clock sale')
-          PY
+          python -m engine_v2.ops validate-checkpoint --report /tmp/v2-checkpoint-guard.json
 
       - name: Persist derived V2 summary and web data
         if: steps.td.outputs.skip != 'true'
@@ -319,36 +293,14 @@ jobs:
           TRADE_DATE: ${{ steps.td.outputs.date }}
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          report = json.load(open('/tmp/v2-checkpoint-guard.json', encoding='utf-8'))
-          if os.environ['EXPECTED_SHA256'] != os.environ['PUBLIC_SHA256']:
-              raise SystemExit('guarded checkpoint public hash mismatch')
-          receipt = {
-              'status': 'verified',
-              'checkpoint_valid': True,
-              'checkpoint_durable': True,
-              'end_to_end_verified': True,
-              'trade_date': os.environ['TRADE_DATE'],
-              'conditional_exit_status': report.get('status'),
-              'event_hash': report.get('event_hash'),
-              'scheduled_time': report.get('scheduled_time'),
-              'executed_at': report.get('executed_at'),
-              'actual_clock': report.get('actual_clock'),
-              'delay_minutes': report.get('delay_minutes'),
-              'execution_model': report.get('execution_model'),
-              'plan_version': report.get('plan_version'),
-              'forced_clock_sell': False,
-              'expected_sha256': os.environ['EXPECTED_SHA256'],
-              'public_sha256': os.environ['PUBLIC_SHA256'],
-              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
-              'workflow_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'verified_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-          }
-          open('/tmp/v2-checkpoint-guard-verification.json', 'w', encoding='utf-8').write(json.dumps(receipt, ensure_ascii=False, indent=2) + '\n')
-          PY
+          python -m engine_v2.ops write-checkpoint-receipt \
+            --report /tmp/v2-checkpoint-guard.json \
+            --output /tmp/v2-checkpoint-guard-verification.json \
+            --expected-sha256 "$EXPECTED_SHA256" \
+            --public-sha256 "$PUBLIC_SHA256" \
+            --trade-date "$TRADE_DATE" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT"
           cd /tmp/main-sync
           pushed=0
           for attempt in 1 2 3; do
