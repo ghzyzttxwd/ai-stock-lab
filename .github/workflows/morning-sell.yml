@@ -2,17 +2,31 @@ name: Conditional intraday exit scans
 
 on:
   workflow_dispatch:
+    inputs:
+      scheduled_time:
+        description: Logical checkpoint to run; auto picks the nearest valid checkpoint.
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - '09:40'
+          - '10:30'
+          - '11:20'
+          - '13:30'
+          - '14:30'
+          - '14:55'
   push:
     branches: [main]
     paths:
       - 'state/.morning-trigger'
   schedule:
-    - cron: '40 1 * * 1-5'  # 09:40 Beijing
-    - cron: '30 2 * * 1-5'  # 10:30 Beijing
-    - cron: '20 3 * * 1-5'  # 11:20 Beijing
-    - cron: '30 5 * * 1-5'  # 13:30 Beijing
-    - cron: '30 6 * * 1-5'  # 14:30 Beijing
-    - cron: '55 6 * * 1-5'  # 14:55 Beijing
+    - cron: '25 0 * * 1-5'  # 08:25 Beijing prewarm -> 09:40
+    - cron: '15 1 * * 1-5'  # 09:15 Beijing prewarm -> 10:30
+    - cron: '5 2 * * 1-5'   # 10:05 Beijing prewarm -> 11:20
+    - cron: '15 4 * * 1-5'  # 12:15 Beijing prewarm -> 13:30
+    - cron: '15 5 * * 1-5'  # 13:15 Beijing prewarm -> 14:30
+    - cron: '40 5 * * 1-5'  # 13:40 Beijing prewarm -> 14:55
 
 permissions:
   contents: write
@@ -20,46 +34,164 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ai-stock-conditional-scan
+  group: ai-stock-conditional-scan-${{ github.event.schedule || github.event.inputs.scheduled_time || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   conditional-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120
     environment:
       name: github-pages
     steps:
+      - name: Resolve Beijing date and logical checkpoint
+        id: td
+        shell: bash
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          DISPATCH_SLOT: ${{ github.event.inputs.scheduled_time }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          checkpoints = ('09:40', '10:30', '11:20', '13:30', '14:30', '14:55')
+          schedule_map = {
+              '25 0 * * 1-5': '09:40',
+              '15 1 * * 1-5': '10:30',
+              '5 2 * * 1-5': '11:20',
+              '15 4 * * 1-5': '13:30',
+              '15 5 * * 1-5': '14:30',
+              '40 5 * * 1-5': '14:55',
+          }
+          now = datetime.now(ZoneInfo('Asia/Shanghai'))
+          event_schedule = os.environ.get('EVENT_SCHEDULE', '').strip()
+          dispatch_slot = os.environ.get('DISPATCH_SLOT', '').strip()
+
+          if event_schedule:
+              slot = schedule_map.get(event_schedule)
+          elif dispatch_slot and dispatch_slot != 'auto':
+              slot = dispatch_slot if dispatch_slot in checkpoints else None
+          else:
+              now_minutes = now.hour * 60 + now.minute
+              slot = None
+              for candidate in reversed(checkpoints):
+                  hour, minute = (int(x) for x in candidate.split(':', 1))
+                  delay = now_minutes - (hour * 60 + minute)
+                  if 0 <= delay <= 10:
+                      slot = candidate
+                      break
+              if slot is None:
+                  current = now.strftime('%H:%M')
+                  slot = next((x for x in checkpoints if x > current), None)
+
+          skip = slot is None
+          print(f"date={now.date().isoformat()}")
+          print(f"slot={slot or 'none'}")
+          print(f"skip={'true' if skip else 'false'}")
+          PY
+
       - uses: actions/checkout@v4
+        if: steps.td.outputs.skip != 'true'
         with:
           fetch-depth: 0
+
       - uses: actions/setup-python@v5
+        if: steps.td.outputs.skip != 'true'
         with:
           python-version: '3.12'
           cache: 'pip'
-      - run: pip install -r requirements.txt
-      - name: Resolve scheduled checkpoint
-        id: slot
+
+      - name: Install dependencies
+        if: steps.td.outputs.skip != 'true'
+        run: pip install -r requirements.txt
+
+      - name: Check exchange session
+        id: marketday
+        if: steps.td.outputs.skip != 'true'
+        run: python -m engine.schedule_guard preflight --date "${{ steps.td.outputs.date }}"
+
+      - name: Wait until logical checkpoint fallback
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
+        shell: bash
+        env:
+          CHECKPOINT: ${{ steps.td.outputs.slot }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import time
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          tz = ZoneInfo('Asia/Shanghai')
+          now = datetime.now(tz)
+          hour, minute = (int(x) for x in os.environ['CHECKPOINT'].split(':', 1))
+          target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+          fallback_target = target.timestamp() + 7 * 60
+          wait_seconds = fallback_target - now.timestamp()
+          if wait_seconds > 0:
+              print(f"[PREWARM] waiting {wait_seconds:.1f}s for checkpoint {os.environ['CHECKPOINT']}+07m", flush=True)
+              time.sleep(wait_seconds)
+          else:
+              print(f"[PREWARM] checkpoint fallback already reached; freshness gate will decide", flush=True)
+          PY
+
+      - name: Refresh main immediately before market mutation
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         shell: bash
         run: |
-          case "${{ github.event.schedule }}" in
-            '40 1 * * 1-5') slot='09:40' ;;
-            '30 2 * * 1-5') slot='10:30' ;;
-            '20 3 * * 1-5') slot='11:20' ;;
-            '30 5 * * 1-5') slot='13:30' ;;
-            '30 6 * * 1-5') slot='14:30' ;;
-            '55 6 * * 1-5') slot='14:55' ;;
-            *) slot="$(TZ=Asia/Shanghai date +%H:%M)" ;;
-          esac
-          echo "slot=$slot" >> "$GITHUB_OUTPUT"
-          echo "conditional checkpoint=$slot"
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
       - name: Check hard-stop take-profit trailing rotation and time exits
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         env:
-          CONDITIONAL_SCAN_SLOT: ${{ steps.slot.outputs.slot }}
+          CONDITIONAL_SCAN_SLOT: ${{ steps.td.outputs.slot }}
         run: python -m engine.morning_run
+
+      - name: Require a fresh durable logical checkpoint before persistence
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
+        shell: bash
+        env:
+          TRADE_DATE: ${{ steps.td.outputs.date }}
+          CHECKPOINT: ${{ steps.td.outputs.slot }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = f"{os.environ['TRADE_DATE']}T{os.environ['CHECKPOINT']}"
+          fund_ids = ('D_MAIN', 'A', 'B', 'C', 'D', 'L')
+          failures = []
+          for fid in fund_ids:
+              path = Path('state') / f'{fid}.json'
+              try:
+                  state = json.loads(path.read_text(encoding='utf-8'))
+              except Exception as exc:
+                  failures.append(f'{fid}: unreadable state: {exc}')
+                  continue
+              actual = state.get('last_conditional_scan_key')
+              if actual != expected:
+                  failures.append(f'{fid}: last_conditional_scan_key={actual!r}, expected={expected!r}')
+              if state.get('execution_model') != 'CONDITIONAL_PLAN_V1':
+                  failures.append(f"{fid}: execution_model={state.get('execution_model')!r}")
+          if failures:
+              raise SystemExit('V1 checkpoint did not complete fresh and durably:\n' + '\n'.join(failures))
+          print(f'[V1 CHECKPOINT] verified {expected} across all six ledgers')
+          PY
+
       - name: Run regression tests before persistence
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         run: python -m unittest discover -s tests -v
+
       - name: Persist conditional-exit ledger and intraday public snapshots
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -73,13 +205,21 @@ jobs:
             git pull --rebase origin main
             git push origin HEAD:main
           fi
+
       - name: Refresh latest committed web before deploy
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         run: |
           git fetch origin main
           git reset --hard origin/main
+
       - uses: actions/configure-pages@v5
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
+
       - uses: actions/upload-pages-artifact@v3
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         with:
           path: web
+
       - id: deployment
+        if: steps.td.outputs.skip != 'true' && steps.marketday.outputs.run == 'true'
         uses: actions/deploy-pages@v4
