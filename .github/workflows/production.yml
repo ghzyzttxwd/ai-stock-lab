@@ -26,17 +26,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Skip redundant retry if today already has a conditional plan
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Resolve target exchange session for this run
+        id: marketday
+        run: python -m engine.schedule_guard production
+      - name: Skip redundant retry if target session already has a conditional plan
         id: guard
         shell: bash
+        env:
+          SETTLEMENT_DATE: ${{ steps.marketday.outputs.latest_trade_date }}
         run: |
           python - <<'PY'
           import json, os
-          from datetime import datetime, date
+          from datetime import date
           from pathlib import Path
-          from zoneinfo import ZoneInfo
 
-          today = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+          target = os.environ['SETTLEMENT_DATE']
           fund_ids = ('D_MAIN','A','B','C','D','L')
           processed = True
           conditional = True
@@ -47,9 +56,9 @@ jobs:
               except Exception:
                   processed = conditional = False
                   break
-              if str(state.get('last_processed_date') or '')[:10] != today:
+              if str(state.get('last_processed_date') or '')[:10] != target:
                   processed = False
-              if str(state.get('conditional_plan_date') or '')[:10] != today:
+              if str(state.get('conditional_plan_date') or '')[:10] != target:
                   conditional = False
 
           cache_ok = False
@@ -58,7 +67,7 @@ jobs:
               payload = json.loads(cache_path.read_text(encoding='utf-8'))
               asof = str(payload.get('asof') or '')[:10]
               symbols = payload.get('symbols') or []
-              age = (date.fromisoformat(today) - date.fromisoformat(asof)).days
+              age = (date.fromisoformat(target) - date.fromisoformat(asof)).days
               cache_ok = 0 <= age <= 14 and len(symbols) >= 50
           except Exception:
               pass
@@ -68,21 +77,10 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'done={str(done).lower()}\n')
           print(
-              f'[guard] Beijing date={today}; processed={processed}; conditional_plan={conditional}; '
+              f'[guard] target exchange session={target}; processed={processed}; conditional_plan={conditional}; '
               f'recovery_cache_ok={cache_ok}; explicit_refresh={explicit_refresh}; work_needed={not done}'
           )
           PY
-      - uses: actions/setup-python@v5
-        if: steps.guard.outputs.done != 'true'
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      - run: pip install -r requirements.txt
-        if: steps.guard.outputs.done != 'true'
-      - name: Check exchange session for scheduled run
-        id: marketday
-        if: steps.guard.outputs.done != 'true' && github.event_name == 'schedule'
-        run: python -m engine.schedule_guard production
       - name: Settle triggered entry conditions and build tomorrow conditional plans
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         env:
@@ -93,10 +91,11 @@ jobs:
       - name: Run V1 production safety gate before persistence
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         shell: bash
+        env:
+          SETTLEMENT_DATE: ${{ steps.marketday.outputs.latest_trade_date }}
         run: |
           set -euo pipefail
-          expected_date="$(TZ=Asia/Shanghai date +%F)"
-          python -m engine.v1_production_gate --date "$expected_date"
+          python -m engine.v1_production_gate --date "$SETTLEMENT_DATE"
       - name: Persist portfolio ledger and public snapshots
         if: steps.guard.outputs.done != 'true' && (github.event_name != 'schedule' || steps.marketday.outputs.run == 'true')
         run: |
@@ -119,10 +118,11 @@ jobs:
       - name: Assert persisted V1 settlement freshness before deploy
         if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
         shell: bash
+        env:
+          SETTLEMENT_DATE: ${{ steps.marketday.outputs.latest_trade_date }}
         run: |
           set -euo pipefail
-          expected_date="$(TZ=Asia/Shanghai date +%F)"
-          python -m engine.v1_freshness --date "$expected_date"
+          python -m engine.v1_freshness --date "$SETTLEMENT_DATE"
       - uses: actions/configure-pages@v5
         if: steps.guard.outputs.done == 'true' || github.event_name != 'schedule' || steps.marketday.outputs.run == 'true'
       - uses: actions/upload-pages-artifact@v3
@@ -138,6 +138,7 @@ jobs:
         shell: bash
         env:
           DEPLOYED_SOURCE_SHA: ${{ steps.deployed_source.outputs.sha }}
+          SETTLEMENT_DATE: ${{ steps.marketday.outputs.latest_trade_date }}
         run: |
           set -euo pipefail
           d_expected="$(sha256sum web/d/data.json | awk '{print $1}')"
@@ -155,9 +156,8 @@ jobs:
                 python - <<'PY'
           import json, os
           from datetime import datetime, timezone
-          from zoneinfo import ZoneInfo
 
-          expected_date=datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+          expected_date=os.environ['SETTLEMENT_DATE']
           for path in ('/tmp/live-d.json','/tmp/live-e.json'):
               x=json.load(open(path,encoding='utf-8'))
               if x.get('execution_model') != 'CONDITIONAL_PLAN_V1':
