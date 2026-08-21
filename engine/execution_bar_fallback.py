@@ -7,8 +7,8 @@ from datetime import date, timedelta
 from typing import Callable
 
 
-_EASTMONEY_BUDGET_SECONDS = 50
-_SINA_BUDGET_SECONDS = 50
+_EASTMONEY_BUDGET_SECONDS = 45
+_SINA_BUDGET_SECONDS = 45
 _PER_SYMBOL_TIMEOUT_SECONDS = 5
 _MIN_MINUTE_ROWS = 180
 _MINUTE_OPEN_LATEST = '09:35:00'
@@ -61,7 +61,7 @@ def _records(frame) -> list[dict]:
 def _eastmoney_bar_from_records(
     records: list[dict], *, symbol: str, name: str, trade_date: str
 ) -> dict | None:
-    """Accept one Eastmoney daily row only with exact date/symbol and a prior close."""
+    """Accept an Eastmoney daily row only when the requested date is explicitly present."""
     code = symbol[-6:]
     ordered = sorted(records, key=lambda row: str(row.get('日期') or '')[:10])
     current_index = next(
@@ -119,11 +119,11 @@ def _eastmoney_bar_from_records(
 def _sina_minute_bar_from_records(
     records: list[dict], *, symbol: str, name: str, trade_date: str
 ) -> dict | None:
-    """Aggregate a completed unadjusted Sina minute session into one exact-date daily bar.
+    """Aggregate only a clearly completed Sina minute session into an exact-date daily bar.
 
-    The minute fallback is deliberately strict: it needs a previous-session close, a near-open
-    first current bar, at least 180 current-session rows, and a tail at/after 14:55. This prevents
-    a partial intraday response from being promoted into a completed daily OHLC bar.
+    A previous-session close, a near-open first bar, at least 180 current-session rows and a
+    tail at/after 14:55 are all mandatory. A partial intraday response therefore remains
+    ineligible for close settlement.
     """
     rows = sorted(records, key=lambda row: str(row.get('day') or ''))
     current = [row for row in rows if str(row.get('day') or '')[:10] == trade_date]
@@ -143,9 +143,8 @@ def _sina_minute_bar_from_records(
     open_px = _f(current[0].get('open'))
     close_px = _f(current[-1].get('close'))
     highs = [_f(row.get('high')) for row in current]
-    lows = [_f(row.get('low')) for row in current]
+    positive_lows = [_f(row.get('low')) for row in current if _f(row.get('low')) > 0]
     high_px = max(highs) if highs else 0.0
-    positive_lows = [x for x in lows if x > 0]
     low_px = min(positive_lows) if positive_lows else 0.0
     preclose = _f(previous[-1].get('close'))
     if min(open_px, high_px, low_px, close_px, preclose) <= 0:
@@ -153,7 +152,7 @@ def _sina_minute_bar_from_records(
     if high_px < max(open_px, close_px) or low_px > min(open_px, close_px):
         return None
 
-    return {
+    bar = {
         'date': trade_date,
         'bar_date': trade_date,
         'bar_date_evidence': f'sina_minute_completed_session:{first_stamp}->{last_stamp}',
@@ -167,7 +166,6 @@ def _sina_minute_bar_from_records(
         'close': close_px,
         'preclose': preclose,
         'volume': sum(max(0.0, _f(row.get('volume'))) for row in current),
-        'amount': sum(max(0.0, _f(row.get('amount'))) for row in current),
         'turn': 0.0,
         'pctChg': (close_px / preclose - 1.0) * 100.0,
         'tradestatus': '1',
@@ -176,6 +174,12 @@ def _sina_minute_bar_from_records(
         'pbMRQ': 0.0,
         'r60_snapshot': 0.0,
     }
+    # Sina's minute endpoint does not consistently expose turnover amount. Preserve the
+    # full-market snapshot amount instead of manufacturing one when the field is absent.
+    minute_amounts = [max(0.0, _f(row.get('amount'))) for row in current if row.get('amount') not in (None, '')]
+    if minute_amounts:
+        bar['amount'] = sum(minute_amounts)
+    return bar
 
 
 def _fetch_eastmoney(ak, symbols: dict[str, str], trade_date: str) -> dict[str, dict]:
@@ -195,14 +199,13 @@ def _fetch_eastmoney(ak, symbols: dict[str, str], trade_date: str) -> dict[str, 
         timeout = max(1, min(_PER_SYMBOL_TIMEOUT_SECONDS, int(remaining)))
         try:
             frame = _bounded(
-                timeout + 1,
-                lambda symbol=symbol, timeout=timeout: ak.stock_zh_a_hist(
+                timeout,
+                lambda symbol=symbol: ak.stock_zh_a_hist(
                     symbol=symbol[-6:],
                     period='daily',
                     start_date=start,
                     end_date=end,
                     adjust='',
-                    timeout=timeout,
                 ),
             )
             bar = _eastmoney_bar_from_records(
@@ -255,13 +258,12 @@ def _fetch_sina_minute(ak, symbols: dict[str, str], trade_date: str) -> dict[str
 
 
 def fetch_alternate_execution_bars(ak, symbols: dict[str, str], trade_date: str) -> dict[str, dict]:
-    """Recover Tencent misses from independent sources without weakening date evidence.
+    """Recover Tencent misses without weakening the exact-session evidence requirement.
 
-    Eastmoney unadjusted daily history is tried first because it directly exposes a dated daily
-    record and supports request timeouts. Only the still-missing symbols then use Sina's explicit
-    minute timestamps, aggregated under completed-session checks. No undated spot quote is ever
-    accepted. If both sources fail, the symbol remains missing and downstream coverage gates fail
-    closed exactly as before.
+    Eastmoney unadjusted daily history is preferred because it directly exposes a dated daily
+    row. Only symbols still missing then use Sina minute timestamps, and only when those rows
+    prove a completed session. No undated spot quote is accepted. If every dated source fails,
+    the symbol stays missing so the existing V1 coverage gate still fails closed.
     """
     if not symbols:
         return {}
