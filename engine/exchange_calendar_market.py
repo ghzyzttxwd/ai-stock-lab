@@ -10,6 +10,22 @@ _CLOSE_READY = time(15, 5)
 _CN = ZoneInfo('Asia/Shanghai')
 
 
+def _should_enforce_close_gate(requested_date: str, latest_session: str, now: datetime) -> bool:
+    """Block before 15:05 only when the requested calendar day is itself today's session.
+
+    On weekends and exchange holidays, ``requested_date`` can equal today's wall-clock date
+    while ``latest_session`` correctly resolves to an already completed prior session. Such a
+    recovery must not be rejected as "market not closed yet" merely because the clock is before
+    15:05 on a non-session day.
+    """
+    requested = date.fromisoformat(requested_date)
+    return (
+        requested == now.date()
+        and latest_session == requested_date
+        and now.time() < _CLOSE_READY
+    )
+
+
 def install() -> None:
     """Make AKShareMarket session resolution independent from quote-bar freshness.
 
@@ -28,15 +44,15 @@ def install() -> None:
     original_latest = AKShareMarket.latest_trade_date
 
     def latest_trade_date(self, requested_date: str):
-        requested = date.fromisoformat(requested_date)
         now = datetime.now(_CN)
+        trade_date = exchange_calendar_latest_session(requested_date, self.ak)
 
-        # Preserve the existing no-before-close rule for an explicit current-day market run.
-        # Scheduled preflight does not use this method; it calls the calendar resolver directly.
-        if requested == now.date() and now.time() < _CLOSE_READY:
+        # Preserve the no-before-close rule only when today is actually an exchange session.
+        # A current-date weekend/holiday request resolves to an older completed session and is
+        # therefore a legitimate recovery run, not an attempt to settle an unfinished session.
+        if _should_enforce_close_gate(requested_date, trade_date, now):
             return original_latest(self, requested_date)
 
-        trade_date = exchange_calendar_latest_session(requested_date, self.ak)
         self._resolved_trade_date = trade_date
         print(
             f'[market] trading-date source=exchange-calendar requested={requested_date} '
