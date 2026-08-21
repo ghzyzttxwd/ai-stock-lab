@@ -2,35 +2,28 @@
   "fund_id": "B",
   "name": "趋势追强基金",
   "initial_cash": 1000000.0,
-  "cash": 457196.05,
+  "cash": 607288.88,
   "positions": {
     "sh.603259": {
       "name": "药明康德",
       "qty": 900,
       "avg_cost": 160.2945,
       "acquired_date": "2026-08-17",
-      "last_price": 162.96
+      "last_price": 162.95
     },
     "sz.002428": {
       "name": "云南锗业",
       "qty": 1400,
       "avg_cost": 110.098,
       "acquired_date": "2026-08-18",
-      "last_price": 100.5
-    },
-    "sh.600667": {
-      "name": "太极实业",
-      "qty": 7000,
-      "avg_cost": 23.7944,
-      "acquired_date": "2026-08-19",
-      "last_price": 21.33
+      "last_price": 100.91
     },
     "sz.000703": {
       "name": "恒逸石化",
       "qty": 2400,
       "avg_cost": 19.3358,
       "acquired_date": "2026-08-20",
-      "last_price": 20.54
+      "last_price": 20.74
     }
   },
   "fills": [
@@ -463,6 +456,28 @@
       "actual_execution_time": "2026-08-21T11:27:00+08:00",
       "actual_clock": "11:27",
       "market_reference_time": "11:28",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
+    },
+    {
+      "symbol": "sh.600667",
+      "name": "太极实业",
+      "side": "SELL",
+      "trade_date": "2026-08-21",
+      "reference_price": 21.47,
+      "price": 21.459,
+      "qty": 7000,
+      "gross": 150213.0,
+      "fees": 120.17,
+      "note": "条件计划 · 14:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "14:30",
+      "scheduled_time": "14:30",
+      "actual_execution_time": "2026-08-21T14:37:00+08:00",
+      "actual_clock": "14:37",
+      "market_reference_time": "14:38",
       "market_reference_time_basis": "snapshot_capture_minute",
       "market_reference_source": "sina"
     }
@@ -2388,22 +2403,6 @@
       "rotation_min_price": 104.803,
       "setup": "legacy-migrated"
     },
-    "sh.600667": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-19",
-      "entry_price": 23.7944,
-      "hard_stop_price": 20.17,
-      "take_profit_price": 24.27,
-      "trailing_activation_price": 24.032,
-      "trailing_drawdown_pct": 0.025,
-      "highest_price": 23.7944,
-      "partial_taken": false,
-      "max_hold_days": 3,
-      "sessions_held": 1,
-      "rotation_exit": true,
-      "rotation_min_price": 21.465,
-      "setup": "legacy-migrated"
-    },
     "sz.000703": {
       "plan_version": "conditional-plan-v1",
       "opened_date": "2026-08-20",
@@ -2451,8 +2450,8 @@
     "price_time_evidence": "first_trigger_minute_when_available"
   },
   "pending_decision_date": "2026-08-20",
-  "last_conditional_scan_key": "2026-08-21T13:30",
-  "last_conditional_scan_at": "2026-08-21T13:37:00+08:00",
+  "last_conditional_scan_key": "2026-08-21T14:30",
+  "last_conditional_scan_at": "2026-08-21T14:37:00+08:00",
   "conditional_scan_log": [
     {
       "slot": "11:20",
@@ -2549,6 +2548,47 @@
           "action": "HOLD",
           "reason": "conditions_not_met",
           "price": 20.54,
+          "hard_stop": 18.272,
+          "take_profit": 21.25,
+          "trailing_stop": 20.091,
+          "rotation_min_price": null
+        }
+      ]
+    },
+    {
+      "slot": "14:30",
+      "scheduled_time": "14:30",
+      "actual_clock": "14:37",
+      "quote_clock": "14:38",
+      "delay_minutes": 7.01,
+      "at": "2026-08-21T14:37:00+08:00",
+      "fills": 1,
+      "checks": [
+        {
+          "symbol": "sh.603259",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 162.95,
+          "hard_stop": 156.62,
+          "take_profit": 169.74,
+          "trailing_stop": 162.23,
+          "rotation_min_price": 168.404
+        },
+        {
+          "symbol": "sz.002428",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 100.91,
+          "hard_stop": 99.989,
+          "take_profit": 112.3,
+          "trailing_stop": 107.346,
+          "rotation_min_price": 104.803
+        },
+        {
+          "symbol": "sz.000703",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 20.74,
           "hard_stop": 18.272,
           "take_profit": 21.25,
           "trailing_stop": 20.091,
