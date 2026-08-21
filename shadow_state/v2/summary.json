@@ -1,6 +1,6 @@
 {
   "summary_version": "v2-shadow-summary-1.2",
-  "updated_at": "2026-08-20",
+  "updated_at": "2026-08-21",
   "initial_cash_per_fund": 1000000,
   "mode": "FORWARD_SHADOW_ONLY",
   "execution_model": "V2_CONDITIONAL_PLAN_V1",
@@ -14,80 +14,16 @@
     ]
   },
   "source_ref": {
-    "snapshot_version": "v2-shadow-data-0.4",
-    "snapshot_sha256": "caaa35a5ee491658c40a356177fad406c44154eec15a993b0dce03b35d2c12e1",
-    "enrichment_version": "v2-history-0.1",
-    "enrichment_sha256": "d3b97e0063710898a4d2684cd3fd34bfb365656670225710059829f97578835b",
-    "target_version": "v2-shadow-targets-conditional-0.3",
+    "execution_bar_source": "sina-intraday",
+    "missing_critical_execution_bars": [],
+    "scheduled_time": "10:30",
+    "executed_at": "2026-08-21T10:38:25+08:00",
+    "actual_clock": "10:38",
+    "delay_minutes": 7.38,
+    "freshness_limit_minutes": 10,
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
     "plan_version": "v2-conditional-plan-v1",
-    "board_policy": {
-      "version": "retail-mainboard-only-2026-08-19",
-      "scope": "SH_SZ_MAINBOARD_ONLY",
-      "excludes": [
-        "CHINEXT_300_301",
-        "STAR_688_689",
-        "BSE",
-        "B_SHARES"
-      ],
-      "input_candidates": 180,
-      "eligible_candidates": 180,
-      "excluded_non_mainboard_count": 0,
-      "excluded_non_mainboard_symbols": []
-    },
-    "data_quality": {
-      "snapshot_source": "tencent-full",
-      "snapshot_grade": null,
-      "industry_counts": {
-        "industries": 31,
-        "mainboard_stocks": 3193,
-        "component_rows_mainboard": 3193,
-        "duplicate_cross_industry_stocks": 0,
-        "component_failures": 0,
-        "history_failures": 0
-      },
-      "enrichment_coverage": {
-        "preselected": 180,
-        "tencent_current_histories": 180,
-        "eligible_technical_features": 180,
-        "history_ratio": 1.0,
-        "feature_ratio": 1.0,
-        "history_cache": {
-          "cache_version": "v2-tencent-qfq-1",
-          "workers": 3,
-          "selected": 180,
-          "current_histories": 180,
-          "cache_hits": 0,
-          "incremental_fetches": 0,
-          "adjustment_full_refreshes": 0,
-          "full_fetches": 180,
-          "failures": 0,
-          "elapsed_s": 204.43,
-          "sample_errors": []
-        }
-      },
-      "missing_critical_execution_bars": []
-    },
-    "restatement": {
-      "reason": "legacy execution_catchup used fixed open-price target rebalancing after V2 had migrated to conditional plans",
-      "invalid_execution_catchup_hash": "ec7b6cda2f19d1b66ab42f916ee5aff07c8f890f77e2b8aafbe0dea9431ac1c7",
-      "superseded_polluted_daily_hash": "777c5a7558d1f360912d360c690e28125ad3b7370df9665e3a1abf4939f6860b",
-      "clean_state_commit": "698d265dd1d669b33781cef5719c524da5346d42",
-      "canonical_replay_event_hash": "e169afdddc0c2c44192e9cf7bb7fb0dc36407206834fc4546f03955f92404d37",
-      "history_preserved_append_only": true
-    },
-    "pending_plan_restatement": {
-      "reason": "build_pending_decision compacted away per-target conditional trade_plan metadata",
-      "base_execution_restatement_hash": "e07ef8941dcb34f478b3e1eca54a168aaa1633422e91ca13345052898493e48c",
-      "artifact_id": "9417412966",
-      "artifact_name": "v2-20260820-restatement-32396959662",
-      "snapshot_sha256": "caaa35a5ee491658c40a356177fad406c44154eec15a993b0dce03b35d2c12e1",
-      "enrichment_sha256": "d3b97e0063710898a4d2684cd3fd34bfb365656670225710059829f97578835b",
-      "target_payload_sha256": "03403376d3ade9afef52962ea94f0ae29d7252c06d5b739220feb3aadff5fe98",
-      "historical_target_diagnostics_exact_match": true,
-      "economics_unchanged": true,
-      "history_preserved_append_only": true
-    }
+    "note": "Checkpoint 10:30 Asia/Shanghai was evaluated at actual time 10:38. Hard-stop, take-profit, trailing, rotation and time conditions were checked; the clock itself is not a sell signal."
   },
   "target_diagnostics": {
     "stats": {
@@ -230,6 +166,7 @@
         },
         "industry_hhi": 1.0,
         "effective_industries": 1.0,
+        "execution_only_date": "2026-08-21",
         "excess_hs300_pct": 2.1543
       },
       "holdings": [
@@ -1190,7 +1127,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+      "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
       "concentration_flags": []
     },
     "B": {
@@ -1201,75 +1138,26 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 5,
-        "equity": 1008333.36,
-        "cash": 911145.36,
-        "position_market_value": 97188.0,
-        "return_pct": 0.8333,
+        "equity": 1012025.19,
+        "cash": 1012025.19,
+        "position_market_value": 0.0,
+        "return_pct": 1.2025,
         "max_drawdown_pct": -1.2378,
         "daily_volatility_pct": 1.0179,
-        "fills": 34,
+        "fills": 35,
         "rejected_orders": 0,
-        "turnover_on_initial_capital": 2.22329,
-        "fees": 1205.14,
-        "fees_pct_of_initial": 0.120514,
-        "positions": 1,
-        "industry_weights": {
-          "有色金属": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": 2.4033
+        "turnover_on_initial_capital": 2.324251,
+        "fees": 1285.91,
+        "fees_pct_of_initial": 0.128591,
+        "positions": 0,
+        "industry_weights": {},
+        "industry_hhi": 0,
+        "effective_industries": 0.0,
+        "execution_only_date": "2026-08-21",
+        "excess_hs300_pct": 2.7725
       },
-      "holdings": [
-        {
-          "symbol": "sz.002842",
-          "name": "翔鹭钨业",
-          "industry": "有色金属",
-          "qty": 2600,
-          "avg_cost": 39.4318,
-          "last_price": 37.38,
-          "market_value": 97188.0,
-          "weight_pct": 9.6385,
-          "pnl_pct": -5.2034,
-          "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-          "opportunity_score": null,
-          "setup": null,
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-19",
-            "entry_price": 39.4318,
-            "hard_stop_price": 36.175,
-            "take_profit_price": 40.22,
-            "trailing_activation_price": 39.826,
-            "trailing_drawdown_pct": 0.025,
-            "highest_price": 39.4318,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 1,
-            "rotation_exit": true,
-            "rotation_min_price": 37.829,
-            "setup": "legacy-migrated"
-          }
-        }
-      ],
+      "holdings": [],
       "recent_fills": [
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-17",
-          "trade_date": "2026-08-18",
-          "symbol": "sh.605376",
-          "name": "博迁新材",
-          "side": "BUY",
-          "open_price": 175.68,
-          "price": 175.768,
-          "qty": 200,
-          "gross": 35153.6,
-          "fees": 10.55,
-          "net_cash_change": -35164.15,
-          "slippage_bps": 5.0,
-          "note": "V2 目标仓位再平衡"
-        },
         {
           "fund_id": "B",
           "decision_date": "2026-08-17",
@@ -1620,6 +1508,29 @@
           "scheduled_time": "14:30",
           "actual_execution_time": "2026-08-20T14:38:18+08:00",
           "actual_clock": "14:38"
+        },
+        {
+          "fund_id": "B",
+          "decision_date": "2026-08-20",
+          "trade_date": "2026-08-21",
+          "symbol": "sz.002842",
+          "name": "翔鹭钨业",
+          "side": "SELL",
+          "reference_price": 38.85,
+          "execution_price_field": "live_conditional",
+          "price": 38.831,
+          "qty": 2600,
+          "gross": 100960.6,
+          "fees": 80.77,
+          "net_cash_change": 100879.83,
+          "slippage_bps": 5.0,
+          "plan_version": "v2-conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "note": "V2 条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-21T10:38:25+08:00",
+          "actual_clock": "10:38"
         }
       ],
       "recent_rejected_orders": [],
@@ -1972,7 +1883,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+      "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
       "concentration_flags": []
     },
     "C": {
@@ -1998,6 +1909,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-21",
         "excess_hs300_pct": 3.5335
       },
       "holdings": [],
@@ -2612,7 +2524,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+      "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
       "concentration_flags": []
     },
     "D": {
@@ -2623,25 +2535,26 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 5,
-        "equity": 985294.0,
-        "cash": 735739.0,
-        "position_market_value": 249555.0,
-        "return_pct": -1.4706,
+        "equity": 976135.64,
+        "cash": 768286.64,
+        "position_market_value": 207849.0,
+        "return_pct": -2.3864,
         "max_drawdown_pct": -3.5481,
         "daily_volatility_pct": 1.8523,
-        "fills": 35,
+        "fills": 36,
         "rejected_orders": 0,
-        "turnover_on_initial_capital": 1.918307,
-        "fees": 1003.8,
-        "fees_pct_of_initial": 0.10038,
-        "positions": 4,
+        "turnover_on_initial_capital": 1.95088,
+        "fees": 1029.86,
+        "fees_pct_of_initial": 0.102986,
+        "positions": 3,
         "industry_weights": {
-          "农林牧渔": 0.579888,
-          "食品饮料": 0.420112
+          "农林牧渔": 0.508927,
+          "食品饮料": 0.491073
         },
-        "industry_hhi": 0.512764,
-        "effective_industries": 1.9502,
-        "excess_hs300_pct": 0.0994
+        "industry_hhi": 0.500159,
+        "effective_industries": 1.9994,
+        "execution_only_date": "2026-08-21",
+        "excess_hs300_pct": -0.8164
       },
       "holdings": [
         {
@@ -2650,10 +2563,10 @@
           "industry": "食品饮料",
           "qty": 9900,
           "avg_cost": 11.1953,
-          "last_price": 10.59,
-          "market_value": 104841.0,
-          "weight_pct": 10.6406,
-          "pnl_pct": -5.4067,
+          "last_price": 10.31,
+          "market_value": 102069.0,
+          "weight_pct": 10.4564,
+          "pnl_pct": -7.9078,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
           "opportunity_score": null,
@@ -2676,46 +2589,15 @@
           }
         },
         {
-          "symbol": "sh.601952",
-          "name": "苏垦农发",
-          "industry": "农林牧渔",
-          "qty": 6200,
-          "avg_cost": 9.0477,
-          "last_price": 8.88,
-          "market_value": 55056.0,
-          "weight_pct": 5.5878,
-          "pnl_pct": -1.8535,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-          "opportunity_score": null,
-          "setup": null,
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-19",
-            "entry_price": 9.0477,
-            "hard_stop_price": 8.394,
-            "take_profit_price": 9.229,
-            "trailing_activation_price": 9.138,
-            "trailing_drawdown_pct": 0.025,
-            "highest_price": 9.0477,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 1,
-            "rotation_exit": true,
-            "rotation_min_price": 8.987,
-            "setup": "legacy-migrated"
-          }
-        },
-        {
           "symbol": "sz.002772",
           "name": "众兴菌业",
           "industry": "农林牧渔",
           "qty": 5100,
           "avg_cost": 11.2794,
-          "last_price": 10.74,
-          "market_value": 54774.0,
-          "weight_pct": 5.5592,
-          "pnl_pct": -4.7822,
+          "last_price": 10.42,
+          "market_value": 53142.0,
+          "weight_pct": 5.4441,
+          "pnl_pct": -7.6192,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
           "opportunity_score": null,
@@ -2738,15 +2620,15 @@
           }
         },
         {
-          "symbol": "sh.600354",
-          "name": "敦煌种业",
+          "symbol": "sh.601952",
+          "name": "苏垦农发",
           "industry": "农林牧渔",
-          "qty": 5100,
-          "avg_cost": 7.0261,
-          "last_price": 6.84,
-          "market_value": 34884.0,
-          "weight_pct": 3.5405,
-          "pnl_pct": -2.6487,
+          "qty": 6200,
+          "avg_cost": 9.0477,
+          "last_price": 8.49,
+          "market_value": 52638.0,
+          "weight_pct": 5.3925,
+          "pnl_pct": -6.164,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
           "opportunity_score": null,
@@ -2754,38 +2636,22 @@
           "exit_plan": {
             "plan_version": "v2-conditional-plan-v1",
             "opened_date": "2026-08-19",
-            "entry_price": 7.0261,
-            "hard_stop_price": 6.542,
-            "take_profit_price": 7.167,
-            "trailing_activation_price": 7.096,
+            "entry_price": 9.0477,
+            "hard_stop_price": 8.394,
+            "take_profit_price": 9.229,
+            "trailing_activation_price": 9.138,
             "trailing_drawdown_pct": 0.025,
-            "highest_price": 7.0261,
+            "highest_price": 9.0477,
             "partial_taken": false,
             "max_hold_days": 3,
             "sessions_held": 1,
             "rotation_exit": true,
-            "rotation_min_price": 6.922,
+            "rotation_min_price": 8.987,
             "setup": "legacy-migrated"
           }
         }
       ],
       "recent_fills": [
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-17",
-          "trade_date": "2026-08-18",
-          "symbol": "sh.603259",
-          "name": "药明康德",
-          "side": "BUY",
-          "open_price": 165.1,
-          "price": 165.183,
-          "qty": 300,
-          "gross": 49554.9,
-          "fees": 14.87,
-          "net_cash_change": -49569.77,
-          "slippage_bps": 5.0,
-          "note": "V2 目标仓位再平衡"
-        },
         {
           "fund_id": "D",
           "decision_date": "2026-08-17",
@@ -3131,6 +2997,29 @@
           "scheduled_time": "14:55",
           "actual_execution_time": "2026-08-20T15:03:23+08:00",
           "actual_clock": "15:03"
+        },
+        {
+          "fund_id": "D",
+          "decision_date": "2026-08-20",
+          "trade_date": "2026-08-21",
+          "symbol": "sh.600354",
+          "name": "敦煌种业",
+          "side": "SELL",
+          "reference_price": 6.39,
+          "execution_price_field": "live_conditional",
+          "price": 6.387,
+          "qty": 5100,
+          "gross": 32573.7,
+          "fees": 26.06,
+          "net_cash_change": 32547.64,
+          "slippage_bps": 5.0,
+          "plan_version": "v2-conditional-plan-v1",
+          "exit_reason": "hard_stop",
+          "scan_time": "10:30",
+          "note": "V2 条件计划 · 10:30检查触发 hard_stop",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-21T10:38:25+08:00",
+          "actual_clock": "10:38"
         }
       ],
       "recent_rejected_orders": [],
@@ -3521,7 +3410,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+      "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
       "concentration_flags": []
     },
     "L": {
@@ -3532,68 +3421,37 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 5,
-        "equity": 1010302.41,
-        "cash": 881425.41,
-        "position_market_value": 128877.0,
-        "return_pct": 1.0302,
+        "equity": 1009855.18,
+        "cash": 953150.18,
+        "position_market_value": 56705.0,
+        "return_pct": 0.9855,
         "max_drawdown_pct": -1.2376,
         "daily_volatility_pct": 0.913,
-        "fills": 33,
+        "fills": 34,
         "rejected_orders": 2,
-        "turnover_on_initial_capital": 2.08901,
-        "fees": 1138.99,
-        "fees_pct_of_initial": 0.113899,
-        "positions": 2,
+        "turnover_on_initial_capital": 2.160792,
+        "fees": 1196.42,
+        "fees_pct_of_initial": 0.119642,
+        "positions": 1,
         "industry_weights": {
-          "煤炭": 0.548057,
-          "食品饮料": 0.451943
+          "食品饮料": 1.0
         },
-        "industry_hhi": 0.504619,
-        "effective_industries": 1.9817,
-        "excess_hs300_pct": 2.6002
+        "industry_hhi": 1.0,
+        "effective_industries": 1.0,
+        "execution_only_date": "2026-08-21",
+        "excess_hs300_pct": 2.5555
       },
       "holdings": [
-        {
-          "symbol": "sh.600546",
-          "name": "山煤国际",
-          "industry": "煤炭",
-          "qty": 5400,
-          "avg_cost": 12.9801,
-          "last_price": 13.08,
-          "market_value": 70632.0,
-          "weight_pct": 6.9912,
-          "pnl_pct": 0.7696,
-          "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-          "opportunity_score": null,
-          "setup": null,
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-17",
-            "entry_price": 12.9801,
-            "hard_stop_price": 12.482,
-            "take_profit_price": 13.527,
-            "trailing_activation_price": 13.331,
-            "trailing_drawdown_pct": 0.025,
-            "highest_price": 13.3,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 1,
-            "rotation_exit": true,
-            "rotation_min_price": 13.119,
-            "setup": "legacy-migrated"
-          }
-        },
         {
           "symbol": "sz.002582",
           "name": "好想你",
           "industry": "食品饮料",
           "qty": 5500,
           "avg_cost": 11.2339,
-          "last_price": 10.59,
-          "market_value": 58245.0,
-          "weight_pct": 5.7651,
-          "pnl_pct": -5.7318,
+          "last_price": 10.31,
+          "market_value": 56705.0,
+          "weight_pct": 5.6152,
+          "pnl_pct": -8.2242,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
           "opportunity_score": null,
@@ -3617,22 +3475,6 @@
         }
       ],
       "recent_fills": [
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-17",
-          "trade_date": "2026-08-18",
-          "symbol": "sz.002142",
-          "name": "宁波银行",
-          "side": "BUY",
-          "open_price": 32.19,
-          "price": 32.206,
-          "qty": 1600,
-          "gross": 51529.6,
-          "fees": 15.46,
-          "net_cash_change": -51545.06,
-          "slippage_bps": 5.0,
-          "note": "V2 目标仓位再平衡"
-        },
         {
           "fund_id": "L",
           "decision_date": "2026-08-17",
@@ -3989,6 +3831,29 @@
           "scheduled_time": "14:30",
           "actual_execution_time": "2026-08-20T14:38:18+08:00",
           "actual_clock": "14:38"
+        },
+        {
+          "fund_id": "L",
+          "decision_date": "2026-08-20",
+          "trade_date": "2026-08-21",
+          "symbol": "sh.600546",
+          "name": "山煤国际",
+          "side": "SELL",
+          "reference_price": 13.3,
+          "execution_price_field": "live_conditional",
+          "price": 13.293,
+          "qty": 5400,
+          "gross": 71782.2,
+          "fees": 57.43,
+          "net_cash_change": 71724.77,
+          "slippage_bps": 5.0,
+          "plan_version": "v2-conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "note": "V2 条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-21T10:38:25+08:00",
+          "actual_clock": "10:38"
         }
       ],
       "recent_rejected_orders": [
@@ -4443,17 +4308,17 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+      "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
       "concentration_flags": []
     }
   },
-  "audit_head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+  "audit_head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
   "audit_verification": {
     "status": "PASS",
-    "events": 17,
-    "head": "8ab6bcd39ba5c08c498e6bc297428a9023491fbb0a25b2285f55489784c20bfc",
+    "events": 18,
+    "head": "b20a1848877c5def713a35cb96d8da26ecc5697c9ddb7cd7cc5fe2a040ba5376",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-20~conditional-plan-restatement"
+    "last_date": "2026-08-21-execution-1030"
   },
   "safety": {
     "calls_sol": false,
@@ -4461,12 +4326,12 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_plan_restatement",
+  "audit_event_kind": "conditional_exit_scan",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
     "start_date": "2026-08-14",
-    "end_date": "2026-08-20",
+    "end_date": "2026-08-21",
     "return_pct": -1.57,
     "source": "tencent-index",
     "status": "OK",
