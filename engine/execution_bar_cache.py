@@ -71,8 +71,8 @@ def _execution_bars_with_cache(
 
 
 def install() -> None:
-    """Install a per-instance exact-bar cache with an exact-date secondary provider."""
-    from .execution_bar_fallback import fetch_baostock_execution_bars
+    """Install a per-instance exact-bar cache with independent dated fallbacks."""
+    from .execution_bar_fallback import fetch_alternate_execution_bars
     from .real_market import AKShareMarket
 
     if getattr(AKShareMarket.execution_bars, '_v1_execution_bar_cache_installed', False):
@@ -86,7 +86,11 @@ def install() -> None:
             original_execution_bars,
             symbols,
             trade_date,
-            fallback=fetch_baostock_execution_bars,
+            fallback=lambda missing, date_key: fetch_alternate_execution_bars(
+                self.ak,
+                missing,
+                date_key,
+            ),
         )
 
     execution_bars._v1_execution_bar_cache_installed = True
