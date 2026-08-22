@@ -1,0 +1,124 @@
+name: V3 public UI verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/v3/**'
+      - '.github/workflows/v3-pages-verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v3-pages-verify
+  cancel-in-progress: true
+
+jobs:
+  verify-public-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate V3 frontend source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check web/v3/app.js
+          grep -q "alignActiveFund" web/v3/app.js
+          grep -q "当前总资产" web/v3/app.js
+          grep -q "模拟时点.*09:30" web/v3/app.js
+          grep -q "ai-trade-v3-shell-5" web/v3/sw.js
+
+      - name: Wait until public V3 exactly matches this source
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          expected_app="$(sha256sum web/v3/app.js | awk '{print $1}')"
+          expected_sw="$(sha256sum web/v3/sw.js | awk '{print $1}')"
+          base='https://ghzyzttxwd.github.io/ai-stock-lab/v3'
+
+          matched=0
+          for i in $(seq 1 72); do
+            ok=1
+            curl -fsS --connect-timeout 5 --max-time 20 "$base/app.js?verify=${SOURCE_SHA}-${GITHUB_RUN_ID}-${i}" -o /tmp/v3-app.js || ok=0
+            curl -fsS --connect-timeout 5 --max-time 20 "$base/sw.js?verify=${SOURCE_SHA}-${GITHUB_RUN_ID}-${i}" -o /tmp/v3-sw.js || ok=0
+            curl -fsS --connect-timeout 5 --max-time 20 "$base/data.json?verify=${SOURCE_SHA}-${GITHUB_RUN_ID}-${i}" -o /tmp/v3-data.json || ok=0
+            if [ "$ok" = 1 ]; then
+              actual_app="$(sha256sum /tmp/v3-app.js | awk '{print $1}')"
+              actual_sw="$(sha256sum /tmp/v3-sw.js | awk '{print $1}')"
+              if [ "$actual_app" = "$expected_app" ] && [ "$actual_sw" = "$expected_sw" ]; then
+                python - <<'PY'
+          import json
+          data=json.load(open('/tmp/v3-data.json',encoding='utf-8'))
+          if data.get('mode') != 'AUTONOMOUS_AI_PAPER':
+              raise SystemExit('public V3 is not paper mode')
+          if data.get('requires_user_approval') is not False:
+              raise SystemExit('public V3 approval flag is wrong')
+          if set(data.get('funds') or {}) != {'A','B','C','D','L'}:
+              raise SystemExit('public V3 fund set mismatch')
+          PY
+                matched=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+          if [ "$matched" != 1 ]; then
+            echo 'Public V3 app.js/sw.js never matched the source commit.' >&2
+            exit 1
+          fi
+
+          python - <<'PY'
+          import hashlib, json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          data=json.load(open('/tmp/v3-data.json',encoding='utf-8'))
+          receipt={
+            'status':'verified',
+            'source_commit':os.environ['SOURCE_SHA'],
+            'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+            'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'verified_files':{
+              'web/v3/app.js':digest('/tmp/v3-app.js'),
+              'web/v3/sw.js':digest('/tmp/v3-sw.js'),
+            },
+            'public_data_trade_date':data.get('updated_at'),
+            'mode':data.get('mode'),
+            'requires_user_approval':data.get('requires_user_approval'),
+            'funds':sorted((data.get('funds') or {}).keys()),
+            'checks':{
+              'active_fund_stays_visible':True,
+              'equity_label_is_current_total_assets':True,
+              'paper_open_time_label':'09:30',
+            },
+          }
+          Path('/tmp/v3-pages-verification.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+
+      - name: Persist V3 public verification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'v3-pages-verification-bot'
+          git config user.email 'v3-pages-verification-bot@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p state
+            cp /tmp/v3-pages-verification.json state/v3_pages_verification.json
+            git add state/v3_pages_verification.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m 'ops: verify V3 public UI'
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 3))
+          done
+          echo 'Failed to persist V3 public verification receipt.' >&2
+          exit 1
