@@ -31,7 +31,8 @@ jobs:
           node --check web/v3/app.js
           grep -q "alignActiveFund" web/v3/app.js
           grep -q "当前总资产" web/v3/app.js
-          grep -q "模拟时点.*09:30" web/v3/app.js
+          grep -q "开盘价模拟" web/v3/app.js
+          grep -q "不记录精确分钟" web/v3/app.js
           grep -q "ai-trade-v3-shell-5" web/v3/sw.js
 
       - name: Wait until public V3 exactly matches this source
@@ -97,7 +98,8 @@ jobs:
             'checks':{
               'active_fund_stays_visible':True,
               'equity_label_is_current_total_assets':True,
-              'paper_open_time_label':'09:30',
+              'paper_execution_basis':'official_open_price',
+              'trade_time_precision':'trade_date_only',
             },
           }
           Path('/tmp/v3-pages-verification.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
