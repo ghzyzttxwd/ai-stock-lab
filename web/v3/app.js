@@ -1,7 +1,6 @@
 const LIVE_DATA = 'https://raw.githubusercontent.com/ghzyzttxwd/ai-stock-lab/v3-agent-paper/web/v3/data.json';
 const FUND_ORDER = ['A', 'B', 'C', 'D', 'L'];
 const FUND_LABEL = { A: '保守稳健', B: '趋势进攻', C: '短线机会', D: '综合判断', L: '长线价值' };
-const OPEN_EXECUTION_TIME = '09:30';
 const REJECTION = {
   limit_up_locked: '涨停无法买入', limit_down_locked: '跌停无法卖出', t_plus_one_locked: 'T+1 当日不可卖',
   insufficient_cash: '现金不足', below_board_lot: '不足一手', missing_execution_bar: '缺少执行行情',
@@ -111,14 +110,14 @@ function activityRows(fund) {
   const fills = (fund.recent_fills || []).map(x => ({ ...x, kind: 'fill' }));
   const rejects = (fund.recent_rejections || []).map(x => ({ ...x, kind: 'reject' }));
   const rows = [...fills, ...rejects].sort((a, b) => String(b.trade_date || '').localeCompare(String(a.trade_date || ''))).slice(0, 12);
-  if (!rows.length) return `<div class="empty">暂无成交记录<br>第一笔交易将在 AI 决策后的下一交易日 ${OPEN_EXECUTION_TIME} 开盘模拟执行</div>`;
+  if (!rows.length) return '<div class="empty">暂无成交记录<br>第一笔交易将在 AI 决策后的下一交易日按开盘价模拟执行</div>';
   return rows.map(item => {
     const rejected = item.kind === 'reject';
     const side = rejected ? 'reject' : String(item.side || '').toLowerCase();
     const label = rejected ? '拒' : item.side === 'BUY' ? '买' : '卖';
     const title = rejected ? (REJECTION[item.reason] || item.reason || '未成交') : `${item.side === 'BUY' ? '买入' : '卖出'} ${item.name || item.symbol}`;
     const amount = n(item.gross ?? (n(item.qty) * n(item.price)));
-    return `<div class="activity"><div class="row"><span class="side ${side}">${label}</span><div class="activity-main"><b>${esc(title)}</b><div class="meta">${shortDate(item.trade_date || '')} · 模拟时点 ${OPEN_EXECUTION_TIME} · ${num(item.qty)} 股${rejected ? '' : ` · ¥${num(item.price)}`}</div></div><div class="activity-amount">${rejected ? '<span class="neutral">未成交</span>' : `<b>${money(amount)}</b><div class="meta">费 ${money(item.fees)}</div>`}</div></div></div>`;
+    return `<div class="activity"><div class="row"><span class="side ${side}">${label}</span><div class="activity-main"><b>${esc(title)}</b><div class="meta">${shortDate(item.trade_date || '')} · 开盘价模拟 · ${num(item.qty)} 股${rejected ? '' : ` · ¥${num(item.price)}`}</div></div><div class="activity-amount">${rejected ? '<span class="neutral">未成交</span>' : `<b>${money(amount)}</b><div class="meta">费 ${money(item.fees)}</div>`}</div></div></div>`;
   }).join('');
 }
 
@@ -140,10 +139,10 @@ function render(data, activeId = 'A') {
     <section class="section panel summary-panel" id="fund"><div class="fund-title"><div><h3>${esc(fund.name)}</h3><div class="meta">最后结算 ${esc(fund.last_processed_date || '等待首笔交易')}</div></div><span class="pill">${activeId} · ${esc(FUND_LABEL[activeId])}</span></div><div class="metrics"><div class="metric"><span>当前总资产</span><b>${money(fund.equity)}</b></div><div class="metric"><span>累计收益</span><b class="${tone(fund.return_pct)}">${pct(fund.return_pct)}</b></div><div class="metric"><span>现金</span><b>${money(fund.cash)}</b></div><div class="metric"><span>持仓数量</span><b>${(fund.positions || []).length} 只</b></div></div>${equityChart(fund)}</section>
     <div class="dashboard-grid">
       <section class="section" id="positions"><div class="section-head"><h2>当前持仓</h2><span>${(fund.positions || []).length} 只股票</span></div><div class="panel">${positionRows(fund)}</div></section>
-      <section class="section" id="decision"><div class="section-head"><h2>AI 当天决策</h2><span>${decision ? `${esc(decision.decision_date)} → ${esc(decision.execute_on)}` : '等待首轮分析'}</span></div><div class="panel ai-panel"><div class="ai-head"><span class="ai-mark">AI</span><div><b>市场判断</b><span>无需人工审批 · 下一交易日 ${OPEN_EXECUTION_TIME} 开盘模拟执行</span></div></div><p class="market-view">${esc(decision?.market_view || '首个实际交易日收盘后，我会读取完整行情与当天消息并生成决策。')}</p><div class="target-list">${targetRows(decision, activeId)}</div></div></section>
+      <section class="section" id="decision"><div class="section-head"><h2>AI 当天决策</h2><span>${decision ? `${esc(decision.decision_date)} → ${esc(decision.execute_on)}` : '等待首轮分析'}</span></div><div class="panel ai-panel"><div class="ai-head"><span class="ai-mark">AI</span><div><b>市场判断</b><span>无需人工审批 · 下一交易日按开盘价模拟执行</span></div></div><p class="market-view">${esc(decision?.market_view || '首个实际交易日收盘后，我会读取完整行情与当天消息并生成决策。')}</p><div class="target-list">${targetRows(decision, activeId)}</div></div></section>
     </div>
-    <section class="section" id="trades"><div class="section-head"><h2>交易流水</h2><span>成交与拒单 · 开盘模拟 ${OPEN_EXECUTION_TIME}</span></div><div class="panel">${activityRows(fund)}</div></section>
-    <p class="footnote">纯虚拟交易 · 不连接银河证券 · 仅沪深 A 股主板 · 排除创业板、科创板、北交所、B 股、ST 与退市整理股票<br>买卖按决策指定交易日的官方开盘价并计入滑点、手续费模拟，模型成交时点记为 ${OPEN_EXECUTION_TIME}；这不是 GitHub 工作流实际运行时间。GitHub 只负责代码、账本镜像与补跑。</p>
+    <section class="section" id="trades"><div class="section-head"><h2>交易流水</h2><span>成交与拒单 · 开盘价模拟</span></div><div class="panel">${activityRows(fund)}</div></section>
+    <p class="footnote">纯虚拟交易 · 不连接银河证券 · 仅沪深 A 股主板 · 排除创业板、科创板、北交所、B 股、ST 与退市整理股票<br>买卖按决策指定交易日的官方开盘价并计入滑点、手续费模拟。当前账本只记录交易日，不记录精确分钟；GitHub 工作流实际几点运行也不等于虚拟成交时点。</p>
   </div><nav class="bottom-nav"><a href="#overview"><b>⌂</b>总览</a><a href="#fund"><b>◇</b>基金</a><a href="#decision"><b>✦</b>决策</a><a href="#trades"><b>≡</b>流水</a></nav>`;
 
   document.querySelectorAll('[data-fund]').forEach(button => button.addEventListener('click', () => {
