@@ -1,6 +1,7 @@
 const LIVE_DATA = 'https://raw.githubusercontent.com/ghzyzttxwd/ai-stock-lab/v3-agent-paper/web/v3/data.json';
 const FUND_ORDER = ['A', 'B', 'C', 'D', 'L'];
 const FUND_LABEL = { A: '保守稳健', B: '趋势进攻', C: '短线机会', D: '综合判断', L: '长线价值' };
+const OPEN_EXECUTION_TIME = '09:30';
 const REJECTION = {
   limit_up_locked: '涨停无法买入', limit_down_locked: '跌停无法卖出', t_plus_one_locked: 'T+1 当日不可卖',
   insufficient_cash: '现金不足', below_board_lot: '不足一手', missing_execution_bar: '缺少执行行情',
@@ -51,6 +52,14 @@ function positionPnl(position) {
   return cost > 0 && last > 0 ? (last / cost - 1) * 100 : 0;
 }
 
+function alignActiveFund(activeId) {
+  const strip = document.querySelector('.fund-strip');
+  const active = strip?.querySelector(`[data-fund="${activeId}"]`);
+  if (!strip || !active) return;
+  const target = active.offsetLeft - (strip.clientWidth - active.clientWidth) / 2;
+  strip.scrollLeft = Math.max(0, target);
+}
+
 function equityChart(fund) {
   let values = (fund.equity_curve || []).map(x => n(x.equity)).filter(x => x > 0);
   if (!values.length) values = [n(fund.initial_cash), n(fund.equity)];
@@ -66,7 +75,7 @@ function equityChart(fund) {
   const line = points.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const area = `${line} L${points.at(-1)[0]},${height} L${points[0][0]},${height} Z`;
   const last = points.at(-1);
-  return `<div class="chart"><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="累计权益曲线">
+  return `<div class="chart"><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="累计总资产曲线">
     <defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20d49a" stop-opacity=".28"/><stop offset="1" stop-color="#20d49a" stop-opacity="0"/></linearGradient></defs>
     <path class="gridline" d="M0,38 H640 M0,75 H640 M0,112 H640"/><path class="area" d="${area}"/><path class="curve" d="${line}"/><circle class="latest-dot" cx="${last[0]}" cy="${last[1]}" r="4"/>
   </svg></div>`;
@@ -102,14 +111,14 @@ function activityRows(fund) {
   const fills = (fund.recent_fills || []).map(x => ({ ...x, kind: 'fill' }));
   const rejects = (fund.recent_rejections || []).map(x => ({ ...x, kind: 'reject' }));
   const rows = [...fills, ...rejects].sort((a, b) => String(b.trade_date || '').localeCompare(String(a.trade_date || ''))).slice(0, 12);
-  if (!rows.length) return '<div class="empty">暂无成交记录<br>第一笔交易将在 AI 决策后的下一交易日开盘模拟执行</div>';
+  if (!rows.length) return `<div class="empty">暂无成交记录<br>第一笔交易将在 AI 决策后的下一交易日 ${OPEN_EXECUTION_TIME} 开盘模拟执行</div>`;
   return rows.map(item => {
     const rejected = item.kind === 'reject';
     const side = rejected ? 'reject' : String(item.side || '').toLowerCase();
     const label = rejected ? '拒' : item.side === 'BUY' ? '买' : '卖';
     const title = rejected ? (REJECTION[item.reason] || item.reason || '未成交') : `${item.side === 'BUY' ? '买入' : '卖出'} ${item.name || item.symbol}`;
     const amount = n(item.gross ?? (n(item.qty) * n(item.price)));
-    return `<div class="activity"><div class="row"><span class="side ${side}">${label}</span><div class="activity-main"><b>${esc(title)}</b><div class="meta">${esc(item.trade_date || '')} · ${num(item.qty)} 股${rejected ? '' : ` · ¥${num(item.price)}`}</div></div><div class="activity-amount">${rejected ? '<span class="neutral">未成交</span>' : `<b>${money(amount)}</b><div class="meta">费 ${money(item.fees)}</div>`}</div></div></div>`;
+    return `<div class="activity"><div class="row"><span class="side ${side}">${label}</span><div class="activity-main"><b>${esc(title)}</b><div class="meta">${shortDate(item.trade_date || '')} · 模拟时点 ${OPEN_EXECUTION_TIME} · ${num(item.qty)} 股${rejected ? '' : ` · ¥${num(item.price)}`}</div></div><div class="activity-amount">${rejected ? '<span class="neutral">未成交</span>' : `<b>${money(amount)}</b><div class="meta">费 ${money(item.fees)}</div>`}</div></div></div>`;
   }).join('');
 }
 
@@ -128,19 +137,20 @@ function render(data, activeId = 'A') {
     <header class="appbar"><div class="brand"><span class="logo">AI</span><div><b>AI Trade V3</b><small>全自动主板虚拟盘</small></div></div><span class="status"><i></i>系统运行中</span></header>
     <section class="hero" id="overview"><div class="kicker">五组合总资产</div><div class="hero-value">${money(totalEquity)}</div><div class="pnl-line"><b class="${tone(totalReturn)}">${pct(totalReturn)}</b><span class="subtle">累计盈亏 ${money(totalEquity - totalInitial)}</span></div><div class="hero-stats"><div class="hero-stat"><span>可用现金</span><b>${money(totalCash)}</b></div><div class="hero-stat"><span>股票市值</span><b>${money(positionsValue)}</b></div><div class="hero-stat"><span>数据交易日</span><b>${shortDate(updated)}</b></div></div></section>
     <section class="section"><div class="section-head"><h2>AI 基金竞技场</h2><span>每只初始 ¥100万</span></div><div class="fund-strip">${fundCards(data, activeId)}</div></section>
-    <section class="section panel summary-panel" id="fund"><div class="fund-title"><div><h3>${esc(fund.name)}</h3><div class="meta">最后结算 ${esc(fund.last_processed_date || '等待首笔交易')}</div></div><span class="pill">${activeId} · ${esc(FUND_LABEL[activeId])}</span></div><div class="metrics"><div class="metric"><span>当前权益</span><b>${money(fund.equity)}</b></div><div class="metric"><span>累计收益</span><b class="${tone(fund.return_pct)}">${pct(fund.return_pct)}</b></div><div class="metric"><span>现金</span><b>${money(fund.cash)}</b></div><div class="metric"><span>持仓数量</span><b>${(fund.positions || []).length} 只</b></div></div>${equityChart(fund)}</section>
+    <section class="section panel summary-panel" id="fund"><div class="fund-title"><div><h3>${esc(fund.name)}</h3><div class="meta">最后结算 ${esc(fund.last_processed_date || '等待首笔交易')}</div></div><span class="pill">${activeId} · ${esc(FUND_LABEL[activeId])}</span></div><div class="metrics"><div class="metric"><span>当前总资产</span><b>${money(fund.equity)}</b></div><div class="metric"><span>累计收益</span><b class="${tone(fund.return_pct)}">${pct(fund.return_pct)}</b></div><div class="metric"><span>现金</span><b>${money(fund.cash)}</b></div><div class="metric"><span>持仓数量</span><b>${(fund.positions || []).length} 只</b></div></div>${equityChart(fund)}</section>
     <div class="dashboard-grid">
       <section class="section" id="positions"><div class="section-head"><h2>当前持仓</h2><span>${(fund.positions || []).length} 只股票</span></div><div class="panel">${positionRows(fund)}</div></section>
-      <section class="section" id="decision"><div class="section-head"><h2>AI 当天决策</h2><span>${decision ? `${esc(decision.decision_date)} → ${esc(decision.execute_on)}` : '等待首轮分析'}</span></div><div class="panel ai-panel"><div class="ai-head"><span class="ai-mark">AI</span><div><b>市场判断</b><span>无需人工审批 · 下一交易日执行</span></div></div><p class="market-view">${esc(decision?.market_view || '首个实际交易日收盘后，我会读取完整行情与当天消息并生成决策。')}</p><div class="target-list">${targetRows(decision, activeId)}</div></div></section>
+      <section class="section" id="decision"><div class="section-head"><h2>AI 当天决策</h2><span>${decision ? `${esc(decision.decision_date)} → ${esc(decision.execute_on)}` : '等待首轮分析'}</span></div><div class="panel ai-panel"><div class="ai-head"><span class="ai-mark">AI</span><div><b>市场判断</b><span>无需人工审批 · 下一交易日 ${OPEN_EXECUTION_TIME} 开盘模拟执行</span></div></div><p class="market-view">${esc(decision?.market_view || '首个实际交易日收盘后，我会读取完整行情与当天消息并生成决策。')}</p><div class="target-list">${targetRows(decision, activeId)}</div></div></section>
     </div>
-    <section class="section" id="trades"><div class="section-head"><h2>交易流水</h2><span>成交与拒单</span></div><div class="panel">${activityRows(fund)}</div></section>
-    <p class="footnote">纯虚拟交易 · 不连接银河证券 · 仅沪深 A 股主板 · 排除创业板、科创板、北交所、B 股、ST 与退市整理股票<br>GitHub 负责代码与账本镜像；交易日识别、AI 决策和补跑均按交易所日历执行。</p>
+    <section class="section" id="trades"><div class="section-head"><h2>交易流水</h2><span>成交与拒单 · 开盘模拟 ${OPEN_EXECUTION_TIME}</span></div><div class="panel">${activityRows(fund)}</div></section>
+    <p class="footnote">纯虚拟交易 · 不连接银河证券 · 仅沪深 A 股主板 · 排除创业板、科创板、北交所、B 股、ST 与退市整理股票<br>买卖按决策指定交易日的官方开盘价并计入滑点、手续费模拟，模型成交时点记为 ${OPEN_EXECUTION_TIME}；这不是 GitHub 工作流实际运行时间。GitHub 只负责代码、账本镜像与补跑。</p>
   </div><nav class="bottom-nav"><a href="#overview"><b>⌂</b>总览</a><a href="#fund"><b>◇</b>基金</a><a href="#decision"><b>✦</b>决策</a><a href="#trades"><b>≡</b>流水</a></nav>`;
 
   document.querySelectorAll('[data-fund]').forEach(button => button.addEventListener('click', () => {
     sessionStorage.setItem('v3-active-fund', button.dataset.fund);
     render(data, button.dataset.fund);
   }));
+  requestAnimationFrame(() => alignActiveFund(activeId));
 }
 
 loadData().then(data => {
