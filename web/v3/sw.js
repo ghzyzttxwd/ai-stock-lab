@@ -1,4 +1,5 @@
 const CACHE = 'ai-trade-v3-shell-5';
+// Keep this file versioned so a V3-only UI push also triggers the public end-to-end verifier.
 const SHELL = ['./', './index.html', './app.css', './app.js', './data.json', './manifest.webmanifest', './ai-stock-icon-192.png', './ai-stock-icon-512.png', './ai-stock-maskable-192.png', './ai-stock-maskable-512.png', './ai-stock-apple-touch.png'];
 
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
