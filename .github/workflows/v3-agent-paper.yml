@@ -68,7 +68,7 @@ jobs:
             --enriched /tmp/v3-enriched.json \
             --report /tmp/v3-catch-up.json
 
-      - name: Build the broad AI brief for the next session
+      - name: Build or reuse the decision-grade AI brief
         id: next
         run: |
           NEXT=$(python - <<'PY'
@@ -77,12 +77,35 @@ jobs:
           PY
           )
           echo "date=$NEXT" >> "$GITHUB_OUTPUT"
-          python -m engine_v3.brief \
-            --snapshot /tmp/v3-snapshot.json \
-            --enriched /tmp/v3-enriched.json \
-            --next-trade-date "$NEXT" \
-            --output "agent_state/v3/briefs/${{ steps.td.outputs.date }}.json"
-          cp "agent_state/v3/briefs/${{ steps.td.outputs.date }}.json" agent_state/v3/latest_brief.json
+          BRIEF="agent_state/v3/briefs/${{ steps.td.outputs.date }}.json"
+          DECISION="agent_state/v3/decisions/${{ steps.td.outputs.date }}.json"
+          if [[ -f "$DECISION" && -f "$BRIEF" ]]; then
+            python - "$BRIEF" "$DECISION" "${{ steps.td.outputs.date }}" "$NEXT" <<'PY'
+          import json
+          import sys
+          brief_path, decision_path, trade_date, next_date = sys.argv[1:]
+          brief = json.load(open(brief_path, encoding='utf-8'))
+          decision = json.load(open(decision_path, encoding='utf-8'))
+          if brief.get('trade_date') != trade_date:
+              raise SystemExit('stored brief trade_date mismatch')
+          if brief.get('next_trade_date') != next_date:
+              raise SystemExit('stored brief next_trade_date mismatch')
+          if decision.get('decision_date') != trade_date:
+              raise SystemExit('decision_date mismatch')
+          if decision.get('execute_on') != next_date:
+              raise SystemExit('decision execute_on mismatch')
+          if decision.get('brief_source_sha256') != brief.get('source_sha256'):
+              raise SystemExit('decision/brief source hash mismatch; refusing to overwrite audit evidence')
+          PY
+            cp "$BRIEF" agent_state/v3/latest_brief.json
+          else
+            python -m engine_v3.brief \
+              --snapshot /tmp/v3-snapshot.json \
+              --enriched /tmp/v3-enriched.json \
+              --next-trade-date "$NEXT" \
+              --output "$BRIEF"
+            cp "$BRIEF" agent_state/v3/latest_brief.json
+          fi
 
       - name: Build V3 public data mirror
         run: |
