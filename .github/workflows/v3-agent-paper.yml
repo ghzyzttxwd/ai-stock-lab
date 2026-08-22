@@ -1,0 +1,125 @@
+name: V3 autonomous AI paper trading
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-agent-paper]
+    paths:
+      - 'engine_v3/**'
+      - 'tests/test_v3*.py'
+      - '.github/workflows/v3-agent-paper.yml'
+      - 'agent_state/v3/.run-trigger'
+      - 'agent_state/v3/decisions/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v3-agent-paper
+  cancel-in-progress: false
+
+jobs:
+  prepare-and-settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v3-agent-paper
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Test V3 before touching paper state
+        run: python -m unittest discover -s tests -p 'test_v3*.py' -v
+
+      - name: Resolve latest completed session
+        id: td
+        run: |
+          TD=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from engine_v2.data_validation import _safe_requested_date
+          print(_safe_requested_date(datetime.now(ZoneInfo('Asia/Shanghai'))).isoformat())
+          PY
+          )
+          echo "date=$TD" >> "$GITHUB_OUTPUT"
+
+      - name: Build one decision-grade market snapshot
+        env:
+          V2_UNIVERSE_CACHE_PATH: ${{ github.workspace }}/agent_state/v3/cache/market_universe.json
+          V2_DECISION_SNAPSHOT_CACHE_PATH: ${{ github.workspace }}/agent_state/v3/cache/normalized_snapshot.json
+          V2_HISTORY_CACHE_DIR: ${{ github.workspace }}/.cache/v3-history
+          V2_HISTORY_WORKERS: '3'
+        run: |
+          python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v3-snapshot.json
+          python -m engine_v2.enrichment_resilient --snapshot /tmp/v3-snapshot.json --output /tmp/v3-enriched.json
+
+      - name: Settle every due AI decision using its declared historical open
+        run: |
+          python -m engine_v3.catch_up \
+            --as-of "${{ steps.td.outputs.date }}" \
+            --enriched /tmp/v3-enriched.json \
+            --report /tmp/v3-catch-up.json
+
+      - name: Build the broad AI brief for the next session
+        id: next
+        run: |
+          NEXT=$(python - <<'PY'
+          from engine_v3.calendar import next_trade_session
+          print(next_trade_session('${{ steps.td.outputs.date }}'))
+          PY
+          )
+          echo "date=$NEXT" >> "$GITHUB_OUTPUT"
+          python -m engine_v3.brief \
+            --snapshot /tmp/v3-snapshot.json \
+            --enriched /tmp/v3-enriched.json \
+            --next-trade-date "$NEXT" \
+            --output "agent_state/v3/briefs/${{ steps.td.outputs.date }}.json"
+          cp "agent_state/v3/briefs/${{ steps.td.outputs.date }}.json" agent_state/v3/latest_brief.json
+
+      - name: Build V3 public data mirror
+        run: |
+          python -m engine_v3.reporting \
+            --trade-date "${{ steps.td.outputs.date }}" \
+            --output web/v3/data.json
+
+      - name: Prove V1/V2 isolation and V3 output completeness
+        run: |
+          git diff --quiet -- state shadow_state/v2 web/d web/e web/v2
+          python - <<'PY'
+          import json
+          brief=json.load(open('agent_state/v3/latest_brief.json',encoding='utf-8'))
+          summary=json.load(open('web/v3/data.json',encoding='utf-8'))
+          if brief['trade_date'] != '${{ steps.td.outputs.date }}': raise SystemExit('stale V3 brief')
+          if brief['next_trade_date'] != '${{ steps.next.outputs.date }}': raise SystemExit('next-session mismatch')
+          if len(brief['candidates']) < 100: raise SystemExit('undersized AI brief')
+          if set(summary['funds']) != {'A','B','C','D','L'}: raise SystemExit('fund set mismatch')
+          if summary['mode'] != 'AUTONOMOUS_AI_PAPER': raise SystemExit('not paper mode')
+          PY
+
+      - name: Persist V3 only
+        run: |
+          git config user.name "v3-agent-paper-bot"
+          git config user.email "v3-agent-paper-bot@users.noreply.github.com"
+          git add agent_state/v3 web/v3/data.json
+          git diff --cached --quiet || git commit -m "v3-data: settle and prepare autonomous AI paper session"
+          git pull --rebase origin v3-agent-paper
+          git push origin HEAD:v3-agent-paper
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v3-agent-paper-${{ steps.td.outputs.date }}
+          path: |
+            /tmp/v3-snapshot.json
+            /tmp/v3-enriched.json
+            /tmp/v3-catch-up.json
+            agent_state/v3/latest_brief.json
+          if-no-files-found: warn
+          retention-days: 30
