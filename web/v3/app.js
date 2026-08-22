@@ -32,6 +32,14 @@ async function fetchJson(url) {
   } finally { clearTimeout(timer); }
 }
 
+async function loadData() {
+  try { return validate(await fetchJson(LIVE_DATA)); }
+  catch (liveError) {
+    try { return validate(await fetchJson('data.json')); }
+    catch (fallbackError) { throw new Error(`实时账本：${liveError.message}；备用快照：${fallbackError.message}`); }
+  }
+}
+
 function positionValue(position) {
   return n(position.market_value ?? (n(position.qty) * n(position.last_price ?? position.close ?? position.avg_cost)));
 }
@@ -135,7 +143,7 @@ function render(data, activeId = 'A') {
   }));
 }
 
-fetchJson(LIVE_DATA).then(validate).then(data => {
+loadData().then(data => {
   const saved = sessionStorage.getItem('v3-active-fund');
   render(data, FUND_ORDER.includes(saved) ? saved : 'A');
 }).catch(error => {

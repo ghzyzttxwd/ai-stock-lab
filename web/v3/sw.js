@@ -1,5 +1,5 @@
-const CACHE = 'ai-trade-v3-shell-1';
-const SHELL = ['./', './index.html', './app.css', './app.js', './manifest.webmanifest'];
+const CACHE = 'ai-trade-v3-shell-2';
+const SHELL = ['./', './index.html', './app.css', './app.js', './data.json', './manifest.webmanifest'];
 
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
 self.addEventListener('activate', event => event.waitUntil(
