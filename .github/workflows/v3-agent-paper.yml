@@ -112,6 +112,36 @@ jobs:
           git pull --rebase origin v3-agent-paper
           git push origin HEAD:v3-agent-paper
 
+      - name: Sync V3 public mirror to main
+        run: |
+          git fetch origin main
+          rm -rf /tmp/v3-pages-main
+          git worktree add /tmp/v3-pages-main origin/main
+          cp web/v3/data.json /tmp/v3-pages-main/web/v3/data.json
+          cd /tmp/v3-pages-main
+          git config user.name "v3-agent-paper-bot"
+          git config user.email "v3-agent-paper-bot@users.noreply.github.com"
+          git add web/v3/data.json
+          if git diff --cached --quiet; then
+            echo "V3 public mirror already current"
+            exit 0
+          fi
+          git commit -m "v3-data: sync autonomous paper mirror to public site"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$GITHUB_WORKSPACE/web/v3/data.json" web/v3/data.json
+            git add web/v3/data.json
+            git commit -m "v3-data: sync autonomous paper mirror to public site"
+            sleep $((attempt * 3))
+          done
+          echo "Failed to sync V3 public mirror after 3 conflict-safe attempts" >&2
+          exit 1
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
