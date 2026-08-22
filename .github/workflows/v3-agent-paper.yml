@@ -142,6 +142,11 @@ jobs:
           echo "Failed to sync V3 public mirror after 3 conflict-safe attempts" >&2
           exit 1
 
+      - name: Dispatch public Pages deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run auto-deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
