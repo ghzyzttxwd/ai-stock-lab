@@ -35,16 +35,15 @@ class CurrentHealthReceiptTests(unittest.TestCase):
     def test_v2_1455_historical_failure_is_explicitly_superseded(self):
         health = load("state/current_health.json")
         v2 = health["v2"]
-        guard = load("state/v2_checkpoint_guard_status.json")
         pages = load(v2["pages_receipt"])
         terminal = load(v2["terminal_status"])
 
         self.assertEqual(v2["status"], "verified")
         self.assertEqual(v2["latest_checkpoint"], "14:55")
-        self.assertEqual(guard["status"], "failure")
-        self.assertFalse(guard["end_to_end_verified"])
-        self.assertEqual(str(guard["workflow_run_id"]), v2["historical_guard_run_id"])
 
+        # v2_checkpoint_guard_status.json is the mutable status of the newest
+        # checkpoint. Do not pin this historical incident test to that live file:
+        # a newer trading-day checkpoint must be allowed to replace it.
         self.assertEqual(pages["status"], "verified")
         self.assertTrue(pages["historical_guard_superseded"])
         self.assertEqual(pages["historical_guard_run_id"], v2["historical_guard_run_id"])
