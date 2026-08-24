@@ -2,7 +2,7 @@
   "fund_id": "D",
   "name": "综合判断基金",
   "initial_cash": 1000000.0,
-  "cash": 806621.48,
+  "cash": 709964.49,
   "positions": {
     "sh.600663": {
       "name": "陆家嘴",
@@ -17,6 +17,13 @@
       "avg_cost": 15.9428,
       "acquired_date": "2026-08-21",
       "last_price": 15.11
+    },
+    "sh.600026": {
+      "name": "中远海能",
+      "qty": 4900,
+      "avg_cost": 19.7259,
+      "acquired_date": "2026-08-24",
+      "last_price": 19.14
     }
   },
   "fills": [
@@ -877,6 +884,26 @@
       "market_reference_time": "11:28",
       "market_reference_time_basis": "snapshot_capture_minute",
       "market_reference_source": "sina"
+    },
+    {
+      "symbol": "sh.600026",
+      "name": "中远海能",
+      "side": "BUY",
+      "trade_date": "2026-08-24",
+      "reference_price": 19.71,
+      "price": 19.72,
+      "qty": 4900,
+      "gross": 96628.0,
+      "fees": 28.99,
+      "note": "上一交易日条件计划 · 15:10结算当日已触发买单",
+      "execution_price_field": "conditional_trigger",
+      "plan_version": "conditional-plan-v1",
+      "setup": "breakout",
+      "trigger_reason": "intraday_breakout_triggered",
+      "trigger_price": 19.71,
+      "market_reference_time": "09:31",
+      "market_reference_time_basis": "first_trigger_minute",
+      "market_reference_source": "eastmoney-1m"
     }
   ],
   "equity_curve": [
@@ -907,74 +934,111 @@
     {
       "date": "2026-08-21",
       "equity": 993395.44
+    },
+    {
+      "date": "2026-08-24",
+      "equity": 964452.49
     }
   ],
   "pending_targets": [
     {
-      "symbol": "sh.601872",
-      "name": "招商轮船",
-      "target_weight": 0.1,
-      "reason": "1至3日相对强度较好，近1/3/5日均跑赢市场，收盘位置适中，成交活跃但overheat_score仅0.04，风险处于候选中较低水平。",
+      "symbol": "sh.601919",
+      "name": "中远海控",
+      "target_weight": 0.08,
+      "reason": "机会分100，近1/3/5日相对市场均为正且强，成交额比1.46，未见过热；但收盘位置偏高，控制仓位。",
       "trade_plan": {
         "plan_version": "conditional-plan-v1",
-        "decision_date": "2026-08-21",
+        "decision_date": "2026-08-24",
         "setup": "breakout",
         "opportunity_score": 100.0,
         "entry": {
           "mode": "breakout",
           "operator": ">=",
-          "trigger_price": 20.12,
-          "valid_min": 20.12,
-          "valid_max": 20.482,
+          "trigger_price": 17.538,
+          "valid_min": 17.538,
+          "valid_max": 17.684,
           "explanation": "达到突破确认价才买；跳空超过最高追价则放弃"
         },
         "exit": {
-          "hard_stop_pct": 0.055,
+          "hard_stop_pct": 0.02523,
           "reward_risk": 1.8,
           "trailing_activation_rr": 1.0,
-          "trailing_drawdown_pct": 0.035,
+          "trailing_drawdown_pct": 0.018,
           "max_hold_days": 3,
-          "estimated_stop_price": 19.013,
-          "estimated_take_profit_price": 22.112
+          "estimated_stop_price": 17.095,
+          "estimated_take_profit_price": 18.334
         },
         "cancel_if_not_triggered_by_close": true,
-        "estimated_entry_price": 20.12
+        "estimated_entry_price": 17.538
       },
       "opportunity_score": 100.0,
       "setup": "breakout"
     },
     {
-      "symbol": "sh.600026",
-      "name": "中远海能",
-      "target_weight": 0.1,
-      "reason": "短线趋势和相对收益稳定，近3/5日明显跑赢市场，close_position为0.91但过热分仅1.74，波动率低于多数强势候选，适合控制仓位参与。",
+      "symbol": "sh.600489",
+      "name": "中金黄金",
+      "target_weight": 0.07,
+      "reason": "机会分100，趋势98.48，近3/5日相对市场明显占优，收盘位置仅0.39且过热分为0，短线性价比较好。",
       "trade_plan": {
         "plan_version": "conditional-plan-v1",
-        "decision_date": "2026-08-21",
-        "setup": "breakout",
+        "decision_date": "2026-08-24",
+        "setup": "pullback",
         "opportunity_score": 100.0,
         "entry": {
-          "mode": "breakout",
-          "operator": ">=",
-          "trigger_price": 19.71,
-          "valid_min": 19.71,
-          "valid_max": 20.064,
-          "explanation": "达到突破确认价才买；跳空超过最高追价则放弃"
+          "mode": "pullback",
+          "operator": "<=",
+          "trigger_price": 26.323,
+          "valid_min": 25.27,
+          "valid_max": 26.323,
+          "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
         },
         "exit": {
           "hard_stop_pct": 0.055,
-          "reward_risk": 1.8,
+          "reward_risk": 1.65,
           "trailing_activation_rr": 1.0,
           "trailing_drawdown_pct": 0.035,
           "max_hold_days": 3,
-          "estimated_stop_price": 18.626,
-          "estimated_take_profit_price": 21.661
+          "estimated_stop_price": 24.875,
+          "estimated_take_profit_price": 28.711
         },
         "cancel_if_not_triggered_by_close": true,
-        "estimated_entry_price": 19.71
+        "estimated_entry_price": 26.323
       },
       "opportunity_score": 100.0,
-      "setup": "breakout"
+      "setup": "pullback"
+    },
+    {
+      "symbol": "sz.000975",
+      "name": "山金国际",
+      "target_weight": 0.06,
+      "reason": "机会分100，近1/3/5日相对市场均为正，趋势100，收盘位置适中、过热分为0；金价波动较大，采用中等仓位。",
+      "trade_plan": {
+        "plan_version": "conditional-plan-v1",
+        "decision_date": "2026-08-24",
+        "setup": "range",
+        "opportunity_score": 100.0,
+        "entry": {
+          "mode": "range",
+          "operator": "inside",
+          "trigger_price": 29.436,
+          "valid_min": 28.88,
+          "valid_max": 29.436,
+          "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+        },
+        "exit": {
+          "hard_stop_pct": 0.055,
+          "reward_risk": 1.65,
+          "trailing_activation_rr": 1.0,
+          "trailing_drawdown_pct": 0.035,
+          "max_hold_days": 3,
+          "estimated_stop_price": 27.554,
+          "estimated_take_profit_price": 31.804
+        },
+        "cancel_if_not_triggered_by_close": true,
+        "estimated_entry_price": 29.158
+      },
+      "opportunity_score": 100.0,
+      "setup": "range"
     }
   ],
   "decisions": [
@@ -2086,10 +2150,120 @@
       "execution_model": "CONDITIONAL_PLAN_V1",
       "planned_exposure": 0.2,
       "allow_cash": true
+    },
+    {
+      "date": "2026-08-24",
+      "market_score": 40.86,
+      "targets": [
+        {
+          "symbol": "sh.601919",
+          "name": "中远海控",
+          "target_weight": 0.08,
+          "reason": "机会分100，近1/3/5日相对市场均为正且强，成交额比1.46，未见过热；但收盘位置偏高，控制仓位。",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "decision_date": "2026-08-24",
+            "setup": "breakout",
+            "opportunity_score": 100.0,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 17.538,
+              "valid_min": 17.538,
+              "valid_max": 17.684,
+              "explanation": "达到突破确认价才买；跳空超过最高追价则放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.02523,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 3,
+              "estimated_stop_price": 17.095,
+              "estimated_take_profit_price": 18.334
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 17.538
+          },
+          "opportunity_score": 100.0,
+          "setup": "breakout"
+        },
+        {
+          "symbol": "sh.600489",
+          "name": "中金黄金",
+          "target_weight": 0.07,
+          "reason": "机会分100，趋势98.48，近3/5日相对市场明显占优，收盘位置仅0.39且过热分为0，短线性价比较好。",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "decision_date": "2026-08-24",
+            "setup": "pullback",
+            "opportunity_score": 100.0,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 26.323,
+              "valid_min": 25.27,
+              "valid_max": 26.323,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 24.875,
+              "estimated_take_profit_price": 28.711
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 26.323
+          },
+          "opportunity_score": 100.0,
+          "setup": "pullback"
+        },
+        {
+          "symbol": "sz.000975",
+          "name": "山金国际",
+          "target_weight": 0.06,
+          "reason": "机会分100，近1/3/5日相对市场均为正，趋势100，收盘位置适中、过热分为0；金价波动较大，采用中等仓位。",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "decision_date": "2026-08-24",
+            "setup": "range",
+            "opportunity_score": 100.0,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 29.436,
+              "valid_min": 28.88,
+              "valid_max": 29.436,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 27.554,
+              "estimated_take_profit_price": 31.804
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 29.158
+          },
+          "opportunity_score": 100.0,
+          "setup": "range"
+        }
+      ],
+      "diary": "市场评分偏弱，保留现金，仅配置三只相对强势且过热约束较好的标的。",
+      "plan_version": "conditional-plan-v1",
+      "execution_model": "CONDITIONAL_PLAN_V1",
+      "planned_exposure": 0.21,
+      "allow_cash": true
     }
   ],
   "created_at": null,
-  "last_processed_date": "2026-08-21",
+  "last_processed_date": "2026-08-24",
   "morning_sell_date": "2026-08-19",
   "morning_sell_at": "2026-08-19T10:22:43+08:00",
   "morning_quote_source": "sina",
@@ -2106,7 +2280,7 @@
       "reason": "2026-08-19 close-price BUY settlement was incorrect"
     }
   ],
-  "conditional_plan_date": "2026-08-21",
+  "conditional_plan_date": "2026-08-24",
   "exit_plans": {
     "sh.600663": {
       "plan_version": "conditional-plan-v1",
@@ -2119,9 +2293,9 @@
       "highest_price": 9.5579,
       "partial_taken": false,
       "max_hold_days": 3,
-      "sessions_held": 2,
+      "sessions_held": 3,
       "rotation_exit": true,
-      "rotation_min_price": 9.482,
+      "rotation_min_price": 9.462,
       "setup": "legacy-migrated"
     },
     "sz.002365": {
@@ -2135,32 +2309,36 @@
       "highest_price": 16.41,
       "partial_taken": false,
       "max_hold_days": 3,
+      "sessions_held": 1,
+      "rotation_exit": true,
+      "rotation_min_price": 15.291,
+      "setup": "breakout"
+    },
+    "sh.600026": {
+      "plan_version": "conditional-plan-v1",
+      "opened_date": "2026-08-24",
+      "entry_price": 19.7259,
+      "hard_stop_price": 18.641,
+      "take_profit_price": 21.679,
+      "trailing_activation_price": 20.811,
+      "trailing_drawdown_pct": 0.035,
+      "highest_price": 19.7259,
+      "partial_taken": false,
+      "max_hold_days": 3,
       "sessions_held": 0,
       "rotation_exit": true,
-      "rotation_min_price": 16.64,
+      "rotation_min_price": 19.37,
       "setup": "breakout"
     }
   },
   "last_entry_settlement": {
-    "trade_date": "2026-08-21",
-    "settled_at": "2026-08-22T02:48:32+08:00",
-    "fills": 4,
+    "trade_date": "2026-08-24",
+    "settled_at": "2026-08-24T16:54:57+08:00",
+    "fills": 1,
     "not_triggered_or_skipped": [
       {
-        "symbol": "sz.000517",
+        "symbol": "sh.601872",
         "reason": "breakout_not_triggered"
-      },
-      {
-        "symbol": "sz.002412",
-        "reason": "pullback_not_triggered"
-      },
-      {
-        "symbol": "sz.001210",
-        "reason": "breakout_not_triggered"
-      },
-      {
-        "symbol": "sh.600613",
-        "reason": "pullback_not_triggered"
       }
     ],
     "plan_version": "conditional-plan-v1",
@@ -2467,5 +2645,5 @@
       ]
     }
   ],
-  "pending_decision_date": "2026-08-21"
+  "pending_decision_date": "2026-08-24"
 }
