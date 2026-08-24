@@ -2,21 +2,14 @@
   "fund_id": "A",
   "name": "保守稳健基金",
   "initial_cash": 1000000.0,
-  "cash": 868993.49,
+  "cash": 885903.55,
   "positions": {
     "sh.600663": {
       "name": "陆家嘴",
       "qty": 7100,
       "avg_cost": 9.5579,
       "acquired_date": "2026-08-19",
-      "last_price": 9.4
-    },
-    "sh.600900": {
-      "name": "长江电力",
-      "qty": 600,
-      "avg_cost": 28.2325,
-      "acquired_date": "2026-08-20",
-      "last_price": 28.13
+      "last_price": 9.35
     }
   },
   "fills": [
@@ -937,6 +930,28 @@
       "actual_execution_time": "2026-08-24T11:27:00+08:00",
       "actual_clock": "11:27",
       "market_reference_time": "11:28",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
+    },
+    {
+      "symbol": "sh.600900",
+      "name": "长江电力",
+      "side": "SELL",
+      "trade_date": "2026-08-24",
+      "reference_price": 28.22,
+      "price": 28.206,
+      "qty": 600,
+      "gross": 16923.6,
+      "fees": 13.54,
+      "note": "条件计划 · 13:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "13:30",
+      "scheduled_time": "13:30",
+      "actual_execution_time": "2026-08-24T13:37:00+08:00",
+      "actual_clock": "13:37",
+      "market_reference_time": "13:38",
       "market_reference_time_basis": "snapshot_capture_minute",
       "market_reference_source": "sina"
     }
@@ -4688,22 +4703,6 @@
       "rotation_exit": true,
       "rotation_min_price": 9.482,
       "setup": "legacy-migrated"
-    },
-    "sh.600900": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-20",
-      "entry_price": 28.2325,
-      "hard_stop_price": 27.527,
-      "take_profit_price": 29.397,
-      "trailing_activation_price": 28.938,
-      "trailing_drawdown_pct": 0.018,
-      "highest_price": 28.2325,
-      "partial_taken": false,
-      "max_hold_days": 4,
-      "sessions_held": 1,
-      "rotation_exit": true,
-      "rotation_min_price": 28.148,
-      "setup": "pullback"
     }
   },
   "last_entry_settlement": {
@@ -4751,8 +4750,8 @@
     "plan_version": "conditional-plan-v1",
     "price_time_evidence": "first_trigger_minute_when_available"
   },
-  "last_conditional_scan_key": "2026-08-24T11:20",
-  "last_conditional_scan_at": "2026-08-24T11:27:00+08:00",
+  "last_conditional_scan_key": "2026-08-24T13:30",
+  "last_conditional_scan_at": "2026-08-24T13:37:00+08:00",
   "conditional_scan_log": [
     {
       "slot": "11:20",
@@ -5052,6 +5051,27 @@
           "take_profit": 29.397,
           "trailing_stop": 27.724,
           "rotation_min_price": 28.148
+        }
+      ]
+    },
+    {
+      "slot": "13:30",
+      "scheduled_time": "13:30",
+      "actual_clock": "13:37",
+      "quote_clock": "13:38",
+      "delay_minutes": 7.01,
+      "at": "2026-08-24T13:37:00+08:00",
+      "fills": 1,
+      "checks": [
+        {
+          "symbol": "sh.600663",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 9.35,
+          "hard_stop": 9.006,
+          "take_profit": 9.76,
+          "trailing_stop": 9.319,
+          "rotation_min_price": 9.482
         }
       ]
     }
