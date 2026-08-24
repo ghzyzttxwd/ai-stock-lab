@@ -30,15 +30,21 @@ def _critical_symbols(states: dict[str, dict]) -> dict[str, str]:
 
 
 def _session_bars(market, critical: dict[str, str], trade_date: str) -> dict[str, dict]:
-    """Completed daily OHLC is used only to verify whether yesterday's condition was touched."""
+    """Load exact-date OHLC for accounting-critical symbols and fail closed on any miss."""
     if not critical:
         return {}
-    snapshot = market.snapshot()
-    bars = {x['code']: x for x in snapshot if x.get('code') in critical}
-    missing = {symbol: name for symbol, name in critical.items() if symbol not in bars}
+
+    # Settlement only needs holdings/pending-order symbols. Do not make it depend on a
+    # full-market spot snapshot: those rows have no explicit session date and an outage in
+    # Eastmoney/Sina/Tencent full-market feeds must not prevent the independent exact-date
+    # execution-bar provider stack from doing the accounting-critical work.
+    bars = market.execution_bars(critical, trade_date)
+    missing = sorted(symbol for symbol in critical if symbol not in bars)
     if missing:
-        print(f'[15:10-plan] supplementing {len(missing)} critical symbols outside liquid snapshot')
-        bars.update(market.execution_bars(missing, trade_date))
+        raise RuntimeError(
+            f'Exact-date execution-bar coverage incomplete for {trade_date}: '
+            f'missing {len(missing)}/{len(critical)} critical symbols: {", ".join(missing)}'
+        )
     return bars
 
 
