@@ -9,6 +9,7 @@ from engine_v2.shadow_ledger import normalize_symbol
 from engine_v2.shadow_run import bars_from_enriched
 
 from .contracts import FUND_IDS, validate_decision
+from .execution_bar_fallback import fetch_alternate_execution_bars
 from .ledger import load_ledger
 from .session import run_decision
 
@@ -25,6 +26,25 @@ def _critical_symbols(decision: dict, state_root: Path) -> dict[str, str]:
     return symbols
 
 
+def _execution_bars(
+    provider: AKShareMarket,
+    critical: dict[str, str],
+    execute_on: str,
+    current: dict[str, dict],
+) -> dict[str, dict]:
+    """Build a complete exact-session bar set without requiring a full-market snapshot."""
+    bars = {symbol: dict(row) for symbol, row in current.items() if symbol in critical}
+    missing = {symbol: name for symbol, name in critical.items() if symbol not in bars}
+    if missing:
+        bars.update(provider.execution_bars(missing, execute_on))
+
+    missing = {symbol: name for symbol, name in critical.items() if symbol not in bars}
+    if missing and getattr(provider, "ak", None) is not None:
+        bars.update(fetch_alternate_execution_bars(provider.ak, missing, execute_on))
+
+    return bars
+
+
 def catch_up(
     decisions_root: Path,
     state_root: Path,
@@ -34,6 +54,7 @@ def catch_up(
 ) -> dict:
     reports = []
     current = {normalize_symbol(k): dict(v) for k, v in (current_bars or {}).items()}
+    provider = market or AKShareMarket()
     for path in sorted(decisions_root.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         allowed = set(payload.get("brief_symbols") or [])
@@ -49,11 +70,8 @@ def catch_up(
             continue
 
         critical = _critical_symbols(decision, state_root)
-        bars = dict(current) if decision["execute_on"] == as_of else {}
-        missing = {symbol: name for symbol, name in critical.items() if symbol not in bars}
-        if missing:
-            provider = market or AKShareMarket()
-            bars.update(provider.execution_bars(missing, decision["execute_on"]))
+        same_session = current if decision["execute_on"] == as_of else {}
+        bars = _execution_bars(provider, critical, decision["execute_on"], same_session)
         still_missing = sorted(set(critical) - set(bars))
         if still_missing:
             raise RuntimeError(
