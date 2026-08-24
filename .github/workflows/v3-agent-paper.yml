@@ -51,6 +51,30 @@ jobs:
           )
           echo "date=$TD" >> "$GITHUB_OUTPUT"
 
+      - name: Settle every due AI decision from exact-date critical bars
+        run: |
+          python -m engine_v3.catch_up \
+            --as-of "${{ steps.td.outputs.date }}" \
+            --report /tmp/v3-catch-up.json
+
+      - name: Persist due V3 execution before full-market research
+        run: |
+          set -euo pipefail
+          git config user.name "v3-agent-paper-bot"
+          git config user.email "v3-agent-paper-bot@users.noreply.github.com"
+          for path in agent_state/v3/audit agent_state/v3/ledgers; do
+            if [ -e "$path" ]; then
+              git add "$path"
+            fi
+          done
+          if git diff --cached --quiet; then
+            echo "No new due V3 execution state to persist"
+            exit 0
+          fi
+          git commit -m "v3-data: persist due autonomous paper execution"
+          git pull --rebase origin v3-agent-paper
+          git push origin HEAD:v3-agent-paper
+
       - name: Build one decision-grade market snapshot
         env:
           V2_UNIVERSE_CACHE_PATH: ${{ github.workspace }}/agent_state/v3/cache/market_universe.json
@@ -60,13 +84,6 @@ jobs:
         run: |
           python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v3-snapshot.json
           python -m engine_v2.enrichment_resilient --snapshot /tmp/v3-snapshot.json --output /tmp/v3-enriched.json
-
-      - name: Settle every due AI decision using its declared historical open
-        run: |
-          python -m engine_v3.catch_up \
-            --as-of "${{ steps.td.outputs.date }}" \
-            --enriched /tmp/v3-enriched.json \
-            --report /tmp/v3-catch-up.json
 
       - name: Build or reuse the decision-grade AI brief
         id: next
@@ -118,6 +135,7 @@ jobs:
           git diff --quiet -- state shadow_state/v2 web/d web/e web/v2
           python - <<'PY'
           import json
+          from pathlib import Path
           brief=json.load(open('agent_state/v3/latest_brief.json',encoding='utf-8'))
           summary=json.load(open('web/v3/data.json',encoding='utf-8'))
           if brief['trade_date'] != '${{ steps.td.outputs.date }}': raise SystemExit('stale V3 brief')
@@ -125,6 +143,13 @@ jobs:
           if len(brief['candidates']) < 100: raise SystemExit('undersized AI brief')
           if set(summary['funds']) != {'A','B','C','D','L'}: raise SystemExit('fund set mismatch')
           if summary['mode'] != 'AUTONOMOUS_AI_PAPER': raise SystemExit('not paper mode')
+          for fund_id in ('A','B','C','D','L'):
+              path=Path('agent_state/v3/ledgers')/f'{fund_id}.json'
+              if not path.exists(): raise SystemExit(f'missing V3 ledger {fund_id}')
+              state=json.load(open(path,encoding='utf-8'))
+              if state.get('last_processed_date') != '${{ steps.td.outputs.date }}':
+                  raise SystemExit(f'stale V3 ledger {fund_id}: {state.get("last_processed_date")}')
+              if float(state.get('cash') or 0) < -0.01: raise SystemExit(f'negative cash {fund_id}')
           PY
 
       - name: Persist V3 only
@@ -171,6 +196,67 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run auto-deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
 
+      - name: Verify public V3 data matches this run
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum web/v3/data.json | awk '{print $1}')"
+          for i in $(seq 1 30); do
+            if curl -fsS --connect-timeout 5 --max-time 20 \
+              "https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json?v=${GITHUB_RUN_ID}-${i}" \
+              -o /tmp/live-v3.json; then
+              actual="$(sha256sum /tmp/live-v3.json | awk '{print $1}')"
+              echo "attempt=$i expected=$expected actual=$actual"
+              if [ "$actual" = "$expected" ]; then
+                export V3_EXPECTED="$expected" V3_ACTUAL="$actual"
+                python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          x=json.load(open('/tmp/live-v3.json',encoding='utf-8'))
+          expected_date='${{ steps.td.outputs.date }}'
+          if x.get('mode') != 'AUTONOMOUS_AI_PAPER':
+              raise SystemExit('public V3 is not autonomous paper mode')
+          if str(x.get('updated_at') or '')[:10] != expected_date:
+              raise SystemExit(f'public V3 stale: {x.get("updated_at")} expected={expected_date}')
+          receipt={
+              'status':'verified',
+              'trade_date':expected_date,
+              'mode':'AUTONOMOUS_AI_PAPER',
+              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
+              'expected_sha256':os.environ['V3_EXPECTED'],
+              'public_sha256':os.environ['V3_ACTUAL'],
+              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+              'public_url':'https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json',
+          }
+          open('/tmp/v3-public-verification.json','w',encoding='utf-8').write(
+              json.dumps(receipt,ensure_ascii=False,indent=2)+'\n'
+          )
+          print(f'PUBLIC V3 VERIFIED trade_date={expected_date}')
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public V3 data did not converge to this run" >&2
+          exit 1
+
+      - name: Persist V3 public verification receipt
+        run: |
+          set -euo pipefail
+          test -s /tmp/v3-public-verification.json
+          git fetch origin v3-agent-paper
+          git reset --hard origin/v3-agent-paper
+          cp /tmp/v3-public-verification.json agent_state/v3/public_verification.json
+          git config user.name "v3-public-verification-bot"
+          git config user.email "v3-public-verification-bot@users.noreply.github.com"
+          git add agent_state/v3/public_verification.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "ops(v3): verify public autonomous paper state"
+          git pull --rebase origin v3-agent-paper
+          git push origin HEAD:v3-agent-paper
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -180,5 +266,6 @@ jobs:
             /tmp/v3-enriched.json
             /tmp/v3-catch-up.json
             agent_state/v3/latest_brief.json
+            agent_state/v3/public_verification.json
           if-no-files-found: warn
           retention-days: 30
