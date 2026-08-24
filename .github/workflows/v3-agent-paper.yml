@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: v3-agent-paper
@@ -57,7 +56,7 @@ jobs:
             --as-of "${{ steps.td.outputs.date }}" \
             --report /tmp/v3-catch-up.json
 
-      - name: Persist due V3 execution before full-market research
+      - name: Persist due V3 execution before market research
         run: |
           set -euo pipefail
           git config user.name "v3-agent-paper-bot"
@@ -75,7 +74,49 @@ jobs:
           git pull --rebase origin v3-agent-paper
           git push origin HEAD:v3-agent-paper
 
-      - name: Build one decision-grade market snapshot
+      - name: Resolve next session and immutable brief reuse
+        id: brief
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEXT=$(python - <<'PY'
+          from engine_v3.calendar import next_trade_session
+          print(next_trade_session('${{ steps.td.outputs.date }}'))
+          PY
+          )
+          echo "next_date=$NEXT" >> "$GITHUB_OUTPUT"
+          BRIEF="agent_state/v3/briefs/${{ steps.td.outputs.date }}.json"
+          DECISION="agent_state/v3/decisions/${{ steps.td.outputs.date }}.json"
+          if [[ -f "$BRIEF" ]]; then
+            python - "$BRIEF" "$DECISION" "${{ steps.td.outputs.date }}" "$NEXT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          brief_path, decision_path, trade_date, next_date = sys.argv[1:]
+          brief = json.load(open(brief_path, encoding='utf-8'))
+          if brief.get('trade_date') != trade_date:
+              raise SystemExit('stored brief trade_date mismatch')
+          if brief.get('next_trade_date') != next_date:
+              raise SystemExit('stored brief next_trade_date mismatch')
+          if Path(decision_path).exists():
+              decision = json.load(open(decision_path, encoding='utf-8'))
+              if decision.get('decision_date') != trade_date:
+                  raise SystemExit('decision_date mismatch')
+              if decision.get('execute_on') != next_date:
+                  raise SystemExit('decision execute_on mismatch')
+              if decision.get('brief_source_sha256') != brief.get('source_sha256'):
+                  raise SystemExit('decision/brief source hash mismatch; immutable evidence changed')
+          PY
+            cp "$BRIEF" agent_state/v3/latest_brief.json
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing immutable V3 brief $BRIEF"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build one decision-grade market snapshot only for a new brief
+        if: steps.brief.outputs.reuse != 'true'
         env:
           V2_UNIVERSE_CACHE_PATH: ${{ github.workspace }}/agent_state/v3/cache/market_universe.json
           V2_DECISION_SNAPSHOT_CACHE_PATH: ${{ github.workspace }}/agent_state/v3/cache/normalized_snapshot.json
@@ -85,44 +126,16 @@ jobs:
           python -m engine_v2.resilient_snapshot --date "${{ steps.td.outputs.date }}" --output /tmp/v3-snapshot.json
           python -m engine_v2.enrichment_resilient --snapshot /tmp/v3-snapshot.json --output /tmp/v3-enriched.json
 
-      - name: Build or reuse the decision-grade AI brief
-        id: next
+      - name: Build a new immutable AI brief when missing
+        if: steps.brief.outputs.reuse != 'true'
         run: |
-          NEXT=$(python - <<'PY'
-          from engine_v3.calendar import next_trade_session
-          print(next_trade_session('${{ steps.td.outputs.date }}'))
-          PY
-          )
-          echo "date=$NEXT" >> "$GITHUB_OUTPUT"
           BRIEF="agent_state/v3/briefs/${{ steps.td.outputs.date }}.json"
-          DECISION="agent_state/v3/decisions/${{ steps.td.outputs.date }}.json"
-          if [[ -f "$DECISION" && -f "$BRIEF" ]]; then
-            python - "$BRIEF" "$DECISION" "${{ steps.td.outputs.date }}" "$NEXT" <<'PY'
-          import json
-          import sys
-          brief_path, decision_path, trade_date, next_date = sys.argv[1:]
-          brief = json.load(open(brief_path, encoding='utf-8'))
-          decision = json.load(open(decision_path, encoding='utf-8'))
-          if brief.get('trade_date') != trade_date:
-              raise SystemExit('stored brief trade_date mismatch')
-          if brief.get('next_trade_date') != next_date:
-              raise SystemExit('stored brief next_trade_date mismatch')
-          if decision.get('decision_date') != trade_date:
-              raise SystemExit('decision_date mismatch')
-          if decision.get('execute_on') != next_date:
-              raise SystemExit('decision execute_on mismatch')
-          if decision.get('brief_source_sha256') != brief.get('source_sha256'):
-              raise SystemExit('decision/brief source hash mismatch; refusing to overwrite audit evidence')
-          PY
-            cp "$BRIEF" agent_state/v3/latest_brief.json
-          else
-            python -m engine_v3.brief \
-              --snapshot /tmp/v3-snapshot.json \
-              --enriched /tmp/v3-enriched.json \
-              --next-trade-date "$NEXT" \
-              --output "$BRIEF"
-            cp "$BRIEF" agent_state/v3/latest_brief.json
-          fi
+          python -m engine_v3.brief \
+            --snapshot /tmp/v3-snapshot.json \
+            --enriched /tmp/v3-enriched.json \
+            --next-trade-date "${{ steps.brief.outputs.next_date }}" \
+            --output "$BRIEF"
+          cp "$BRIEF" agent_state/v3/latest_brief.json
 
       - name: Build V3 public data mirror
         run: |
@@ -139,7 +152,7 @@ jobs:
           brief=json.load(open('agent_state/v3/latest_brief.json',encoding='utf-8'))
           summary=json.load(open('web/v3/data.json',encoding='utf-8'))
           if brief['trade_date'] != '${{ steps.td.outputs.date }}': raise SystemExit('stale V3 brief')
-          if brief['next_trade_date'] != '${{ steps.next.outputs.date }}': raise SystemExit('next-session mismatch')
+          if brief['next_trade_date'] != '${{ steps.brief.outputs.next_date }}': raise SystemExit('next-session mismatch')
           if len(brief['candidates']) < 100: raise SystemExit('undersized AI brief')
           if set(summary['funds']) != {'A','B','C','D','L'}: raise SystemExit('fund set mismatch')
           if summary['mode'] != 'AUTONOMOUS_AI_PAPER': raise SystemExit('not paper mode')
@@ -191,90 +204,13 @@ jobs:
           echo "Failed to sync V3 public mirror after 3 conflict-safe attempts" >&2
           exit 1
 
-      - name: Check whether public V3 is already current
-        id: public_precheck
+      - name: Confirm dedicated terminal publisher exists on main
+        shell: bash
         run: |
           set -euo pipefail
-          expected="$(sha256sum web/v3/data.json | awk '{print $1}')"
-          echo "expected=$expected" >> "$GITHUB_OUTPUT"
-          current=false
-          if curl -fsS --connect-timeout 5 --max-time 20 \
-            "https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json?precheck=${GITHUB_RUN_ID}" \
-            -o /tmp/precheck-v3.json; then
-            actual="$(sha256sum /tmp/precheck-v3.json | awk '{print $1}')"
-            echo "precheck expected=$expected actual=$actual"
-            if [ "$actual" = "$expected" ]; then
-              current=true
-            fi
-          fi
-          echo "current=$current" >> "$GITHUB_OUTPUT"
-
-      - name: Dispatch public Pages deploy only when needed
-        if: steps.public_precheck.outputs.current != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run auto-deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
-
-      - name: Verify public V3 data matches this run
-        run: |
-          set -euo pipefail
-          expected="${{ steps.public_precheck.outputs.expected }}"
-          for i in $(seq 1 150); do
-            if curl -fsS --connect-timeout 5 --max-time 20 \
-              "https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json?v=${GITHUB_RUN_ID}-${i}" \
-              -o /tmp/live-v3.json; then
-              actual="$(sha256sum /tmp/live-v3.json | awk '{print $1}')"
-              echo "attempt=$i expected=$expected actual=$actual"
-              if [ "$actual" = "$expected" ]; then
-                export V3_EXPECTED="$expected" V3_ACTUAL="$actual"
-                python - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
-          x=json.load(open('/tmp/live-v3.json',encoding='utf-8'))
-          expected_date='${{ steps.td.outputs.date }}'
-          if x.get('mode') != 'AUTONOMOUS_AI_PAPER':
-              raise SystemExit('public V3 is not autonomous paper mode')
-          if str(x.get('updated_at') or '')[:10] != expected_date:
-              raise SystemExit(f'public V3 stale: {x.get("updated_at")} expected={expected_date}')
-          receipt={
-              'status':'verified',
-              'trade_date':expected_date,
-              'mode':'AUTONOMOUS_AI_PAPER',
-              'workflow_run_id':os.environ['GITHUB_RUN_ID'],
-              'expected_sha256':os.environ['V3_EXPECTED'],
-              'public_sha256':os.environ['V3_ACTUAL'],
-              'verified_at_utc':datetime.now(timezone.utc).isoformat(timespec='seconds'),
-              'public_url':'https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json',
-          }
-          open('/tmp/v3-public-verification.json','w',encoding='utf-8').write(
-              json.dumps(receipt,ensure_ascii=False,indent=2)+'\n'
-          )
-          print(f'PUBLIC V3 VERIFIED trade_date={expected_date}')
-          PY
-                exit 0
-              fi
-            fi
-            sleep 5
-          done
-          echo "Public V3 data did not converge to this run within the terminal-verification budget" >&2
-          exit 1
-
-      - name: Persist V3 public verification receipt
-        run: |
-          set -euo pipefail
-          test -s /tmp/v3-public-verification.json
-          git fetch origin v3-agent-paper
-          git reset --hard origin/v3-agent-paper
-          cp /tmp/v3-public-verification.json agent_state/v3/public_verification.json
-          git config user.name "v3-public-verification-bot"
-          git config user.email "v3-public-verification-bot@users.noreply.github.com"
-          git add agent_state/v3/public_verification.json
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "ops(v3): verify public autonomous paper state"
-          git pull --rebase origin v3-agent-paper
-          git push origin HEAD:v3-agent-paper
+          git fetch origin main
+          git cat-file -e origin/main:.github/workflows/v3-pages-terminal.yml
+          echo "Dedicated V3 Pages terminal publisher is present on main."
 
       - uses: actions/upload-artifact@v4
         if: always()
