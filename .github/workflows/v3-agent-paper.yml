@@ -22,7 +22,7 @@ concurrency:
 jobs:
   prepare-and-settle:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -191,7 +191,26 @@ jobs:
           echo "Failed to sync V3 public mirror after 3 conflict-safe attempts" >&2
           exit 1
 
-      - name: Dispatch public Pages deploy
+      - name: Check whether public V3 is already current
+        id: public_precheck
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum web/v3/data.json | awk '{print $1}')"
+          echo "expected=$expected" >> "$GITHUB_OUTPUT"
+          current=false
+          if curl -fsS --connect-timeout 5 --max-time 20 \
+            "https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json?precheck=${GITHUB_RUN_ID}" \
+            -o /tmp/precheck-v3.json; then
+            actual="$(sha256sum /tmp/precheck-v3.json | awk '{print $1}')"
+            echo "precheck expected=$expected actual=$actual"
+            if [ "$actual" = "$expected" ]; then
+              current=true
+            fi
+          fi
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch public Pages deploy only when needed
+        if: steps.public_precheck.outputs.current != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run auto-deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
@@ -199,8 +218,8 @@ jobs:
       - name: Verify public V3 data matches this run
         run: |
           set -euo pipefail
-          expected="$(sha256sum web/v3/data.json | awk '{print $1}')"
-          for i in $(seq 1 30); do
+          expected="${{ steps.public_precheck.outputs.expected }}"
+          for i in $(seq 1 150); do
             if curl -fsS --connect-timeout 5 --max-time 20 \
               "https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json?v=${GITHUB_RUN_ID}-${i}" \
               -o /tmp/live-v3.json; then
@@ -237,7 +256,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "Public V3 data did not converge to this run" >&2
+          echo "Public V3 data did not converge to this run within the terminal-verification budget" >&2
           exit 1
 
       - name: Persist V3 public verification receipt
