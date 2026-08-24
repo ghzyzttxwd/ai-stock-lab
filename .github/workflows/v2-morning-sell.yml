@@ -19,7 +19,9 @@ permissions:
   actions: write
 
 concurrency:
-  group: v2-morning-sell
+  # Keep each logical checkpoint independent so a delayed earlier run cannot
+  # queue the next checkpoint past the 10-minute freshness window.
+  group: v2-morning-sell-${{ github.event.schedule || github.run_id }}
   cancel-in-progress: false
 
 jobs:
