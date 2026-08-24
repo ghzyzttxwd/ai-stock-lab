@@ -79,13 +79,41 @@ def supplement_execution_bars(bars: dict[str, dict], symbols: dict[str, str], tr
 
 def previous_trade_session(trade_date: str) -> str:
     import akshare as ak
+    from .intraday_quotes import previous_exchange_session
     from .provider import bounded_call
 
-    frame = bounded_call(35, lambda: ak.stock_zh_index_daily_tx(symbol='sh000001'), 'previous trading session')
-    dates = sorted({str(x)[:10] for x in frame['date'].tolist() if str(x)[:10] < trade_date})
-    if not dates:
-        raise RuntimeError(f'cannot resolve previous exchange session before {trade_date}')
-    return dates[-1]
+    errors = []
+    try:
+        session = bounded_call(
+            20,
+            lambda: previous_exchange_session(ak, trade_date),
+            'exchange trading calendar',
+        )
+        if session:
+            return session
+        errors.append('exchange calendar returned no prior session')
+    except Exception as exc:
+        errors.append(f'exchange calendar: {type(exc).__name__}: {exc}')
+
+    # Tencent index history is retained only as a fallback.  Its response can be
+    # syntactically valid while omitting qfqday, so it must not be the sole source
+    # for a piece of accounting control data.
+    try:
+        frame = bounded_call(
+            35,
+            lambda: ak.stock_zh_index_daily_tx(symbol='sh000001'),
+            'previous trading session index fallback',
+        )
+        dates = sorted({str(x)[:10] for x in frame['date'].tolist() if str(x)[:10] < trade_date})
+        if dates:
+            return dates[-1]
+        errors.append('index history returned no prior session')
+    except Exception as exc:
+        errors.append(f'index history: {type(exc).__name__}: {exc}')
+
+    raise RuntimeError(
+        f'cannot resolve previous exchange session before {trade_date}: ' + '; '.join(errors)
+    )
 
 
 def _already_processed(state_root: Path, audit_path: Path, trade_date: str) -> dict | None:
