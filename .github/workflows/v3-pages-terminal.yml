@@ -1,0 +1,245 @@
+name: V3 public Pages terminal verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v3-pages-terminal.yml'
+  workflow_run:
+    workflows: ["V3 autonomous AI paper trading"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-auto-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-and-verify:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Lock latest main and validate all public data before deploy
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding='utf-8'))
+
+          d=load('web/d/data.json')
+          e=load('web/e/data.json')
+          v2=load('web/v2/data.json')
+          v3=load('web/v3/data.json')
+
+          if (d.get('execution_model'), d.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('main V1 D model/version mismatch')
+          if (e.get('execution_model'), e.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('main V1 E model/version mismatch')
+          if (v2.get('execution_model'), v2.get('plan_version')) != ('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('main V2 model/version mismatch')
+          if v3.get('mode') != 'AUTONOMOUS_AI_PAPER':
+              raise SystemExit('main V3 is not autonomous paper mode')
+          if set(v3.get('funds') or {}) != {'A','B','C','D','L'}:
+              raise SystemExit('main V3 fund set mismatch')
+          trade_date=str(v3.get('updated_at') or '')[:10]
+          if not trade_date:
+              raise SystemExit('main V3 updated_at missing')
+          for label,payload in (('D',d),('E',e)):
+              if str(payload.get('updated_at') or '')[:10] != trade_date:
+                  raise SystemExit(f'main V1 {label} date does not match V3 trade date {trade_date}')
+          for fund_id,fund in (v3.get('funds') or {}).items():
+              if str(fund.get('last_processed_date') or '')[:10] != trade_date:
+                  raise SystemExit(f'main V3 {fund_id} stale: {fund.get("last_processed_date")} != {trade_date}')
+              if float(fund.get('cash') or 0) < -0.01:
+                  raise SystemExit(f'main V3 {fund_id} negative cash')
+          print(f'PUBLIC SOURCE INVARIANTS PASS trade_date={trade_date}')
+          PY
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload exact latest-main web artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy exact latest-main web artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify V1 V2 V3 public data and UI hashes
+        shell: bash
+        env:
+          DEPLOYED_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          files=(
+            "d/data.json"
+            "e/data.json"
+            "v2/data.json"
+            "v3/data.json"
+            "d/app.js"
+            "e/app.js"
+            "v2/app.js"
+          )
+          for i in $(seq 1 60); do
+            ok=1
+            for file in "${files[@]}"; do
+              safe="$(echo "$file" | tr '/' '-')"
+              curl -fsS --connect-timeout 5 --max-time 20 \
+                "https://ghzyzttxwd.github.io/ai-stock-lab/${file}?verify=${DEPLOYED_SOURCE_SHA}-${GITHUB_RUN_ID}-${i}" \
+                -o "/tmp/live-${safe}" || ok=0
+            done
+            if [ "$ok" = "1" ]; then
+              all_match=1
+              for file in "${files[@]}"; do
+                safe="$(echo "$file" | tr '/' '-')"
+                expected="$(sha256sum "web/$file" | awk '{print $1}')"
+                actual="$(sha256sum "/tmp/live-${safe}" | awk '{print $1}')"
+                echo "attempt=$i file=$file expected=$expected actual=$actual"
+                if [ "$actual" != "$expected" ]; then all_match=0; fi
+              done
+              if [ "$all_match" = "1" ]; then
+                python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding='utf-8'))
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          d=load('/tmp/live-d-data.json')
+          e=load('/tmp/live-e-data.json')
+          v2=load('/tmp/live-v2-data.json')
+          v3=load('/tmp/live-v3-data.json')
+          if (d.get('execution_model'),d.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('public V1 D model mismatch')
+          if (e.get('execution_model'),e.get('plan_version')) != ('CONDITIONAL_PLAN_V1','conditional-plan-v1'):
+              raise SystemExit('public V1 E model mismatch')
+          if (v2.get('execution_model'),v2.get('plan_version')) != ('V2_CONDITIONAL_PLAN_V1','v2-conditional-plan-v1'):
+              raise SystemExit('public V2 model mismatch')
+          if v3.get('mode') != 'AUTONOMOUS_AI_PAPER':
+              raise SystemExit('public V3 mode mismatch')
+          trade_date=str(v3.get('updated_at') or '')[:10]
+          if not trade_date:
+              raise SystemExit('public V3 updated_at missing')
+          for label,payload in (('D',d),('E',e)):
+              if str(payload.get('updated_at') or '')[:10] != trade_date:
+                  raise SystemExit(f'public V1 {label} date mismatch against V3 {trade_date}')
+
+          verified_files={
+              'd/data.json':digest('/tmp/live-d-data.json'),
+              'e/data.json':digest('/tmp/live-e-data.json'),
+              'v2/data.json':digest('/tmp/live-v2-data.json'),
+              'v3/data.json':digest('/tmp/live-v3-data.json'),
+              'd/app.js':digest('/tmp/live-d-app.js'),
+              'e/app.js':digest('/tmp/live-e-app.js'),
+              'v2/app.js':digest('/tmp/live-v2-app.js'),
+          }
+          verified_at=datetime.now(timezone.utc).isoformat(timespec='seconds')
+          source=os.environ['DEPLOYED_SOURCE_SHA']
+          run_id=os.environ['GITHUB_RUN_ID']
+          terminal={
+              'status':'verified',
+              'source_commit':source,
+              'workflow_run_id':run_id,
+              'trade_date':trade_date,
+              'verified_at_utc':verified_at,
+              'verified_files':verified_files,
+              'public_urls':{
+                  'd':'https://ghzyzttxwd.github.io/ai-stock-lab/d/',
+                  'e':'https://ghzyzttxwd.github.io/ai-stock-lab/e/',
+                  'v2':'https://ghzyzttxwd.github.io/ai-stock-lab/v2/',
+                  'v3':'https://ghzyzttxwd.github.io/ai-stock-lab/v3/',
+              },
+          }
+          v3_receipt={
+              'status':'verified',
+              'trade_date':trade_date,
+              'mode':'AUTONOMOUS_AI_PAPER',
+              'source_commit':source,
+              'workflow_run_id':run_id,
+              'expected_sha256':verified_files['v3/data.json'],
+              'public_sha256':verified_files['v3/data.json'],
+              'verified_at_utc':verified_at,
+              'public_url':'https://ghzyzttxwd.github.io/ai-stock-lab/v3/data.json',
+          }
+          Path('/tmp/v3-pages-terminal-verification.json').write_text(
+              json.dumps(terminal,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          Path('/tmp/v3-public-verification.json').write_text(
+              json.dumps(v3_receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(f'PUBLIC V1/V2/V3 TERMINAL VERIFIED trade_date={trade_date}')
+          PY
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Public Pages did not converge to the exact latest-main artifact" >&2
+          exit 1
+
+      - name: Persist terminal receipt on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/v3-pages-terminal-verification.json
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p state
+          cp /tmp/v3-pages-terminal-verification.json state/v3_pages_terminal_verification.json
+          git config user.name "v3-pages-terminal-bot"
+          git config user.email "v3-pages-terminal-bot@users.noreply.github.com"
+          git add state/v3_pages_terminal_verification.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ops(v3): verify full public Pages terminal state"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Persist V3 receipt on isolated V3 branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/v3-public-verification.json
+          git fetch origin v3-agent-paper
+          rm -rf /tmp/v3-verification-state
+          git worktree add /tmp/v3-verification-state origin/v3-agent-paper
+          cd /tmp/v3-verification-state
+          mkdir -p agent_state/v3
+          cp /tmp/v3-public-verification.json agent_state/v3/public_verification.json
+          git config user.name "v3-public-verification-bot"
+          git config user.email "v3-public-verification-bot@users.noreply.github.com"
+          git add agent_state/v3/public_verification.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "ops(v3): verify public autonomous paper state"
+          git pull --rebase origin v3-agent-paper
+          git push origin HEAD:v3-agent-paper
