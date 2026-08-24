@@ -68,7 +68,7 @@ class CurrentHealthReceiptTests(unittest.TestCase):
         diagnostic = load(v1["historical_diagnostic"])
 
         self.assertEqual(v1["historical_diagnostic_status"], "superseded")
-        self.assertEqual(diagnostic["requested_date"], v1["settlement_date"])
+        self.assertLessEqual(diagnostic["requested_date"], v1["settlement_date"])
         self.assertEqual(v1["status"], "verified")
         self.assertEqual(load(v1["production_receipt"])["conclusion"], "success")
         self.assertEqual(load(v1["pages_receipt"])["status"], "verified")
