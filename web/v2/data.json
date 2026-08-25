@@ -1,6 +1,6 @@
 {
   "summary_version": "v2-shadow-summary-1.2",
-  "updated_at": "2026-08-24",
+  "updated_at": "2026-08-25",
   "initial_cash_per_fund": 1000000,
   "mode": "FORWARD_SHADOW_ONLY",
   "execution_model": "V2_CONDITIONAL_PLAN_V1",
@@ -15,12 +15,16 @@
     ]
   },
   "source_ref": {
-    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
+    "execution_bar_source": "sina-intraday",
+    "missing_critical_execution_bars": [],
+    "scheduled_time": "10:30",
+    "executed_at": "2026-08-25T10:38:09+08:00",
+    "actual_clock": "10:38",
+    "delay_minutes": 7.3,
+    "freshness_limit_minutes": 10,
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
     "plan_version": "v2-conditional-plan-v1",
-    "economics_mutated": false,
-    "historical_fills_rewritten": false,
-    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
+    "note": "Checkpoint 10:30 Asia/Shanghai was evaluated at actual time 10:38. Hard-stop, take-profit, trailing, rotation and time conditions were checked; the clock itself is not a sell signal."
   },
   "target_diagnostics": {
     "stats": {
@@ -146,10 +150,10 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 6,
-        "equity": 1005401.51,
+        "equity": 1005695.51,
         "cash": 950913.51,
-        "position_market_value": 54488.0,
-        "return_pct": 0.5402,
+        "position_market_value": 54782.0,
+        "return_pct": 0.5696,
         "max_drawdown_pct": -0.7843,
         "daily_volatility_pct": 0.5861,
         "fills": 44,
@@ -163,7 +167,8 @@
         },
         "industry_hhi": 1.0,
         "effective_industries": 1.0,
-        "excess_hs300_pct": 2.7402
+        "execution_only_date": "2026-08-25",
+        "excess_hs300_pct": 2.7696
       },
       "holdings": [
         {
@@ -172,10 +177,10 @@
           "industry": "基础化工",
           "qty": 4900,
           "avg_cost": 11.5295,
-          "last_price": 11.12,
-          "market_value": 54488.0,
-          "weight_pct": 5.4195,
-          "pnl_pct": -3.5518,
+          "last_price": 11.18,
+          "market_value": 54782.0,
+          "weight_pct": 5.4472,
+          "pnl_pct": -3.0314,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
           "opportunity_score": null,
@@ -1262,7 +1267,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+      "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
       "concentration_flags": []
     },
     "B": {
@@ -1288,6 +1293,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-25",
         "excess_hs300_pct": 3.4025
       },
       "holdings": [],
@@ -2104,7 +2110,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+      "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -2134,6 +2140,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-25",
         "excess_hs300_pct": 4.1635
       },
       "holdings": [],
@@ -2680,7 +2687,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+      "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
       "concentration_flags": []
     },
     "D": {
@@ -2691,124 +2698,26 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 6,
-        "equity": 973713.38,
-        "cash": 866663.38,
-        "position_market_value": 107050.0,
-        "return_pct": -2.6287,
+        "equity": 976288.11,
+        "cash": 976288.11,
+        "position_market_value": 0.0,
+        "return_pct": -2.3712,
         "max_drawdown_pct": -3.8382,
         "daily_volatility_pct": 1.6891,
-        "fills": 37,
+        "fills": 39,
         "rejected_orders": 7,
-        "turnover_on_initial_capital": 2.049336,
-        "fees": 1108.62,
-        "fees_pct_of_initial": 0.110862,
-        "positions": 2,
-        "industry_weights": {
-          "农林牧渔": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": -0.4287
+        "turnover_on_initial_capital": 2.159048,
+        "fees": 1196.39,
+        "fees_pct_of_initial": 0.119639,
+        "positions": 0,
+        "industry_weights": {},
+        "industry_hhi": 0,
+        "effective_industries": 0.0,
+        "execution_only_date": "2026-08-25",
+        "excess_hs300_pct": -0.1712
       },
-      "holdings": [
-        {
-          "symbol": "sh.601952",
-          "name": "苏垦农发",
-          "industry": "农林牧渔",
-          "qty": 6200,
-          "avg_cost": 9.0477,
-          "last_price": 8.81,
-          "market_value": 54622.0,
-          "weight_pct": 5.6097,
-          "pnl_pct": -2.6272,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-          "opportunity_score": null,
-          "setup": null,
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-19",
-            "entry_price": 9.0477,
-            "hard_stop_price": 8.394,
-            "take_profit_price": 9.229,
-            "trailing_activation_price": 9.138,
-            "trailing_drawdown_pct": 0.025,
-            "highest_price": 9.0477,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 3,
-            "rotation_exit": true,
-            "rotation_min_price": 8.916,
-            "setup": "legacy-migrated"
-          }
-        },
-        {
-          "symbol": "sz.002772",
-          "name": "众兴菌业",
-          "industry": "农林牧渔",
-          "qty": 5100,
-          "avg_cost": 11.2794,
-          "last_price": 10.28,
-          "market_value": 52428.0,
-          "weight_pct": 5.3843,
-          "pnl_pct": -8.8604,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-          "opportunity_score": null,
-          "setup": null,
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-19",
-            "entry_price": 11.2794,
-            "hard_stop_price": 10.18,
-            "take_profit_price": 11.505,
-            "trailing_activation_price": 11.392,
-            "trailing_drawdown_pct": 0.025,
-            "highest_price": 11.2794,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 3,
-            "rotation_exit": true,
-            "rotation_min_price": 10.403,
-            "setup": "legacy-migrated"
-          }
-        }
-      ],
+      "holdings": [],
       "recent_fills": [
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-18",
-          "trade_date": "2026-08-19",
-          "symbol": "sh.601069",
-          "name": "西部黄金",
-          "side": "SELL",
-          "reference_price": 28.9,
-          "execution_price_field": "close",
-          "price": 28.886,
-          "qty": 1900,
-          "gross": 54883.4,
-          "fees": 43.91,
-          "net_cash_change": 54839.49,
-          "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 09:40盘中卖出/减仓"
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-18",
-          "trade_date": "2026-08-19",
-          "symbol": "sz.000975",
-          "name": "山金国际",
-          "side": "SELL",
-          "reference_price": 27.52,
-          "execution_price_field": "close",
-          "price": 27.506,
-          "qty": 1900,
-          "gross": 52261.4,
-          "fees": 41.81,
-          "net_cash_change": 52219.59,
-          "slippage_bps": 5.0,
-          "note": "V2 上一交易日决策 · 09:40盘中卖出/减仓"
-        },
         {
           "fund_id": "D",
           "decision_date": "2026-08-18",
@@ -3150,6 +3059,52 @@
           "scheduled_time": "10:30",
           "actual_execution_time": "2026-08-24T10:39:12+08:00",
           "actual_clock": "10:39"
+        },
+        {
+          "fund_id": "D",
+          "decision_date": "2026-08-24",
+          "trade_date": "2026-08-25",
+          "symbol": "sz.002772",
+          "name": "众兴菌业",
+          "side": "SELL",
+          "reference_price": 10.57,
+          "execution_price_field": "live_conditional",
+          "price": 10.565,
+          "qty": 5100,
+          "gross": 53881.5,
+          "fees": 43.11,
+          "net_cash_change": 53838.39,
+          "slippage_bps": 5.0,
+          "plan_version": "v2-conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "note": "V2 条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-25T10:38:09+08:00",
+          "actual_clock": "10:38"
+        },
+        {
+          "fund_id": "D",
+          "decision_date": "2026-08-24",
+          "trade_date": "2026-08-25",
+          "symbol": "sh.601952",
+          "name": "苏垦农发",
+          "side": "SELL",
+          "reference_price": 9.01,
+          "execution_price_field": "live_conditional",
+          "price": 9.005,
+          "qty": 6200,
+          "gross": 55831.0,
+          "fees": 44.66,
+          "net_cash_change": 55786.34,
+          "slippage_bps": 5.0,
+          "plan_version": "v2-conditional-plan-v1",
+          "exit_reason": "trailing_stop",
+          "scan_time": "10:30",
+          "note": "V2 条件计划 · 10:30检查触发 trailing_stop",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-25T10:38:09+08:00",
+          "actual_clock": "10:38"
         }
       ],
       "recent_rejected_orders": [
@@ -3639,7 +3594,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+      "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
       "concentration_flags": []
     },
     "L": {
@@ -3665,6 +3620,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-25",
         "excess_hs300_pct": 2.9804
       },
       "holdings": [],
@@ -4623,17 +4579,17 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+      "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
       "concentration_flags": []
     }
   },
-  "audit_head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+  "audit_head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
   "audit_verification": {
     "status": "PASS",
-    "events": 28,
-    "head": "dcb342fd12dbfe3c0b2c6816f04d3d93b177cf9eea4da8067e8ffde113dfbc9a",
+    "events": 29,
+    "head": "455267779bb951f987a22483cd3a61a08227cf9d8ecd0684c25240cbcec30060",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-24~conditional-plan-migration"
+    "last_date": "2026-08-25-execution-1030"
   },
   "safety": {
     "calls_sol": false,
@@ -4641,12 +4597,12 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_plan_migration",
+  "audit_event_kind": "conditional_exit_scan",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
     "start_date": "2026-08-14",
-    "end_date": "2026-08-24",
+    "end_date": "2026-08-25",
     "return_pct": -2.2,
     "source": "tencent-index",
     "status": "OK",
