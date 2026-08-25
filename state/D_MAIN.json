@@ -2,28 +2,21 @@
   "fund_id": "D_MAIN",
   "name": "AI 综合判断基金",
   "initial_cash": 1000000.0,
-  "cash": 746118.24,
+  "cash": 811804.05,
   "positions": {
     "sh.600663": {
       "name": "陆家嘴",
       "qty": 10300,
       "avg_cost": 9.5579,
       "acquired_date": "2026-08-19",
-      "last_price": 9.38
+      "last_price": 9.37
     },
     "sh.603129": {
       "name": "春风动力",
       "qty": 200,
       "avg_cost": 321.5584,
       "acquired_date": "2026-08-20",
-      "last_price": 306.02
-    },
-    "sz.002365": {
-      "name": "永安药业",
-      "qty": 4200,
-      "avg_cost": 15.9428,
-      "acquired_date": "2026-08-21",
-      "last_price": 15.09
+      "last_price": 305.96
     }
   },
   "fills": [
@@ -797,6 +790,28 @@
       "actual_execution_time": "2026-08-24T11:27:00+08:00",
       "actual_clock": "11:27",
       "market_reference_time": "11:28",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
+    },
+    {
+      "symbol": "sz.002365",
+      "name": "永安药业",
+      "side": "SELL",
+      "trade_date": "2026-08-25",
+      "reference_price": 15.66,
+      "price": 15.652,
+      "qty": 4200,
+      "gross": 65738.4,
+      "fees": 52.59,
+      "note": "条件计划 · 14:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "14:30",
+      "scheduled_time": "14:30",
+      "actual_execution_time": "2026-08-25T14:37:00+08:00",
+      "actual_clock": "14:37",
+      "market_reference_time": "14:38",
       "market_reference_time_basis": "snapshot_capture_minute",
       "market_reference_source": "sina"
     }
@@ -2256,22 +2271,6 @@
       "rotation_exit": true,
       "rotation_min_price": 312.283,
       "setup": "breakout"
-    },
-    "sz.002365": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-21",
-      "entry_price": 15.9428,
-      "hard_stop_price": 15.066,
-      "take_profit_price": 17.521,
-      "trailing_activation_price": 16.82,
-      "trailing_drawdown_pct": 0.035,
-      "highest_price": 16.41,
-      "partial_taken": false,
-      "max_hold_days": 3,
-      "sessions_held": 1,
-      "rotation_exit": true,
-      "rotation_min_price": 15.291,
-      "setup": "breakout"
     }
   },
   "last_entry_settlement": {
@@ -2291,8 +2290,8 @@
     "plan_version": "conditional-plan-v1",
     "price_time_evidence": "first_trigger_minute_when_available"
   },
-  "last_conditional_scan_key": "2026-08-25T11:20",
-  "last_conditional_scan_at": "2026-08-25T11:27:00+08:00",
+  "last_conditional_scan_key": "2026-08-25T14:30",
+  "last_conditional_scan_at": "2026-08-25T14:37:00+08:00",
   "conditional_scan_log": [
     {
       "slot": "11:20",
@@ -2720,6 +2719,37 @@
           "take_profit": 17.521,
           "trailing_stop": 15.836,
           "rotation_min_price": 15.291
+        }
+      ]
+    },
+    {
+      "slot": "14:30",
+      "scheduled_time": "14:30",
+      "actual_clock": "14:37",
+      "quote_clock": "14:38",
+      "delay_minutes": 7.01,
+      "at": "2026-08-25T14:37:00+08:00",
+      "fills": 1,
+      "checks": [
+        {
+          "symbol": "sh.600663",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 9.37,
+          "hard_stop": 9.006,
+          "take_profit": 9.76,
+          "trailing_stop": 9.319,
+          "rotation_min_price": 9.462
+        },
+        {
+          "symbol": "sh.603129",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 305.96,
+          "hard_stop": 305.214,
+          "take_profit": 350.979,
+          "trailing_stop": 310.899,
+          "rotation_min_price": 312.283
         }
       ]
     }
