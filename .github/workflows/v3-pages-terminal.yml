@@ -81,8 +81,14 @@ jobs:
               raise SystemExit(f'main V1 is stale against V3: {d_date} < {v3_date}')
 
           for fund_id,fund in (v3.get('funds') or {}).items():
-              if str(fund.get('last_processed_date') or '')[:10] != v3_date:
-                  raise SystemExit(f'main V3 {fund_id} stale: {fund.get("last_processed_date")} != {v3_date}')
+              processed=str(fund.get('last_processed_date') or '')[:10]
+              if processed and processed != v3_date:
+                  raise SystemExit(f'main V3 {fund_id} stale: {processed} != {v3_date}')
+              if not processed:
+                  if fund.get('positions') or fund.get('recent_fills'):
+                      raise SystemExit(f'main V3 {fund_id} has unprocessed trade state')
+                  if abs(float(fund.get('cash') or 0)-float(fund.get('initial_cash') or 0)) > 0.01:
+                      raise SystemExit(f'main V3 {fund_id} is not at clean reset cash')
               if float(fund.get('cash') or 0) < -0.01:
                   raise SystemExit(f'main V3 {fund_id} negative cash')
           print(f'PUBLIC SOURCE INVARIANTS PASS v1_date={d_date} v3_date={v3_date}')
@@ -168,8 +174,14 @@ jobs:
           if d_date < v3_date:
               raise SystemExit(f'public V1 stale against V3: {d_date} < {v3_date}')
           for fund_id,fund in (v3.get('funds') or {}).items():
-              if str(fund.get('last_processed_date') or '')[:10] != v3_date:
+              processed=str(fund.get('last_processed_date') or '')[:10]
+              if processed and processed != v3_date:
                   raise SystemExit(f'public V3 {fund_id} stale against {v3_date}')
+              if not processed:
+                  if fund.get('positions') or fund.get('recent_fills'):
+                      raise SystemExit(f'public V3 {fund_id} has unprocessed trade state')
+                  if abs(float(fund.get('cash') or 0)-float(fund.get('initial_cash') or 0)) > 0.01:
+                      raise SystemExit(f'public V3 {fund_id} is not at clean reset cash')
               if float(fund.get('cash') or 0) < -0.01:
                   raise SystemExit(f'public V3 {fund_id} negative cash')
 
