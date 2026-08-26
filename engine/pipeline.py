@@ -66,8 +66,9 @@ def market_temperature(candidates: list[dict]) -> float:
     top=candidates[:min(120,len(candidates))]
     breadth1=sum(1 for x in top if float(x.get('r1') or 0.0)>0)/len(top)
     breadth5=sum(1 for x in top if float(x.get('r5') or 0.0)>0)/len(top)
-    avg_opp=sum(float(x.get('opportunity_score') or 0.0) for x in top)/len(top)
-    # A strong market lifts the ceiling; it never forces the portfolio to fill that ceiling.
+    # Market temperature must remain an absolute regime signal. Percentile ranks are
+    # relative by construction, so use the preserved raw opportunity score here.
+    avg_opp=sum(float(x.get('opportunity_score_raw', x.get('opportunity_score') or 0.0)) for x in top)/len(top)
     return _cap(0.35*avg_opp + 35*breadth1 + 30*breadth5)
 
 
