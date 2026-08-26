@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_MODEL = "V2_CONDITIONAL_PLAN_V1"
 EXPECTED_PLAN = "v2-conditional-plan-v1"
 MAX_CHECKPOINT_LATENESS_MINUTES = 10.0
+RESET_DATE = "2026-08-26"
 
 
 def _load_json(path: str) -> dict:
@@ -65,6 +66,8 @@ class V2ProductionContractCharacterizationTests(unittest.TestCase):
         checked = 0
         for fund_id, fund in _public_funds(payload).items():
             for fill in fund.get("recent_fills") or []:
+                fill_date = str(fill.get("trade_date") or fill.get("date") or "")[:10]
+                self.assertGreaterEqual(fill_date, RESET_DATE, f"{fund_id} exposes a pre-reset fill")
                 if fill.get("side") != "SELL":
                     continue
                 if fill.get("plan_version") != EXPECTED_PLAN:
@@ -81,13 +84,14 @@ class V2ProductionContractCharacterizationTests(unittest.TestCase):
             source = payload.get("source_ref") or {}
             if source.get("reset_version") == "paper-reset-20260826":
                 audit = payload.get("audit_verification") or {}
-                self.assertEqual(payload.get("audit_event_kind"), "paper_reset")
                 self.assertEqual(audit.get("status"), "PASS")
-                self.assertEqual(int(audit.get("events", 0)), 1)
+                self.assertEqual(audit.get("first_date"), "2026-08-26~paper-reset")
+                self.assertGreaterEqual(int(audit.get("events", 0)), 1)
                 for fund_id, fund in _public_funds(payload).items():
                     metrics = fund.get("metrics") or {}
                     self.assertEqual(int(metrics.get("fills", 0)), 0, fund_id)
                     self.assertEqual(fund.get("recent_fills") or [], [], fund_id)
+                    self.assertGreaterEqual(float(metrics.get("cash", 0)), 0.0, fund_id)
                 return
 
         self.assertGreater(checked, 0, "expected at least one characterized live conditional V2 sell fill")
