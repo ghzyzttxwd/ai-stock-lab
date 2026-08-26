@@ -1,7 +1,7 @@
 {
   "mode": "REAL",
-  "updated_at": "2026-08-25",
-  "market_source": "tencent-full",
+  "updated_at": "2026-08-26",
+  "market_source": "sina",
   "execution_model": "CONDITIONAL_PLAN_V1",
   "plan_version": "conditional-plan-v1",
   "experiment_days": 9,
@@ -11,9 +11,9 @@
       "name": "保守稳健基金",
       "style": "保守",
       "description": "少折腾，只有价格和风险条件都合格才买。",
-      "equity": 950171.94,
-      "return_pct": -4.98,
-      "today_pct": -0.26,
+      "equity": 950625.47,
+      "return_pct": -4.94,
+      "today_pct": 0.05,
       "return_5d_pct": -4.95,
       "return_20d_pct": null,
       "return_60d_pct": null,
@@ -66,10 +66,10 @@
         }
       ],
       "activity": {
-        "buy_count": 1,
+        "buy_count": 0,
         "sell_count": 1,
-        "buy_amount": 40562.4,
-        "sell_amount": 66491.5,
+        "buy_amount": 0,
+        "sell_amount": 42338.4,
         "pending_count": 10
       },
       "holdings": [
@@ -78,9 +78,9 @@
           "name": "恒逸石化",
           "qty": 3500,
           "avg_cost": 18.9147,
-          "last_price": 18.34,
-          "market_value": 64190.0,
-          "pnl_pct": -3.04,
+          "last_price": 17.93,
+          "market_value": 62755.0,
+          "pnl_pct": -5.21,
           "exit_plan": {
             "plan_version": "conditional-plan-v1",
             "opened_date": "2026-08-24",
@@ -95,31 +95,6 @@
             "sessions_held": 1,
             "rotation_exit": true,
             "rotation_min_price": 18.56,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sh.601899",
-          "name": "紫金矿业",
-          "qty": 1200,
-          "avg_cost": 33.8121,
-          "last_price": 33.68,
-          "market_value": 40416.0,
-          "pnl_pct": -0.39,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 33.8121,
-            "hard_stop_price": 32.134,
-            "take_profit_price": 36.58,
-            "trailing_activation_price": 35.49,
-            "trailing_drawdown_pct": 0.03236,
-            "highest_price": 33.8121,
-            "partial_taken": false,
-            "max_hold_days": 4,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 33.781,
             "setup": "pullback"
           }
         }
@@ -518,28 +493,6 @@
       ],
       "recent_fills": [
         {
-          "symbol": "sh.603259",
-          "name": "药明康德",
-          "side": "SELL",
-          "trade_date": "2026-08-24",
-          "reference_price": 155.53,
-          "price": 155.452,
-          "qty": 400,
-          "gross": 62180.8,
-          "fees": 49.74,
-          "note": "条件计划 · 11:20检查触发 hard_stop",
-          "execution_price_field": "live_conditional",
-          "plan_version": "conditional-plan-v1",
-          "exit_reason": "hard_stop",
-          "scan_time": "11:20",
-          "scheduled_time": "11:20",
-          "actual_execution_time": "2026-08-24T11:27:00+08:00",
-          "actual_clock": "11:27",
-          "market_reference_time": "11:28",
-          "market_reference_time_basis": "snapshot_capture_minute",
-          "market_reference_source": "sina"
-        },
-        {
           "symbol": "sz.002768",
           "name": "国恩股份",
           "side": "SELL",
@@ -686,18 +639,42 @@
           "trigger_reason": "intraday_pullback_triggered",
           "trigger_price": 33.785,
           "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "symbol": "sh.601899",
+          "name": "紫金矿业",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 35.3,
+          "price": 35.282,
+          "qty": 1200,
+          "gross": 42338.4,
+          "fees": 33.87,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
         }
       ],
-      "diary": "稳健规则策略A：短周期机会先过关，再强调风险和流动性"
+      "diary": "稳健规则策略A：短周期机会先过关，再强调风险和流动性",
+      "cash": 887870.47,
+      "position_market_value": 62755.0
     },
     {
       "id": "B",
       "name": "趋势追强基金",
       "style": "追强",
       "description": "找相对大盘真正走强的股票，突破确认才进。",
-      "equity": 900615.57,
-      "return_pct": -9.94,
-      "today_pct": -2.08,
+      "equity": 903676.09,
+      "return_pct": -9.63,
+      "today_pct": 0.34,
       "return_5d_pct": -9.92,
       "return_20d_pct": null,
       "return_60d_pct": null,
@@ -750,39 +727,13 @@
         }
       ],
       "activity": {
-        "buy_count": 1,
-        "sell_count": 4,
-        "buy_amount": 45068.4,
-        "sell_amount": 408733.7,
+        "buy_count": 0,
+        "sell_count": 1,
+        "buy_amount": 0,
+        "sell_amount": 45099.6,
         "pending_count": 6
       },
-      "holdings": [
-        {
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "qty": 3900,
-          "avg_cost": 11.5595,
-          "last_price": 10.77,
-          "market_value": 42003.0,
-          "pnl_pct": -6.83,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 11.5595,
-            "hard_stop_price": 10.924,
-            "take_profit_price": 12.704,
-            "trailing_activation_price": 12.195,
-            "trailing_drawdown_pct": 0.035,
-            "highest_price": 11.5595,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 10.899,
-            "setup": "breakout"
-          }
-        }
-      ],
+      "holdings": [],
       "pending_targets": [
         {
           "action": "条件待买",
@@ -1021,26 +972,6 @@
       ],
       "recent_fills": [
         {
-          "symbol": "sz.000603",
-          "name": "盛达资源",
-          "side": "BUY",
-          "trade_date": "2026-08-24",
-          "reference_price": 37.0,
-          "price": 37.018,
-          "qty": 2900,
-          "gross": 107352.2,
-          "fees": 32.21,
-          "note": "上一交易日条件计划 · 15:10结算当日已触发买单",
-          "execution_price_field": "conditional_trigger",
-          "plan_version": "conditional-plan-v1",
-          "setup": "breakout",
-          "trigger_reason": "gap_or_open_above_trigger",
-          "trigger_price": 36.756,
-          "market_reference_time": "09:30",
-          "market_reference_time_basis": "market_open",
-          "market_reference_source": "daily-open"
-        },
-        {
           "symbol": "sh.600988",
           "name": "赤峰黄金",
           "side": "BUY",
@@ -1187,18 +1118,42 @@
           "market_reference_time": "09:30",
           "market_reference_time_basis": "market_open",
           "market_reference_source": "daily-open"
+        },
+        {
+          "symbol": "sz.002716",
+          "name": "湖南白银",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 11.57,
+          "price": 11.564,
+          "qty": 3900,
+          "gross": 45099.6,
+          "fees": 36.08,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
         }
       ],
-      "diary": "趋势规则策略B：相对强势、突破质量和短周期动量优先"
+      "diary": "趋势规则策略B：相对强势、突破质量和短周期动量优先",
+      "cash": 903676.09,
+      "position_market_value": 0.0
     },
     {
       "id": "C",
       "name": "短线快攻基金",
       "style": "短线",
       "description": "偏1-3日短线，重视量价和相对强弱，并惩罚过热追高。",
-      "equity": 922796.41,
-      "return_pct": -7.72,
-      "today_pct": -2.57,
+      "equity": 929859.15,
+      "return_pct": -7.01,
+      "today_pct": 0.77,
       "return_5d_pct": -10.4,
       "return_20d_pct": null,
       "return_60d_pct": null,
@@ -1251,39 +1206,13 @@
         }
       ],
       "activity": {
-        "buy_count": 1,
-        "sell_count": 2,
-        "buy_amount": 104004.0,
-        "sell_amount": 342356.6,
+        "buy_count": 0,
+        "sell_count": 1,
+        "buy_amount": 0,
+        "sell_amount": 104076.0,
         "pending_count": 4
       },
-      "holdings": [
-        {
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "qty": 9000,
-          "avg_cost": 11.5595,
-          "last_price": 10.77,
-          "market_value": 96930.0,
-          "pnl_pct": -6.83,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 11.5595,
-            "hard_stop_price": 10.924,
-            "take_profit_price": 12.704,
-            "trailing_activation_price": 12.195,
-            "trailing_drawdown_pct": 0.035,
-            "highest_price": 11.5595,
-            "partial_taken": false,
-            "max_hold_days": 2,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 10.899,
-            "setup": "breakout"
-          }
-        }
-      ],
+      "holdings": [],
       "pending_targets": [
         {
           "action": "条件待买",
@@ -1444,28 +1373,6 @@
       ],
       "recent_fills": [
         {
-          "symbol": "sz.000703",
-          "name": "恒逸石化",
-          "side": "SELL",
-          "trade_date": "2026-08-24",
-          "reference_price": 19.02,
-          "price": 19.01,
-          "qty": 9300,
-          "gross": 176793.0,
-          "fees": 141.43,
-          "note": "条件计划 · 11:20检查触发 hard_stop",
-          "execution_price_field": "live_conditional",
-          "plan_version": "conditional-plan-v1",
-          "exit_reason": "hard_stop",
-          "scan_time": "11:20",
-          "scheduled_time": "11:20",
-          "actual_execution_time": "2026-08-24T11:27:00+08:00",
-          "actual_clock": "11:27",
-          "market_reference_time": "11:28",
-          "market_reference_time_basis": "snapshot_capture_minute",
-          "market_reference_source": "sina"
-        },
-        {
           "symbol": "sh.600988",
           "name": "赤峰黄金",
           "side": "SELL",
@@ -1610,18 +1517,42 @@
           "market_reference_time": "09:30",
           "market_reference_time_basis": "market_open",
           "market_reference_source": "daily-open"
+        },
+        {
+          "symbol": "sz.002716",
+          "name": "湖南白银",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 11.57,
+          "price": 11.564,
+          "qty": 9000,
+          "gross": 104076.0,
+          "fees": 83.26,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
         }
       ],
-      "diary": "短线规则策略C：1-3日相对强弱/量价/过热惩罚优先"
+      "diary": "短线规则策略C：1-3日相对强弱/量价/过热惩罚优先",
+      "cash": 929859.15,
+      "position_market_value": 0.0
     },
     {
       "id": "D",
       "name": "综合判断基金",
       "style": "综合",
       "description": "短周期机会、趋势、估值、稳定性和风险综合判断。",
-      "equity": 963185.44,
-      "return_pct": -3.68,
-      "today_pct": -0.13,
+      "equity": 965540.31,
+      "return_pct": -3.45,
+      "today_pct": 0.24,
       "return_5d_pct": -5.23,
       "return_20d_pct": null,
       "return_60d_pct": null,
@@ -1674,10 +1605,10 @@
         }
       ],
       "activity": {
-        "buy_count": 2,
-        "sell_count": 2,
-        "buy_amount": 121462.5,
-        "sell_amount": 163134.4,
+        "buy_count": 0,
+        "sell_count": 1,
+        "buy_amount": 0,
+        "sell_amount": 67665.0,
         "pending_count": 8
       },
       "holdings": [
@@ -1686,9 +1617,9 @@
           "name": "中远海能",
           "qty": 4900,
           "avg_cost": 19.7259,
-          "last_price": 19.04,
-          "market_value": 93296.0,
-          "pnl_pct": -3.48,
+          "last_price": 18.99,
+          "market_value": 93051.0,
+          "pnl_pct": -3.73,
           "exit_plan": {
             "plan_version": "conditional-plan-v1",
             "opened_date": "2026-08-24",
@@ -1707,38 +1638,13 @@
           }
         },
         {
-          "symbol": "sh.600489",
-          "name": "中金黄金",
-          "qty": 2500,
-          "avg_cost": 26.3439,
-          "last_price": 26.24,
-          "market_value": 65600.0,
-          "pnl_pct": -0.39,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 26.3439,
-            "hard_stop_price": 24.895,
-            "take_profit_price": 28.735,
-            "trailing_activation_price": 27.793,
-            "trailing_drawdown_pct": 0.035,
-            "highest_price": 26.3439,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 26.319,
-            "setup": "pullback"
-          }
-        },
-        {
           "symbol": "sz.000975",
           "name": "山金国际",
           "qty": 1900,
           "avg_cost": 29.2838,
-          "last_price": 27.8,
-          "market_value": 52820.0,
-          "pnl_pct": -5.07,
+          "last_price": 28.11,
+          "market_value": 53409.0,
+          "pnl_pct": -4.01,
           "exit_plan": {
             "plan_version": "conditional-plan-v1",
             "opened_date": "2026-08-25",
@@ -2073,28 +1979,6 @@
       ],
       "recent_fills": [
         {
-          "symbol": "sz.000703",
-          "name": "恒逸石化",
-          "side": "SELL",
-          "trade_date": "2026-08-24",
-          "reference_price": 19.02,
-          "price": 19.01,
-          "qty": 3300,
-          "gross": 62733.0,
-          "fees": 50.19,
-          "note": "条件计划 · 11:20检查触发 hard_stop",
-          "execution_price_field": "live_conditional",
-          "plan_version": "conditional-plan-v1",
-          "exit_reason": "hard_stop",
-          "scan_time": "11:20",
-          "scheduled_time": "11:20",
-          "actual_execution_time": "2026-08-24T11:27:00+08:00",
-          "actual_clock": "11:27",
-          "market_reference_time": "11:28",
-          "market_reference_time_basis": "snapshot_capture_minute",
-          "market_reference_source": "sina"
-        },
-        {
           "symbol": "sh.600988",
           "name": "赤峰黄金",
           "side": "SELL",
@@ -2239,18 +2123,42 @@
           "market_reference_time": "09:30",
           "market_reference_time_basis": "market_open",
           "market_reference_source": "daily-open"
+        },
+        {
+          "symbol": "sh.600489",
+          "name": "中金黄金",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 27.08,
+          "price": 27.066,
+          "qty": 2500,
+          "gross": 67665.0,
+          "fees": 54.13,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
         }
       ],
-      "diary": "AI调用失败，已启用短周期D规则兜底"
+      "diary": "AI调用失败，已启用短周期D规则兜底",
+      "cash": 819080.31,
+      "position_market_value": 146460.0
     },
     {
       "id": "L",
       "name": "长线价值基金",
       "style": "长线",
       "description": "更看重估值和稳定性，但买点仍需条件触发。",
-      "equity": 937949.01,
-      "return_pct": -6.21,
-      "today_pct": -0.32,
+      "equity": 938925.04,
+      "return_pct": -6.11,
+      "today_pct": 0.1,
       "return_5d_pct": -7.13,
       "return_20d_pct": null,
       "return_60d_pct": null,
@@ -2303,10 +2211,10 @@
         }
       ],
       "activity": {
-        "buy_count": 2,
-        "sell_count": 0,
-        "buy_amount": 103021.6,
-        "sell_amount": 0,
+        "buy_count": 0,
+        "sell_count": 2,
+        "buy_amount": 0,
+        "sell_amount": 104704.8,
         "pending_count": 8
       },
       "holdings": [
@@ -2315,9 +2223,9 @@
           "name": "陆家嘴",
           "qty": 10300,
           "avg_cost": 9.5579,
-          "last_price": 9.37,
-          "market_value": 96511.0,
-          "pnl_pct": -1.97,
+          "last_price": 9.42,
+          "market_value": 97026.0,
+          "pnl_pct": -1.44,
           "exit_plan": {
             "plan_version": "conditional-plan-v1",
             "opened_date": "2026-08-19",
@@ -2340,9 +2248,9 @@
           "name": "恒逸石化",
           "qty": 4000,
           "avg_cost": 18.9147,
-          "last_price": 18.34,
-          "market_value": 73360.0,
-          "pnl_pct": -3.04,
+          "last_price": 17.93,
+          "market_value": 71720.0,
+          "pnl_pct": -5.21,
           "exit_plan": {
             "plan_version": "conditional-plan-v1",
             "opened_date": "2026-08-24",
@@ -2357,56 +2265,6 @@
             "sessions_held": 1,
             "rotation_exit": true,
             "rotation_min_price": 18.56,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sz.000975",
-          "name": "山金国际",
-          "qty": 1800,
-          "avg_cost": 27.9804,
-          "last_price": 27.8,
-          "market_value": 50040.0,
-          "pnl_pct": -0.64,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 27.9804,
-            "hard_stop_price": 26.441,
-            "take_profit_price": 30.52,
-            "trailing_activation_price": 29.519,
-            "trailing_drawdown_pct": 0.035,
-            "highest_price": 27.9804,
-            "partial_taken": false,
-            "max_hold_days": 5,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 27.896,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sh.600489",
-          "name": "中金黄金",
-          "qty": 2000,
-          "avg_cost": 26.3439,
-          "last_price": 26.24,
-          "market_value": 52480.0,
-          "pnl_pct": -0.39,
-          "exit_plan": {
-            "plan_version": "conditional-plan-v1",
-            "opened_date": "2026-08-25",
-            "entry_price": 26.3439,
-            "hard_stop_price": 24.895,
-            "take_profit_price": 28.735,
-            "trailing_activation_price": 27.793,
-            "trailing_drawdown_pct": 0.035,
-            "highest_price": 26.3439,
-            "partial_taken": false,
-            "max_hold_days": 5,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 26.319,
             "setup": "pullback"
           }
         }
@@ -2727,48 +2585,6 @@
       ],
       "recent_fills": [
         {
-          "symbol": "sh.600267",
-          "name": "海正药业",
-          "side": "BUY",
-          "trade_date": "2026-08-21",
-          "reference_price": 13.75,
-          "price": 13.757,
-          "qty": 5700,
-          "gross": 78414.9,
-          "fees": 23.52,
-          "note": "上一交易日条件计划 · 15:10结算当日已触发买单",
-          "execution_price_field": "conditional_trigger",
-          "plan_version": "conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "open_inside_pullback_zone",
-          "trigger_price": 13.936,
-          "market_reference_time": "09:30",
-          "market_reference_time_basis": "market_open",
-          "market_reference_source": "daily-open"
-        },
-        {
-          "symbol": "sh.603259",
-          "name": "药明康德",
-          "side": "SELL",
-          "trade_date": "2026-08-24",
-          "reference_price": 155.53,
-          "price": 155.452,
-          "qty": 600,
-          "gross": 93271.2,
-          "fees": 74.62,
-          "note": "条件计划 · 11:20检查触发 hard_stop",
-          "execution_price_field": "live_conditional",
-          "plan_version": "conditional-plan-v1",
-          "exit_reason": "hard_stop",
-          "scan_time": "11:20",
-          "scheduled_time": "11:20",
-          "actual_execution_time": "2026-08-24T11:27:00+08:00",
-          "actual_clock": "11:27",
-          "market_reference_time": "11:28",
-          "market_reference_time_basis": "snapshot_capture_minute",
-          "market_reference_source": "sina"
-        },
-        {
           "symbol": "sz.002437",
           "name": "誉衡药业",
           "side": "SELL",
@@ -2889,9 +2705,55 @@
           "trigger_reason": "intraday_pullback_triggered",
           "trigger_price": 26.323,
           "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "symbol": "sz.000975",
+          "name": "山金国际",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 28.11,
+          "price": 28.096,
+          "qty": 1800,
+          "gross": 50572.8,
+          "fees": 40.46,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
+        },
+        {
+          "symbol": "sh.600489",
+          "name": "中金黄金",
+          "side": "SELL",
+          "trade_date": "2026-08-26",
+          "reference_price": 27.08,
+          "price": 27.066,
+          "qty": 2000,
+          "gross": 54132.0,
+          "fees": 43.31,
+          "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+          "execution_price_field": "live_conditional",
+          "plan_version": "conditional-plan-v1",
+          "exit_reason": "rotation_exit_price_reached",
+          "scan_time": "10:30",
+          "scheduled_time": "10:30",
+          "actual_execution_time": "2026-08-26T10:38:51+08:00",
+          "actual_clock": "10:38",
+          "market_reference_time": "10:39",
+          "market_reference_time_basis": "snapshot_capture_minute",
+          "market_reference_source": "sina"
         }
       ],
-      "diary": "长线规则策略L：估值/风险/质量优先，买点仍需条件触发"
+      "diary": "长线规则策略L：估值/风险/质量优先，买点仍需条件触发",
+      "cash": 770179.04,
+      "position_market_value": 168746.0
     }
   ],
   "benchmarks": [
@@ -3035,5 +2897,9 @@
     }
   ],
   "weekly_report": "近5个交易日最好：保守稳健基金 -4.95%；最弱：短线快攻基金 -10.40%。",
-  "evaluation_note": "条件没触发就留现金；至少看20/60个交易日再评价策略，不用一天盈亏自我欺骗。"
+  "evaluation_note": "条件没触发就留现金；至少看20/60个交易日再评价策略，不用一天盈亏自我欺骗。",
+  "updated_time": "10:38",
+  "scheduled_checkpoint": "10:30",
+  "actual_execution_time": "10:38",
+  "session_phase": "10:30计划检查点于10:38实际执行；15:10结算当天触发的买入条件"
 }

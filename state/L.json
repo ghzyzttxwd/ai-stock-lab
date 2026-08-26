@@ -2,35 +2,21 @@
   "fund_id": "L",
   "name": "长线价值基金",
   "initial_cash": 1000000.0,
-  "cash": 665558.01,
+  "cash": 770179.04,
   "positions": {
     "sh.600663": {
       "name": "陆家嘴",
       "qty": 10300,
       "avg_cost": 9.5579,
       "acquired_date": "2026-08-19",
-      "last_price": 9.37
+      "last_price": 9.42
     },
     "sz.000703": {
       "name": "恒逸石化",
       "qty": 4000,
       "avg_cost": 18.9147,
       "acquired_date": "2026-08-24",
-      "last_price": 18.34
-    },
-    "sz.000975": {
-      "name": "山金国际",
-      "qty": 1800,
-      "avg_cost": 27.9804,
-      "acquired_date": "2026-08-25",
-      "last_price": 27.8
-    },
-    "sh.600489": {
-      "name": "中金黄金",
-      "qty": 2000,
-      "avg_cost": 26.3439,
-      "acquired_date": "2026-08-25",
-      "last_price": 26.24
+      "last_price": 17.93
     }
   },
   "fills": [
@@ -757,6 +743,50 @@
       "trigger_reason": "intraday_pullback_triggered",
       "trigger_price": 26.323,
       "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "symbol": "sz.000975",
+      "name": "山金国际",
+      "side": "SELL",
+      "trade_date": "2026-08-26",
+      "reference_price": 28.11,
+      "price": 28.096,
+      "qty": 1800,
+      "gross": 50572.8,
+      "fees": 40.46,
+      "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "10:30",
+      "scheduled_time": "10:30",
+      "actual_execution_time": "2026-08-26T10:38:51+08:00",
+      "actual_clock": "10:38",
+      "market_reference_time": "10:39",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
+    },
+    {
+      "symbol": "sh.600489",
+      "name": "中金黄金",
+      "side": "SELL",
+      "trade_date": "2026-08-26",
+      "reference_price": 27.08,
+      "price": 27.066,
+      "qty": 2000,
+      "gross": 54132.0,
+      "fees": 43.31,
+      "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "10:30",
+      "scheduled_time": "10:30",
+      "actual_execution_time": "2026-08-26T10:38:51+08:00",
+      "actual_clock": "10:38",
+      "market_reference_time": "10:39",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
     }
   ],
   "equity_curve": [
@@ -4854,38 +4884,6 @@
       "rotation_exit": true,
       "rotation_min_price": 18.56,
       "setup": "pullback"
-    },
-    "sz.000975": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-25",
-      "entry_price": 27.9804,
-      "hard_stop_price": 26.441,
-      "take_profit_price": 30.52,
-      "trailing_activation_price": 29.519,
-      "trailing_drawdown_pct": 0.035,
-      "highest_price": 27.9804,
-      "partial_taken": false,
-      "max_hold_days": 5,
-      "sessions_held": 0,
-      "rotation_exit": true,
-      "rotation_min_price": 27.896,
-      "setup": "pullback"
-    },
-    "sh.600489": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-25",
-      "entry_price": 26.3439,
-      "hard_stop_price": 24.895,
-      "take_profit_price": 28.735,
-      "trailing_activation_price": 27.793,
-      "trailing_drawdown_pct": 0.035,
-      "highest_price": 26.3439,
-      "partial_taken": false,
-      "max_hold_days": 5,
-      "sessions_held": 0,
-      "rotation_exit": true,
-      "rotation_min_price": 26.319,
-      "setup": "pullback"
     }
   },
   "last_entry_settlement": {
@@ -4921,8 +4919,8 @@
     "plan_version": "conditional-plan-v1",
     "price_time_evidence": "first_trigger_minute_when_available"
   },
-  "last_conditional_scan_key": "2026-08-25T14:55",
-  "last_conditional_scan_at": "2026-08-25T15:02:00+08:00",
+  "last_conditional_scan_key": "2026-08-26T10:30",
+  "last_conditional_scan_at": "2026-08-26T10:38:51+08:00",
   "conditional_scan_log": [
     {
       "slot": "11:20",
@@ -5298,6 +5296,37 @@
           "take_profit": 20.631,
           "trailing_stop": 18.702,
           "rotation_min_price": 19.077
+        }
+      ]
+    },
+    {
+      "slot": "10:30",
+      "scheduled_time": "10:30",
+      "actual_clock": "10:38",
+      "quote_clock": "10:39",
+      "delay_minutes": 8.85,
+      "at": "2026-08-26T10:38:51+08:00",
+      "fills": 2,
+      "checks": [
+        {
+          "symbol": "sh.600663",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 9.42,
+          "hard_stop": 9.006,
+          "take_profit": 9.76,
+          "trailing_stop": 9.319,
+          "rotation_min_price": 9.482
+        },
+        {
+          "symbol": "sz.000703",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 17.93,
+          "hard_stop": 17.874,
+          "take_profit": 20.631,
+          "trailing_stop": 18.702,
+          "rotation_min_price": 18.56
         }
       ]
     }

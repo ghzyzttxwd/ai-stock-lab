@@ -2,21 +2,14 @@
   "fund_id": "A",
   "name": "保守稳健基金",
   "initial_cash": 1000000.0,
-  "cash": 845565.94,
+  "cash": 887870.47,
   "positions": {
     "sz.000703": {
       "name": "恒逸石化",
       "qty": 3500,
       "avg_cost": 18.9147,
       "acquired_date": "2026-08-24",
-      "last_price": 18.34
-    },
-    "sh.601899": {
-      "name": "紫金矿业",
-      "qty": 1200,
-      "avg_cost": 33.8121,
-      "acquired_date": "2026-08-25",
-      "last_price": 33.68
+      "last_price": 17.93
     }
   },
   "fills": [
@@ -1021,6 +1014,28 @@
       "trigger_reason": "intraday_pullback_triggered",
       "trigger_price": 33.785,
       "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "symbol": "sh.601899",
+      "name": "紫金矿业",
+      "side": "SELL",
+      "trade_date": "2026-08-26",
+      "reference_price": 35.3,
+      "price": 35.282,
+      "qty": 1200,
+      "gross": 42338.4,
+      "fees": 33.87,
+      "note": "条件计划 · 10:30检查触发 rotation_exit_price_reached",
+      "execution_price_field": "live_conditional",
+      "plan_version": "conditional-plan-v1",
+      "exit_reason": "rotation_exit_price_reached",
+      "scan_time": "10:30",
+      "scheduled_time": "10:30",
+      "actual_execution_time": "2026-08-26T10:38:51+08:00",
+      "actual_clock": "10:38",
+      "market_reference_time": "10:39",
+      "market_reference_time_basis": "snapshot_capture_minute",
+      "market_reference_source": "sina"
     }
   ],
   "equity_curve": [
@@ -6080,22 +6095,6 @@
       "rotation_exit": true,
       "rotation_min_price": 18.56,
       "setup": "pullback"
-    },
-    "sh.601899": {
-      "plan_version": "conditional-plan-v1",
-      "opened_date": "2026-08-25",
-      "entry_price": 33.8121,
-      "hard_stop_price": 32.134,
-      "take_profit_price": 36.58,
-      "trailing_activation_price": 35.49,
-      "trailing_drawdown_pct": 0.03236,
-      "highest_price": 33.8121,
-      "partial_taken": false,
-      "max_hold_days": 4,
-      "sessions_held": 0,
-      "rotation_exit": true,
-      "rotation_min_price": 33.781,
-      "setup": "pullback"
     }
   },
   "last_entry_settlement": {
@@ -6143,8 +6142,8 @@
     "plan_version": "conditional-plan-v1",
     "price_time_evidence": "first_trigger_minute_when_available"
   },
-  "last_conditional_scan_key": "2026-08-25T14:55",
-  "last_conditional_scan_at": "2026-08-25T15:02:00+08:00",
+  "last_conditional_scan_key": "2026-08-26T10:30",
+  "last_conditional_scan_at": "2026-08-26T10:38:51+08:00",
   "conditional_scan_log": [
     {
       "slot": "11:20",
@@ -6600,6 +6599,27 @@
           "take_profit": 20.631,
           "trailing_stop": 18.702,
           "rotation_min_price": 19.077
+        }
+      ]
+    },
+    {
+      "slot": "10:30",
+      "scheduled_time": "10:30",
+      "actual_clock": "10:38",
+      "quote_clock": "10:39",
+      "delay_minutes": 8.85,
+      "at": "2026-08-26T10:38:51+08:00",
+      "fills": 1,
+      "checks": [
+        {
+          "symbol": "sz.000703",
+          "action": "HOLD",
+          "reason": "conditions_not_met",
+          "price": 17.93,
+          "hard_stop": 17.874,
+          "take_profit": 20.631,
+          "trailing_stop": 18.702,
+          "rotation_min_price": 18.56
         }
       ]
     }
