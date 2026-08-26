@@ -231,7 +231,7 @@ def build_summary(state_root: Path) -> dict:
             'name': state.get('name'),
             'strategy_family': state.get('strategy_family'),
             'execution_model': state.get('execution_model') or EXECUTION_MODEL,
-            'plan_version': state.get('plan_version'),
+            'plan_version': state.get('plan_version') or PLAN_VERSION,
             'metrics': metrics,
             'holdings': ledger_holdings(state, float(metrics.get('equity') or 0.0)),
             'recent_fills': list(state.get('fills') or [])[-20:],
@@ -247,6 +247,15 @@ def build_summary(state_root: Path) -> dict:
     current_audit=next((event for _,event in reversed(events) if event.get('event_hash')==head),None)
     if not current_audit:
         raise RuntimeError(f'V2 current audit head not found: {head}')
+    if current_audit.get('event_kind') == 'paper_reset':
+        reset_date = str(current_audit.get('trade_date') or '')[:10]
+        if not reset_date:
+            raise RuntimeError('V2 paper_reset audit is missing trade_date')
+        if trade_date and trade_date != reset_date:
+            raise RuntimeError(
+                f'V2 reset summary date mismatch: ledger={trade_date} reset={reset_date}'
+            )
+        trade_date = reset_date
     latest_decision_audit=next((event for _,event in reversed(events) if event.get('target_diagnostics') is not None),current_audit)
     concentration_flags = ((latest_decision_audit.get('target_diagnostics') or {}).get('concentration_flags') or {})
     for fund_id, fund in ledgers.items():
@@ -287,6 +296,19 @@ def attach_hs300_benchmark(summary: dict) -> dict:
             if start:
                 starts.append(start)
     start_date = min(starts) if starts else trade_date
+    if summary.get('audit_event_kind') == 'paper_reset' and not starts:
+        summary['benchmark'] = {
+            'name': '沪深300',
+            'symbol': 'sh000300',
+            'start_date': trade_date,
+            'end_date': trade_date,
+            'return_pct': None,
+            'source': 'reset',
+            'status': 'PENDING_FIRST_SESSION',
+        }
+        for fund in (summary.get('funds') or {}).values():
+            (fund.get('metrics') or {})['excess_hs300_pct'] = None
+        return summary
     benchmark = {
         'name': '沪深300', 'symbol': 'sh000300', 'start_date': start_date, 'end_date': trade_date,
         'return_pct': None, 'source': 'tencent-index', 'status': 'UNAVAILABLE',
