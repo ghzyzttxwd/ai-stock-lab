@@ -16,7 +16,9 @@ def _opp(x: dict) -> float:
 
 def strategy_a(candidates: list[dict], market_score: float) -> list[dict]:
     """稳健：只做横向排名靠前的机会，弱市主动留现金。"""
-    eligible = [x for x in candidates if _opp(x) >= 62]
+    # Keep the first-stage universe slightly wider than the final conditional-plan
+    # threshold (62) so board/risk filters still receive viable main-board names.
+    eligible = [x for x in candidates if _opp(x) >= 60]
     ranked = sorted(
         eligible,
         key=lambda x: (0.34*x['risk'] + 0.24*x['quality'] + 0.22*_opp(x) + 0.20*x['liquidity']),
