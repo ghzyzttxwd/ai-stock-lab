@@ -61,7 +61,7 @@ def assert_v1_regression_smoke(
     if settled_dates == {''} and plan_dates == {''} and reset_path.exists():
         reset = _load(reset_path)
         reset_date = _date(reset.get('reset_date'))
-        initial_cash = float(reset.get('initial_cash') or 0.0)
+        initial_cash = float(reset.get('initial_cash_per_fund') or reset.get('initial_cash') or 0.0)
         if not reset_date or web_date != reset_date:
             raise RuntimeError(
                 f'V1 regression smoke: reset date {reset_date!r} does not match public date {web_date!r}'
