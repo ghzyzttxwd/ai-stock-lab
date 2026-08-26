@@ -36,7 +36,13 @@ class V2PaperResetTests(unittest.TestCase):
     def test_summary_is_zeroed(self):
         summary = json.loads((STATE_ROOT / 'summary.json').read_text(encoding='utf-8'))
         self.assertEqual(summary['updated_at'], '2026-08-26')
+        self.assertEqual(summary['execution_model'], 'V2_CONDITIONAL_PLAN_V1')
+        self.assertEqual(summary['plan_version'], 'v2-conditional-plan-v1')
+        self.assertEqual(summary['audit_event_kind'], 'paper_reset')
+        self.assertEqual((summary.get('benchmark') or {}).get('status'), 'PENDING_FIRST_SESSION')
         for fund in summary['funds'].values():
+            self.assertEqual(fund['execution_model'], 'V2_CONDITIONAL_PLAN_V1')
+            self.assertEqual(fund['plan_version'], 'v2-conditional-plan-v1')
             metrics = fund['metrics']
             self.assertEqual(float(metrics['equity']), 1_000_000.0)
             self.assertEqual(float(metrics['cash']), 1_000_000.0)
