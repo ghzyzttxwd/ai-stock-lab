@@ -5,7 +5,7 @@ from .indicators import score_history
 from .risk import clamp_d_targets
 from .strategies import strategy_a, strategy_b, strategy_c, strategy_d, strategy_l
 from .ai_manager import decide_with_api
-from .trading_plan import opportunity_score
+from .trading_plan import calibrate_opportunity_scores, opportunity_score
 from .universe import is_main_board
 
 
@@ -43,6 +43,11 @@ def build_candidates(histories: dict[str, list[dict]], names: dict[str,str] | No
         sc['market_relative_3']=round(float(sc.get('r3') or 0.0)-med3,6)
         sc['market_relative_5']=round(float(sc.get('r5') or 0.0)-med5,6)
         sc['opportunity_score']=opportunity_score(sc)
+
+    # Raw formulas can saturate at 100. Trade on a cross-sectional percentile instead,
+    # while retaining opportunity_score_raw for diagnostics.
+    calibrate_opportunity_scores(out)
+    for sc in out:
         sc['score_d']=round(
             0.30*sc['opportunity_score'] +
             0.16*sc['trend'] +
@@ -61,8 +66,9 @@ def market_temperature(candidates: list[dict]) -> float:
     top=candidates[:min(120,len(candidates))]
     breadth1=sum(1 for x in top if float(x.get('r1') or 0.0)>0)/len(top)
     breadth5=sum(1 for x in top if float(x.get('r5') or 0.0)>0)/len(top)
-    avg_opp=sum(float(x.get('opportunity_score') or 0.0) for x in top)/len(top)
-    # A strong market lifts the ceiling; it never forces the portfolio to fill that ceiling.
+    # Market temperature must remain an absolute regime signal. Percentile ranks are
+    # relative by construction, so use the preserved raw opportunity score here.
+    avg_opp=sum(float(x.get('opportunity_score_raw', x.get('opportunity_score') or 0.0)) for x in top)/len(top)
     return _cap(0.35*avg_opp + 35*breadth1 + 30*breadth5)
 
 
@@ -71,13 +77,13 @@ def targets_for(fund_id: str, candidates: list[dict], market_score: float, state
     # any target generator even if they bypass build_candidates().
     candidates=[x for x in candidates if is_main_board(str(x.get('symbol') or ''))]
     if fund_id == 'A':
-        return strategy_a(candidates,market_score), '稳健规则策略A：短周期机会先过关，再强调风险和流动性'
+        return strategy_a(candidates,market_score), '稳健规则策略A：只做横向前列机会，弱市主动留现金'
     if fund_id == 'B':
-        return strategy_b(candidates,market_score), '趋势规则策略B：相对强势、突破质量和短周期动量优先'
+        return strategy_b(candidates,market_score), '趋势规则策略B：弱市不追，限制过热和单日大涨后的追强'
     if fund_id == 'C':
-        return strategy_c(candidates,market_score), '短线规则策略C：1-3日相对强弱/量价/过热惩罚优先'
+        return strategy_c(candidates,market_score), '短线规则策略C：只做横向前列且不过热的1-3日机会'
     if fund_id == 'L':
-        return strategy_l(candidates,market_score,state), '长线规则策略L：估值/风险/质量优先，买点仍需条件触发'
+        return strategy_l(candidates,market_score,state), '长线规则策略L：估值/风险/质量优先，弱市降低仓位'
     if fund_id == 'D':
         if use_ai:
             ai = decide_with_api(candidates, {'cash':state.get('cash'), 'positions':state.get('positions',{})}, market_score)
@@ -90,7 +96,7 @@ def targets_for(fund_id: str, candidates: list[dict], market_score: float, state
                     notes.append(f'拒绝 {rejected} 个候选池外代码')
                 return clean, ai.get('diary','AI综合决策') + (('；'+'；'.join(notes)) if notes else '')
             clean, notes=clamp_d_targets(strategy_d(candidates,market_score),state)
-            return clean, 'AI调用失败，已启用短周期D规则兜底' + (('；'+'；'.join(notes)) if notes else '')
+            return clean, 'AI调用失败，已启用收缩版D规则兜底' + (('；'+'；'.join(notes)) if notes else '')
         clean, notes=clamp_d_targets(strategy_d(candidates,market_score),state)
-        return clean, 'D短周期规则' + (('；'+'；'.join(notes)) if notes else '')
+        return clean, 'D收缩版规则' + (('；'+'；'.join(notes)) if notes else '')
     raise ValueError(f'unknown fund {fund_id}')
