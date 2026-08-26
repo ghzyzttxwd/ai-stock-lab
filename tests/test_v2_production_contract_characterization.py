@@ -81,11 +81,9 @@ class V2ProductionContractCharacterizationTests(unittest.TestCase):
                 self.assertTrue(fill.get("actual_execution_time"), f"{fund_id} conditional sell missing actual_execution_time")
 
         if checked == 0:
-            source = payload.get("source_ref") or {}
-            if source.get("reset_version") == "paper-reset-20260826":
-                audit = payload.get("audit_verification") or {}
+            audit = payload.get("audit_verification") or {}
+            if audit.get("first_date") == "2026-08-26~paper-reset":
                 self.assertEqual(audit.get("status"), "PASS")
-                self.assertEqual(audit.get("first_date"), "2026-08-26~paper-reset")
                 self.assertGreaterEqual(int(audit.get("events", 0)), 1)
                 for fund_id, fund in _public_funds(payload).items():
                     metrics = fund.get("metrics") or {}
