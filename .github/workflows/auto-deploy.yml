@@ -83,8 +83,8 @@ jobs:
           for fid,fund in (v2.get('funds') or {}).items():
               pending=fund.get('pending_decision')
               if pending:
-                  if pending.get('plan_version')!='v2-conditional-plan-v1':
-                      raise SystemExit(f'V2 {fid} pending version mismatch')
+                  if fund.get('plan_version')!='v2-conditional-plan-v1':
+                      raise SystemExit(f'V2 {fid} fund plan version mismatch')
                   for item in pending.get('targets') or []:
                       if (item.get('trade_plan') or {}).get('plan_version')!='v2-conditional-plan-v1':
                           raise SystemExit(f'V2 {fid} contains a legacy pending entry')
