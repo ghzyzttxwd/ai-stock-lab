@@ -1,192 +1,1451 @@
 {
   "mode": "REAL",
   "updated_at": "2026-08-26",
-  "market_source": "none",
+  "market_source": "tencent-cache",
   "execution_model": "CONDITIONAL_PLAN_V1",
   "plan_version": "conditional-plan-v1",
-  "experiment_days": 0,
+  "experiment_days": 1,
   "funds": [
     {
       "id": "A",
       "name": "保守稳健基金",
       "style": "保守",
-      "description": "控制回撤，只有价格和风险条件都合格才买。",
+      "description": "少折腾，只有价格和风险条件都合格才买。",
       "equity": 1000000.0,
-      "cash": 1000000.0,
-      "position_market_value": 0.0,
       "return_pct": 0.0,
-      "today_pct": 0.0,
+      "today_pct": 0,
       "return_5d_pct": null,
       "return_20d_pct": null,
       "return_60d_pct": null,
       "max_drawdown_pct": 0.0,
-      "volatility_pct": 0.0,
+      "volatility_pct": 0,
+      "trading_days": 1,
       "losing_streak_days": 0,
-      "health": "新实验",
-      "health_reason": "2026-08-26 已重置，等待收盘后重新选股。",
-      "excess_hs300_pct": null,
+      "health": "观察期",
+      "health_reason": "样本还少，先积累至少20个交易日。",
+      "excess_hs300_pct": 0.0,
       "composite_score": null,
       "risk": "低",
       "trades": 0,
-      "curve": [],
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ],
       "activity": {
         "buy_count": 0,
         "sell_count": 0,
         "buy_amount": 0,
         "sell_amount": 0,
-        "pending_count": 0
+        "pending_count": 7
       },
       "holdings": [],
-      "pending_targets": [],
+      "pending_targets": [
+        {
+          "action": "条件待买",
+          "name": "中国平安",
+          "symbol": "sh.601318",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分80.1，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 80.13,
+          "buy_condition": "<= 54.419，有效下限 53.439",
+          "stop_estimate": 53.058,
+          "take_profit_estimate": 56.663,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 80.13,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 54.419,
+              "valid_min": 53.439,
+              "valid_max": 54.419,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 4,
+              "estimated_stop_price": 53.058,
+              "estimated_take_profit_price": 56.663
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 54.419
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "中信证券",
+          "symbol": "sh.600030",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分71.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 71.15,
+          "buy_condition": "<= 27.325，有效下限 26.833",
+          "stop_estimate": 26.641,
+          "take_profit_estimate": 28.452,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 71.15,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 27.325,
+              "valid_min": 26.833,
+              "valid_max": 27.325,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 4,
+              "estimated_stop_price": 26.641,
+              "estimated_take_profit_price": 28.452
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 27.325
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "兴业银行",
+          "symbol": "sh.601166",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分62.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 62.18,
+          "buy_condition": "<= 18.101，有效下限 17.775",
+          "stop_estimate": 17.648,
+          "take_profit_estimate": 18.847,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 62.18,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 18.101,
+              "valid_min": 17.775,
+              "valid_max": 18.101,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 4,
+              "estimated_stop_price": 17.648,
+              "estimated_take_profit_price": 18.847
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 18.101
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "北方铜业",
+          "symbol": "sz.000737",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分95.5，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 95.51,
+          "buy_condition": "<= 14.757，有效下限 14.229",
+          "stop_estimate": 13.947,
+          "take_profit_estimate": 16.095,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 95.51,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 14.757,
+              "valid_min": 14.229,
+              "valid_max": 14.757,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.05493,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 4,
+              "estimated_stop_price": 13.947,
+              "estimated_take_profit_price": 16.095
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 14.757
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "紫金矿业",
+          "symbol": "sh.601899",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分69.9，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 69.87,
+          "buy_condition": "<= 34.263，有效下限 33.209",
+          "stop_estimate": 32.646,
+          "take_profit_estimate": 36.931,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 69.87,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 34.263,
+              "valid_min": 33.209,
+              "valid_max": 34.263,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.04719,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.03078,
+              "max_hold_days": 4,
+              "estimated_stop_price": 32.646,
+              "estimated_take_profit_price": 36.931
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 34.263
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "招商证券",
+          "symbol": "sh.600999",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分82.7，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 82.69,
+          "buy_condition": "<= 17.986，有效下限 17.662",
+          "stop_estimate": 17.523,
+          "take_profit_estimate": 18.75,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 82.69,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 17.986,
+              "valid_min": 17.662,
+              "valid_max": 17.986,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.02576,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 4,
+              "estimated_stop_price": 17.523,
+              "estimated_take_profit_price": 18.75
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 17.986
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "歌尔股份",
+          "symbol": "sz.002241",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分76.3，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 76.28,
+          "buy_condition": "<= 23.204，有效下限 22.606",
+          "stop_estimate": 22.287,
+          "take_profit_estimate": 24.719,
+          "max_hold_days": 4,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 76.28,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 23.204,
+              "valid_min": 22.606,
+              "valid_max": 23.204,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.03955,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.02579,
+              "max_hold_days": 4,
+              "estimated_stop_price": 22.287,
+              "estimated_take_profit_price": 24.719
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 23.204
+          }
+        }
+      ],
       "recent_fills": [],
-      "diary": "新实验已清零。"
+      "diary": "稳健规则策略A：只做横向前列机会，弱市主动留现金"
     },
     {
       "id": "B",
       "name": "趋势追强基金",
-      "style": "趋势",
-      "description": "只做通过过热、跳空和市场环境过滤后的趋势机会。",
+      "style": "追强",
+      "description": "找相对大盘真正走强的股票，突破确认才进。",
       "equity": 1000000.0,
-      "cash": 1000000.0,
-      "position_market_value": 0.0,
       "return_pct": 0.0,
-      "today_pct": 0.0,
+      "today_pct": 0,
       "return_5d_pct": null,
       "return_20d_pct": null,
       "return_60d_pct": null,
       "max_drawdown_pct": 0.0,
-      "volatility_pct": 0.0,
+      "volatility_pct": 0,
+      "trading_days": 1,
       "losing_streak_days": 0,
-      "health": "新实验",
-      "health_reason": "2026-08-26 已重置，等待收盘后重新选股。",
-      "excess_hs300_pct": null,
+      "health": "观察期",
+      "health_reason": "样本还少，先积累至少20个交易日。",
+      "excess_hs300_pct": 0.0,
       "composite_score": null,
-      "risk": "中高",
+      "risk": "高",
       "trades": 0,
-      "curve": [],
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ],
       "activity": {
         "buy_count": 0,
         "sell_count": 0,
         "buy_amount": 0,
         "sell_amount": 0,
-        "pending_count": 0
+        "pending_count": 5
       },
       "holdings": [],
-      "pending_targets": [],
+      "pending_targets": [
+        {
+          "action": "条件待买",
+          "name": "英维克",
+          "symbol": "sz.002837",
+          "weight": "10.0%",
+          "reason": "pullback条件计划；横向机会分94.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 94.23,
+          "buy_condition": "<= 56.934，有效下限 54.656",
+          "stop_estimate": 53.802,
+          "take_profit_estimate": 62.1,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 94.23,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 56.934,
+              "valid_min": 54.656,
+              "valid_max": 56.934,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 53.802,
+              "estimated_take_profit_price": 62.1
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 56.934
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "圣阳股份",
+          "symbol": "sz.002580",
+          "weight": "10.0%",
+          "reason": "range条件计划；横向机会分85.3，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 85.26,
+          "buy_condition": "21.349 ~ 21.760",
+          "stop_estimate": 20.369,
+          "take_profit_estimate": 23.51,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 85.26,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 21.76,
+              "valid_min": 21.349,
+              "valid_max": 21.76,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 20.369,
+              "estimated_take_profit_price": 23.51
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 21.554
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "红星发展",
+          "symbol": "sh.600367",
+          "weight": "10.0%",
+          "reason": "breakout条件计划；横向机会分78.8，未触发则保持现金",
+          "setup": "breakout",
+          "opportunity_score": 78.85,
+          "buy_condition": ">= 40.420，最高追到 40.905",
+          "stop_estimate": 38.197,
+          "take_profit_estimate": 44.422,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "breakout",
+            "opportunity_score": 78.85,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 40.42,
+              "valid_min": 40.42,
+              "valid_max": 40.905,
+              "explanation": "突破后确认才买；高开或冲高超过最高追价直接放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 38.197,
+              "estimated_take_profit_price": 44.422
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 40.42
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "中国平安",
+          "symbol": "sh.601318",
+          "weight": "10.0%",
+          "reason": "breakout条件计划；横向机会分80.1，未触发则保持现金",
+          "setup": "breakout",
+          "opportunity_score": 80.13,
+          "buy_condition": ">= 56.436，最高追到 56.775",
+          "stop_estimate": 55.025,
+          "take_profit_estimate": 58.976,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "breakout",
+            "opportunity_score": 80.13,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 56.436,
+              "valid_min": 56.436,
+              "valid_max": 56.775,
+              "explanation": "突破后确认才买；高开或冲高超过最高追价直接放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 3,
+              "estimated_stop_price": 55.025,
+              "estimated_take_profit_price": 58.976
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 56.436
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "歌尔股份",
+          "symbol": "sz.002241",
+          "weight": "10.0%",
+          "reason": "pullback条件计划；横向机会分76.3，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 76.28,
+          "buy_condition": "<= 23.204，有效下限 22.606",
+          "stop_estimate": 22.287,
+          "take_profit_estimate": 24.719,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 76.28,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 23.204,
+              "valid_min": 22.606,
+              "valid_max": 23.204,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.03955,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.02579,
+              "max_hold_days": 3,
+              "estimated_stop_price": 22.287,
+              "estimated_take_profit_price": 24.719
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 23.204
+          }
+        }
+      ],
       "recent_fills": [],
-      "diary": "新实验已清零。"
+      "diary": "趋势规则策略B：弱市不追，限制过热和单日大涨后的追强"
     },
     {
       "id": "C",
       "name": "短线快攻基金",
       "style": "短线",
-      "description": "只做少数高质量短线机会，弱市允许空仓。",
+      "description": "偏1-3日短线，重视量价和相对强弱，并惩罚过热追高。",
       "equity": 1000000.0,
-      "cash": 1000000.0,
-      "position_market_value": 0.0,
       "return_pct": 0.0,
-      "today_pct": 0.0,
+      "today_pct": 0,
       "return_5d_pct": null,
       "return_20d_pct": null,
       "return_60d_pct": null,
       "max_drawdown_pct": 0.0,
-      "volatility_pct": 0.0,
+      "volatility_pct": 0,
+      "trading_days": 1,
       "losing_streak_days": 0,
-      "health": "新实验",
-      "health_reason": "2026-08-26 已重置，等待收盘后重新选股。",
-      "excess_hs300_pct": null,
+      "health": "观察期",
+      "health_reason": "样本还少，先积累至少20个交易日。",
+      "excess_hs300_pct": 0.0,
       "composite_score": null,
-      "risk": "高",
+      "risk": "很高",
       "trades": 0,
-      "curve": [],
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ],
       "activity": {
         "buy_count": 0,
         "sell_count": 0,
         "buy_amount": 0,
         "sell_amount": 0,
-        "pending_count": 0
+        "pending_count": 4
       },
       "holdings": [],
-      "pending_targets": [],
+      "pending_targets": [
+        {
+          "action": "条件待买",
+          "name": "英维克",
+          "symbol": "sz.002837",
+          "weight": "11.2%",
+          "reason": "pullback条件计划；横向机会分94.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 94.23,
+          "buy_condition": "<= 56.934，有效下限 54.656",
+          "stop_estimate": 53.802,
+          "take_profit_estimate": 62.1,
+          "max_hold_days": 2,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 94.23,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 56.934,
+              "valid_min": 54.656,
+              "valid_max": 56.934,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 2,
+              "estimated_stop_price": 53.802,
+              "estimated_take_profit_price": 62.1
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 56.934
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "圣阳股份",
+          "symbol": "sz.002580",
+          "weight": "11.2%",
+          "reason": "range条件计划；横向机会分85.3，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 85.26,
+          "buy_condition": "21.349 ~ 21.760",
+          "stop_estimate": 20.369,
+          "take_profit_estimate": 23.51,
+          "max_hold_days": 2,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 85.26,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 21.76,
+              "valid_min": 21.349,
+              "valid_max": 21.76,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 2,
+              "estimated_stop_price": 20.369,
+              "estimated_take_profit_price": 23.51
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 21.554
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "中国平安",
+          "symbol": "sh.601318",
+          "weight": "11.2%",
+          "reason": "breakout条件计划；横向机会分80.1，未触发则保持现金",
+          "setup": "breakout",
+          "opportunity_score": 80.13,
+          "buy_condition": ">= 56.436，最高追到 56.775",
+          "stop_estimate": 55.025,
+          "take_profit_estimate": 58.976,
+          "max_hold_days": 2,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "breakout",
+            "opportunity_score": 80.13,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 56.436,
+              "valid_min": 56.436,
+              "valid_max": 56.775,
+              "explanation": "突破后确认才买；高开或冲高超过最高追价直接放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 2,
+              "estimated_stop_price": 55.025,
+              "estimated_take_profit_price": 58.976
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 56.436
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "红星发展",
+          "symbol": "sh.600367",
+          "weight": "11.2%",
+          "reason": "breakout条件计划；横向机会分78.8，未触发则保持现金",
+          "setup": "breakout",
+          "opportunity_score": 78.85,
+          "buy_condition": ">= 40.420，最高追到 40.905",
+          "stop_estimate": 38.197,
+          "take_profit_estimate": 44.422,
+          "max_hold_days": 2,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "breakout",
+            "opportunity_score": 78.85,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 40.42,
+              "valid_min": 40.42,
+              "valid_max": 40.905,
+              "explanation": "突破后确认才买；高开或冲高超过最高追价直接放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 2,
+              "estimated_stop_price": 38.197,
+              "estimated_take_profit_price": 44.422
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 40.42
+          }
+        }
+      ],
       "recent_fills": [],
-      "diary": "新实验已清零。"
+      "diary": "短线规则策略C：只做横向前列且不过热的1-3日机会"
     },
     {
       "id": "D",
       "name": "综合判断基金",
       "style": "综合",
-      "description": "综合趋势、估值、风险和条件计划，不为满仓而交易。",
+      "description": "短周期机会、趋势、估值、稳定性和风险综合判断。",
       "equity": 1000000.0,
-      "cash": 1000000.0,
-      "position_market_value": 0.0,
       "return_pct": 0.0,
-      "today_pct": 0.0,
+      "today_pct": 0,
       "return_5d_pct": null,
       "return_20d_pct": null,
       "return_60d_pct": null,
       "max_drawdown_pct": 0.0,
-      "volatility_pct": 0.0,
+      "volatility_pct": 0,
+      "trading_days": 1,
       "losing_streak_days": 0,
-      "health": "新实验",
-      "health_reason": "2026-08-26 已重置，等待收盘后重新选股。",
-      "excess_hs300_pct": null,
+      "health": "观察期",
+      "health_reason": "样本还少，先积累至少20个交易日。",
+      "excess_hs300_pct": 0.0,
       "composite_score": null,
       "risk": "中",
       "trades": 0,
-      "curve": [],
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ],
       "activity": {
         "buy_count": 0,
         "sell_count": 0,
         "buy_amount": 0,
         "sell_amount": 0,
-        "pending_count": 0
+        "pending_count": 7
       },
       "holdings": [],
-      "pending_targets": [],
+      "pending_targets": [
+        {
+          "action": "条件待买",
+          "name": "湖南白银",
+          "symbol": "sz.002716",
+          "weight": "5.0%",
+          "reason": "range条件计划；横向机会分99.4，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 99.36,
+          "buy_condition": "11.173 ~ 11.388",
+          "stop_estimate": 10.66,
+          "take_profit_estimate": 12.304,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 99.36,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 11.388,
+              "valid_min": 11.173,
+              "valid_max": 11.388,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 10.66,
+              "estimated_take_profit_price": 12.304
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 11.28
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "白银有色",
+          "symbol": "sh.601212",
+          "weight": "5.0%",
+          "reason": "pullback条件计划；横向机会分98.1，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 98.08,
+          "buy_condition": "<= 6.443，有效下限 6.185",
+          "stop_estimate": 6.089,
+          "take_profit_estimate": 7.028,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 98.08,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 6.443,
+              "valid_min": 6.185,
+              "valid_max": 6.443,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 6.089,
+              "estimated_take_profit_price": 7.028
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 6.443
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "北方铜业",
+          "symbol": "sz.000737",
+          "weight": "5.0%",
+          "reason": "range条件计划；横向机会分95.5，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 95.51,
+          "buy_condition": "15.256 ~ 15.528",
+          "stop_estimate": 14.547,
+          "take_profit_estimate": 16.787,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 95.51,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 15.528,
+              "valid_min": 15.256,
+              "valid_max": 15.528,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.05493,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 14.547,
+              "estimated_take_profit_price": 16.787
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 15.392
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "江西铜业",
+          "symbol": "sh.600362",
+          "weight": "5.0%",
+          "reason": "range条件计划；横向机会分93.0，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 92.95,
+          "buy_condition": "47.939 ~ 48.861",
+          "stop_estimate": 45.738,
+          "take_profit_estimate": 52.792,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 92.95,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 48.861,
+              "valid_min": 47.939,
+              "valid_max": 48.861,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 45.738,
+              "estimated_take_profit_price": 52.792
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 48.4
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "英维克",
+          "symbol": "sz.002837",
+          "weight": "5.0%",
+          "reason": "range条件计划；横向机会分94.2，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 94.23,
+          "buy_condition": "61.263 ~ 62.442",
+          "stop_estimate": 58.451,
+          "take_profit_estimate": 67.466,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 94.23,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 62.442,
+              "valid_min": 61.263,
+              "valid_max": 62.442,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 58.451,
+              "estimated_take_profit_price": 67.466
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 61.853
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "剑桥科技",
+          "symbol": "sh.603083",
+          "weight": "5.0%",
+          "reason": "range条件计划；横向机会分96.8，未触发则保持现金",
+          "setup": "range",
+          "opportunity_score": 96.79,
+          "buy_condition": "188.369 ~ 191.995",
+          "stop_estimate": 179.722,
+          "take_profit_estimate": 207.441,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "range",
+            "opportunity_score": 96.79,
+            "entry": {
+              "mode": "range",
+              "operator": "inside",
+              "trigger_price": 191.995,
+              "valid_min": 188.369,
+              "valid_max": 191.995,
+              "explanation": "只在计划价格区间内买，不追高也不接失控下跌"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 3,
+              "estimated_stop_price": 179.722,
+              "estimated_take_profit_price": 207.441
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 190.182
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "中国平安",
+          "symbol": "sh.601318",
+          "weight": "5.0%",
+          "reason": "breakout条件计划；横向机会分80.1，未触发则保持现金",
+          "setup": "breakout",
+          "opportunity_score": 80.13,
+          "buy_condition": ">= 56.436，最高追到 56.775",
+          "stop_estimate": 55.025,
+          "take_profit_estimate": 58.976,
+          "max_hold_days": 3,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "breakout",
+            "opportunity_score": 80.13,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 56.436,
+              "valid_min": 56.436,
+              "valid_max": 56.775,
+              "explanation": "突破后确认才买；高开或冲高超过最高追价直接放弃"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.8,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 3,
+              "estimated_stop_price": 55.025,
+              "estimated_take_profit_price": 58.976
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 56.436
+          }
+        }
+      ],
       "recent_fills": [],
-      "diary": "新实验已清零。"
+      "diary": "AI调用失败，已启用收缩版D规则兜底"
     },
     {
       "id": "L",
       "name": "长线价值基金",
       "style": "长线",
-      "description": "以长期质量和估值为主，减少不必要换手。",
+      "description": "更看重估值和稳定性，但买点仍需条件触发。",
       "equity": 1000000.0,
-      "cash": 1000000.0,
-      "position_market_value": 0.0,
       "return_pct": 0.0,
-      "today_pct": 0.0,
+      "today_pct": 0,
       "return_5d_pct": null,
       "return_20d_pct": null,
       "return_60d_pct": null,
       "max_drawdown_pct": 0.0,
-      "volatility_pct": 0.0,
+      "volatility_pct": 0,
+      "trading_days": 1,
       "losing_streak_days": 0,
-      "health": "新实验",
-      "health_reason": "2026-08-26 已重置，等待收盘后重新选股。",
-      "excess_hs300_pct": null,
+      "health": "观察期",
+      "health_reason": "样本还少，先积累至少20个交易日。",
+      "excess_hs300_pct": 0.0,
       "composite_score": null,
       "risk": "中低",
       "trades": 0,
-      "curve": [],
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ],
       "activity": {
         "buy_count": 0,
         "sell_count": 0,
         "buy_amount": 0,
         "sell_amount": 0,
-        "pending_count": 0
+        "pending_count": 7
       },
       "holdings": [],
-      "pending_targets": [],
+      "pending_targets": [
+        {
+          "action": "条件待买",
+          "name": "中国平安",
+          "symbol": "sh.601318",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分80.1，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 80.13,
+          "buy_condition": "<= 54.419，有效下限 53.439",
+          "stop_estimate": 53.058,
+          "take_profit_estimate": 56.663,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 80.13,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 54.419,
+              "valid_min": 53.439,
+              "valid_max": 54.419,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 5,
+              "estimated_stop_price": 53.058,
+              "estimated_take_profit_price": 56.663
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 54.419
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "北方铜业",
+          "symbol": "sz.000737",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分95.5，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 95.51,
+          "buy_condition": "<= 14.757，有效下限 14.229",
+          "stop_estimate": 13.947,
+          "take_profit_estimate": 16.095,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 95.51,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 14.757,
+              "valid_min": 14.229,
+              "valid_max": 14.757,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.05493,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 5,
+              "estimated_stop_price": 13.947,
+              "estimated_take_profit_price": 16.095
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 14.757
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "中信证券",
+          "symbol": "sh.600030",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分71.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 71.15,
+          "buy_condition": "<= 27.325，有效下限 26.833",
+          "stop_estimate": 26.641,
+          "take_profit_estimate": 28.452,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 71.15,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 27.325,
+              "valid_min": 26.833,
+              "valid_max": 27.325,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 5,
+              "estimated_stop_price": 26.641,
+              "estimated_take_profit_price": 28.452
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 27.325
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "紫金矿业",
+          "symbol": "sh.601899",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分69.9，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 69.87,
+          "buy_condition": "<= 34.263，有效下限 33.209",
+          "stop_estimate": 32.646,
+          "take_profit_estimate": 36.931,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 69.87,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 34.263,
+              "valid_min": 33.209,
+              "valid_max": 34.263,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.04719,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.03078,
+              "max_hold_days": 5,
+              "estimated_stop_price": 32.646,
+              "estimated_take_profit_price": 36.931
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 34.263
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "湖南白银",
+          "symbol": "sz.002716",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分99.4，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 99.36,
+          "buy_condition": "<= 10.709，有效下限 10.281",
+          "stop_estimate": 10.12,
+          "take_profit_estimate": 11.681,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 99.36,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 10.709,
+              "valid_min": 10.281,
+              "valid_max": 10.709,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.055,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.035,
+              "max_hold_days": 5,
+              "estimated_stop_price": 10.12,
+              "estimated_take_profit_price": 11.681
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 10.709
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "兴业银行",
+          "symbol": "sh.601166",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分62.2，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 62.18,
+          "buy_condition": "<= 18.101，有效下限 17.775",
+          "stop_estimate": 17.648,
+          "take_profit_estimate": 18.847,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 62.18,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 18.101,
+              "valid_min": 17.775,
+              "valid_max": 18.101,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.025,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 5,
+              "estimated_stop_price": 17.648,
+              "estimated_take_profit_price": 18.847
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 18.101
+          }
+        },
+        {
+          "action": "条件待买",
+          "name": "招商证券",
+          "symbol": "sh.600999",
+          "weight": "7.1%",
+          "reason": "pullback条件计划；横向机会分82.7，未触发则保持现金",
+          "setup": "pullback",
+          "opportunity_score": 82.69,
+          "buy_condition": "<= 17.986，有效下限 17.662",
+          "stop_estimate": 17.523,
+          "take_profit_estimate": 18.75,
+          "max_hold_days": 5,
+          "timing": "下一交易日价格触发才成交；未触发保持现金",
+          "trade_plan": {
+            "plan_version": "conditional-plan-v1",
+            "strategy_revision": "v1-discipline-20260826",
+            "decision_date": "2026-08-26",
+            "setup": "pullback",
+            "opportunity_score": 82.69,
+            "entry": {
+              "mode": "pullback",
+              "operator": "<=",
+              "trigger_price": 17.986,
+              "valid_min": 17.662,
+              "valid_max": 17.986,
+              "explanation": "回踩到计划价才买；直接跌穿有效区间则取消"
+            },
+            "exit": {
+              "hard_stop_pct": 0.02576,
+              "reward_risk": 1.65,
+              "trailing_activation_rr": 1.0,
+              "trailing_drawdown_pct": 0.018,
+              "max_hold_days": 5,
+              "estimated_stop_price": 17.523,
+              "estimated_take_profit_price": 18.75
+            },
+            "cancel_if_not_triggered_by_close": true,
+            "estimated_entry_price": 17.986
+          }
+        }
+      ],
       "recent_fills": [],
-      "diary": "新实验已清零。"
+      "diary": "长线规则策略L：估值/风险/质量优先，弱市降低仓位"
     }
   ],
-  "benchmarks": [],
-  "weekly_report": "2026-08-26 重置后重新开始统计，当前暂无新实验战报。",
-  "evaluation_note": "新实验从 2026-08-26 起重新累计，至少观察若干交易日后再比较策略表现。",
-  "updated_time": "15:02",
-  "scheduled_checkpoint": "14:55",
-  "actual_execution_time": "15:02",
-  "session_phase": "14:55计划检查点于15:02实际执行；15:10结算当天触发的买入条件"
+  "benchmarks": [
+    {
+      "name": "沪深300",
+      "symbol": "sh000300",
+      "return_pct": 0.0,
+      "return_5d_pct": null,
+      "return_20d_pct": null,
+      "return_60d_pct": null,
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ]
+    },
+    {
+      "name": "中证500",
+      "symbol": "sh000905",
+      "return_pct": 0.0,
+      "return_5d_pct": null,
+      "return_20d_pct": null,
+      "return_60d_pct": null,
+      "curve": [
+        {
+          "date": "2026-08-26",
+          "equity": 1000000.0
+        }
+      ]
+    },
+    {
+      "name": "中证1000",
+      "symbol": "sh000852",
+      "return_pct": null,
+      "return_5d_pct": null,
+      "return_20d_pct": null,
+      "return_60d_pct": null,
+      "curve": []
+    }
+  ],
+  "weekly_report": "运行不足6个交易日，周战报将在样本够后自动生成。",
+  "evaluation_note": "条件没触发就留现金；至少看20/60个交易日再评价策略，不用一天盈亏自我欺骗。"
 }
