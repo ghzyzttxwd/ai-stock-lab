@@ -36,7 +36,7 @@ jobs:
 
           p = Path('web/v2/data.json')
           data = json.loads(p.read_text(encoding='utf-8'))
-          assert data.get('summary_version') == 'v2-shadow-summary-1.1'
+          assert data.get('summary_version') == 'v2-shadow-summary-1.2'
           assert data.get('mode') == 'FORWARD_SHADOW_ONLY'
           assert set(data.get('funds', {})) == {'A', 'B', 'C', 'D', 'L'}
           print('updated_at=', data.get('updated_at'))
