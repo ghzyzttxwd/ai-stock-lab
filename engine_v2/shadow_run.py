@@ -241,6 +241,7 @@ def run_shadow_session(
 
     event = {
         'schema_version': AUDIT_SCHEMA_VERSION,
+        'event_kind': 'conditional_entries_and_decision',
         'trade_date': trade_date,
         'previous_trade_date': previous_trade_date,
         'execution_policy_version': EXECUTION_POLICY_VERSION,
