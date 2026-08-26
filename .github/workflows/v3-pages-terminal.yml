@@ -64,18 +64,28 @@ jobs:
               raise SystemExit('main V3 is not autonomous paper mode')
           if set(v3.get('funds') or {}) != {'A','B','C','D','L'}:
               raise SystemExit('main V3 fund set mismatch')
-          trade_date=str(v3.get('updated_at') or '')[:10]
-          if not trade_date:
+
+          v3_date=str(v3.get('updated_at') or '')[:10]
+          d_date=str(d.get('updated_at') or '')[:10]
+          e_date=str(e.get('updated_at') or '')[:10]
+          if not v3_date:
               raise SystemExit('main V3 updated_at missing')
-          for label,payload in (('D',d),('E',e)):
-              if str(payload.get('updated_at') or '')[:10] != trade_date:
-                  raise SystemExit(f'main V1 {label} date does not match V3 trade date {trade_date}')
+          if not d_date or not e_date:
+              raise SystemExit('main V1 D/E updated_at missing')
+          if d_date != e_date:
+              raise SystemExit(f'main V1 D/E date mismatch: {d_date} != {e_date}')
+          # V1 has intraday/current-session workflows while V3 intentionally advances only
+          # to the latest completed session. Therefore V1 may be one session ahead of V3;
+          # it must never be older than the V3 public state.
+          if d_date < v3_date:
+              raise SystemExit(f'main V1 is stale against V3: {d_date} < {v3_date}')
+
           for fund_id,fund in (v3.get('funds') or {}).items():
-              if str(fund.get('last_processed_date') or '')[:10] != trade_date:
-                  raise SystemExit(f'main V3 {fund_id} stale: {fund.get("last_processed_date")} != {trade_date}')
+              if str(fund.get('last_processed_date') or '')[:10] != v3_date:
+                  raise SystemExit(f'main V3 {fund_id} stale: {fund.get("last_processed_date")} != {v3_date}')
               if float(fund.get('cash') or 0) < -0.01:
                   raise SystemExit(f'main V3 {fund_id} negative cash')
-          print(f'PUBLIC SOURCE INVARIANTS PASS trade_date={trade_date}')
+          print(f'PUBLIC SOURCE INVARIANTS PASS v1_date={d_date} v3_date={v3_date}')
           PY
 
       - name: Configure GitHub Pages
@@ -147,12 +157,21 @@ jobs:
               raise SystemExit('public V2 model mismatch')
           if v3.get('mode') != 'AUTONOMOUS_AI_PAPER':
               raise SystemExit('public V3 mode mismatch')
-          trade_date=str(v3.get('updated_at') or '')[:10]
-          if not trade_date:
-              raise SystemExit('public V3 updated_at missing')
-          for label,payload in (('D',d),('E',e)):
-              if str(payload.get('updated_at') or '')[:10] != trade_date:
-                  raise SystemExit(f'public V1 {label} date mismatch against V3 {trade_date}')
+
+          v3_date=str(v3.get('updated_at') or '')[:10]
+          d_date=str(d.get('updated_at') or '')[:10]
+          e_date=str(e.get('updated_at') or '')[:10]
+          if not v3_date or not d_date or not e_date:
+              raise SystemExit('public updated_at missing')
+          if d_date != e_date:
+              raise SystemExit(f'public V1 D/E date mismatch: {d_date} != {e_date}')
+          if d_date < v3_date:
+              raise SystemExit(f'public V1 stale against V3: {d_date} < {v3_date}')
+          for fund_id,fund in (v3.get('funds') or {}).items():
+              if str(fund.get('last_processed_date') or '')[:10] != v3_date:
+                  raise SystemExit(f'public V3 {fund_id} stale against {v3_date}')
+              if float(fund.get('cash') or 0) < -0.01:
+                  raise SystemExit(f'public V3 {fund_id} negative cash')
 
           verified_files={
               'd/data.json':digest('/tmp/live-d-data.json'),
@@ -170,7 +189,8 @@ jobs:
               'status':'verified',
               'source_commit':source,
               'workflow_run_id':run_id,
-              'trade_date':trade_date,
+              'v1_trade_date':d_date,
+              'v3_trade_date':v3_date,
               'verified_at_utc':verified_at,
               'verified_files':verified_files,
               'public_urls':{
@@ -182,7 +202,7 @@ jobs:
           }
           v3_receipt={
               'status':'verified',
-              'trade_date':trade_date,
+              'trade_date':v3_date,
               'mode':'AUTONOMOUS_AI_PAPER',
               'source_commit':source,
               'workflow_run_id':run_id,
@@ -195,7 +215,7 @@ jobs:
               json.dumps(terminal,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           Path('/tmp/v3-public-verification.json').write_text(
               json.dumps(v3_receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-          print(f'PUBLIC V1/V2/V3 TERMINAL VERIFIED trade_date={trade_date}')
+          print(f'PUBLIC V1/V2/V3 TERMINAL VERIFIED v1_date={d_date} v3_date={v3_date}')
           PY
                 exit 0
               fi
