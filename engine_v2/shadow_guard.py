@@ -110,7 +110,40 @@ def main() -> None:
     parser.add_argument('--trade-date', required=True)
     parser.add_argument('--report', required=True)
     args = parser.parse_args()
-    report = processed_session(Path(args.state_root), args.trade_date)
+    state_root = Path(args.state_root)
+    reset_path = state_root / 'reset_epoch.json'
+    report = None
+    if reset_path.exists():
+        reset = json.loads(reset_path.read_text(encoding='utf-8'))
+        reset_date = str(reset.get('reset_date') or '')[:10]
+        if reset_date and args.trade_date < reset_date:
+            heads = {
+                json.loads((state_root / 'ledgers' / f'{fund_id}.json').read_text(encoding='utf-8')).get('audit_head')
+                for fund_id in FUND_NAMES
+            }
+            if len(heads) != 1 or None in heads:
+                raise RuntimeError('V2 reset guard: ledgers do not share the paper_reset audit head')
+            report = {
+                'status': 'before_reset_noop',
+                'trade_date': args.trade_date,
+                'reset_date': reset_date,
+                'event_hash': next(iter(heads)),
+                'audit_path': str(state_root / 'audit' / f'{reset_date}~paper-reset.json'),
+                'fills': {},
+                'rejected_orders': {},
+                'concentration_flags': {},
+                'missing_critical_execution_bars': [],
+                'safety': {
+                    'calls_sol': False,
+                    'reads_v1_ledger': False,
+                    'writes_v1_ledger': False,
+                    'state_root': 'shadow_state/v2',
+                    'paper_reset': True,
+                    'retroactive_fills_forbidden': True,
+                },
+            }
+    if report is None:
+        report = processed_session(state_root, args.trade_date)
     done = report is not None
     _github_output('done', str(done).lower())
     if report:
