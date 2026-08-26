@@ -1,6 +1,6 @@
 {
   "summary_version": "v2-shadow-summary-1.2",
-  "updated_at": "2026-08-25",
+  "updated_at": "2026-08-26",
   "initial_cash_per_fund": 1000000,
   "mode": "FORWARD_SHADOW_ONLY",
   "execution_model": "V2_CONDITIONAL_PLAN_V1",
@@ -14,12 +14,16 @@
     ]
   },
   "source_ref": {
-    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
+    "execution_bar_source": "sina-intraday",
+    "missing_critical_execution_bars": [],
+    "scheduled_time": "10:30",
+    "executed_at": "2026-08-26T10:40:46+08:00",
+    "actual_clock": "10:40",
+    "delay_minutes": 9.82,
+    "freshness_limit_minutes": 10,
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
     "plan_version": "v2-conditional-plan-v1",
-    "economics_mutated": false,
-    "historical_fills_rewritten": false,
-    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
+    "note": "Checkpoint 10:30 Asia/Shanghai was evaluated at actual time 10:40. Hard-stop, take-profit, trailing, rotation and time conditions were checked; the clock itself is not a sell signal."
   },
   "target_diagnostics": {
     "stats": {
@@ -153,10 +157,10 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 7,
-        "equity": 1004622.78,
+        "equity": 1006129.78,
         "cash": 955014.78,
-        "position_market_value": 49608.0,
-        "return_pct": 0.4623,
+        "position_market_value": 51115.0,
+        "return_pct": 0.613,
         "max_drawdown_pct": -0.7843,
         "daily_volatility_pct": 0.5396,
         "fills": 48,
@@ -166,13 +170,14 @@
         "fees_pct_of_initial": 0.111682,
         "positions": 3,
         "industry_weights": {
-          "煤炭": 0.433156,
-          "基础化工": 0.332003,
-          "建筑材料": 0.234841
+          "煤炭": 0.431811,
+          "基础化工": 0.333131,
+          "建筑材料": 0.235058
         },
-        "industry_hhi": 0.353,
-        "effective_industries": 2.8329,
-        "excess_hs300_pct": 2.9023
+        "industry_hhi": 0.352689,
+        "effective_industries": 2.8354,
+        "execution_only_date": "2026-08-26",
+        "excess_hs300_pct": 3.053
       },
       "holdings": [
         {
@@ -181,10 +186,10 @@
           "industry": "煤炭",
           "qty": 800,
           "avg_cost": 27.3022,
-          "last_price": 26.86,
-          "market_value": 21488.0,
-          "weight_pct": 2.1389,
-          "pnl_pct": -1.6196,
+          "last_price": 27.59,
+          "market_value": 22072.0,
+          "weight_pct": 2.1938,
+          "pnl_pct": 1.0541,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
           "opportunity_score": 65.59,
@@ -212,10 +217,10 @@
           "industry": "基础化工",
           "qty": 600,
           "avg_cost": 28.3315,
-          "last_price": 27.45,
-          "market_value": 16470.0,
-          "weight_pct": 1.6394,
-          "pnl_pct": -3.1114,
+          "last_price": 28.38,
+          "market_value": 17028.0,
+          "weight_pct": 1.6924,
+          "pnl_pct": 0.1712,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
           "opportunity_score": 68.58,
@@ -243,10 +248,10 @@
           "industry": "建筑材料",
           "qty": 500,
           "avg_cost": 23.24,
-          "last_price": 23.3,
-          "market_value": 11650.0,
-          "weight_pct": 1.1596,
-          "pnl_pct": 0.2582,
+          "last_price": 24.03,
+          "market_value": 12015.0,
+          "weight_pct": 1.1942,
+          "pnl_pct": 3.3993,
           "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
           "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
           "opportunity_score": 66.57,
@@ -1456,7 +1461,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+      "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
       "concentration_flags": []
     },
     "B": {
@@ -1482,6 +1487,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-26",
         "excess_hs300_pct": 3.6425
       },
       "holdings": [],
@@ -2381,7 +2387,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+      "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -2411,6 +2417,7 @@
         "industry_weights": {},
         "industry_hhi": 0,
         "effective_industries": 0.0,
+        "execution_only_date": "2026-08-26",
         "excess_hs300_pct": 4.4035
       },
       "holdings": [],
@@ -3114,7 +3121,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+      "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -3129,10 +3136,10 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 7,
-        "equity": 976434.23,
+        "equity": 977414.23,
         "cash": 956684.23,
-        "position_market_value": 19750.0,
-        "return_pct": -2.3566,
+        "position_market_value": 20730.0,
+        "return_pct": -2.2586,
         "max_drawdown_pct": -3.8382,
         "daily_volatility_pct": 1.5702,
         "fills": 40,
@@ -3146,7 +3153,8 @@
         },
         "industry_hhi": 1.0,
         "effective_industries": 1.0,
-        "excess_hs300_pct": 0.0834
+        "execution_only_date": "2026-08-26",
+        "excess_hs300_pct": 0.1814
       },
       "holdings": [
         {
@@ -3155,10 +3163,10 @@
           "industry": "有色金属",
           "qty": 500,
           "avg_cost": 39.2078,
-          "last_price": 39.5,
-          "market_value": 19750.0,
-          "weight_pct": 2.0227,
-          "pnl_pct": 0.7453,
+          "last_price": 41.46,
+          "market_value": 20730.0,
+          "weight_pct": 2.1209,
+          "pnl_pct": 5.7443,
           "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
           "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
           "opportunity_score": 75.03,
@@ -4185,7 +4193,7 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+      "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
       "concentration_flags": []
     },
     "L": {
@@ -4196,10 +4204,10 @@
       "plan_version": "v2-conditional-plan-v1",
       "metrics": {
         "trading_days": 7,
-        "equity": 1007115.23,
+        "equity": 1009086.23,
         "cash": 938153.23,
-        "position_market_value": 68962.0,
-        "return_pct": 0.7115,
+        "position_market_value": 70933.0,
+        "return_pct": 0.9086,
         "max_drawdown_pct": -1.2376,
         "daily_volatility_pct": 0.7729,
         "fills": 37,
@@ -4209,12 +4217,13 @@
         "fees_pct_of_initial": 0.126107,
         "positions": 2,
         "industry_weights": {
-          "煤炭": 0.662133,
-          "建筑材料": 0.337867
+          "煤炭": 0.66123,
+          "建筑材料": 0.33877
         },
-        "industry_hhi": 0.552574,
-        "effective_industries": 1.8097,
-        "excess_hs300_pct": 3.1515
+        "industry_hhi": 0.55199,
+        "effective_industries": 1.8116,
+        "execution_only_date": "2026-08-26",
+        "excess_hs300_pct": 3.3486
       },
       "holdings": [
         {
@@ -4223,10 +4232,10 @@
           "industry": "煤炭",
           "qty": 1700,
           "avg_cost": 27.3022,
-          "last_price": 26.86,
-          "market_value": 45662.0,
-          "weight_pct": 4.5339,
-          "pnl_pct": -1.6196,
+          "last_price": 27.59,
+          "market_value": 46903.0,
+          "weight_pct": 4.6481,
+          "pnl_pct": 1.0541,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
           "opportunity_score": 65.59,
@@ -4254,10 +4263,10 @@
           "industry": "建筑材料",
           "qty": 1000,
           "avg_cost": 23.237,
-          "last_price": 23.3,
-          "market_value": 23300.0,
-          "weight_pct": 2.3135,
-          "pnl_pct": 0.2711,
+          "last_price": 24.03,
+          "market_value": 24030.0,
+          "weight_pct": 2.3814,
+          "pnl_pct": 3.4127,
           "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
           "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
           "opportunity_score": 66.57,
@@ -5331,17 +5340,17 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+      "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
       "concentration_flags": []
     }
   },
-  "audit_head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+  "audit_head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
   "audit_verification": {
     "status": "PASS",
-    "events": 34,
-    "head": "95b4f97425acaeb05245490af53324827d2b1a88ac4772ae9ace1f17a8ec936b",
+    "events": 35,
+    "head": "dfed88a9ccc14accbdaa4b740a07ec2c5f2cd8567d10318f2e21374c3a72beb1",
     "first_date": "2026-08-14",
-    "last_date": "2026-08-25~conditional-plan-migration"
+    "last_date": "2026-08-26-execution-1030"
   },
   "safety": {
     "calls_sol": false,
@@ -5349,12 +5358,12 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_plan_migration",
+  "audit_event_kind": "conditional_exit_scan",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
     "start_date": "2026-08-14",
-    "end_date": "2026-08-25",
+    "end_date": "2026-08-26",
     "return_pct": -2.44,
     "source": "tencent-index",
     "status": "OK",
