@@ -37,17 +37,6 @@ def assert_v1_regression_smoke(
     states = {fid: _load(state_root / f'{fid}.json') for fid in FUND_IDS}
     settled_dates = {_date(st.get('last_processed_date')) for st in states.values()}
     plan_dates = {_date(st.get('conditional_plan_date')) for st in states.values()}
-    if len(settled_dates) != 1 or '' in settled_dates:
-        raise RuntimeError(f'V1 regression smoke: inconsistent last_processed_date values: {sorted(settled_dates)}')
-    if len(plan_dates) != 1 or '' in plan_dates:
-        raise RuntimeError(f'V1 regression smoke: inconsistent conditional_plan_date values: {sorted(plan_dates)}')
-
-    settled_date = next(iter(settled_dates))
-    plan_date = next(iter(plan_dates))
-    if plan_date != settled_date:
-        raise RuntimeError(
-            f'V1 regression smoke: conditional plan date {plan_date} differs from settled date {settled_date}'
-        )
 
     web = {page: _load(web_root / page / 'data.json') for page in ('d', 'e')}
     web_dates = {_date(payload.get('updated_at')) for payload in web.values()}
@@ -64,6 +53,54 @@ def assert_v1_regression_smoke(
             raise RuntimeError(
                 f'V1 regression smoke: web/{page} plan_version={payload.get("plan_version")!r}'
             )
+
+    # A reset epoch deliberately has no settled or plan date until the first
+    # post-reset close. Treat it as a distinct production state and prove that
+    # no retired experiment state leaked into the new ledgers.
+    reset_path = state_root / 'paper_reset_epoch.json'
+    if settled_dates == {''} and plan_dates == {''} and reset_path.exists():
+        reset = _load(reset_path)
+        reset_date = _date(reset.get('reset_date'))
+        initial_cash = float(reset.get('initial_cash') or 0.0)
+        if not reset_date or web_date != reset_date:
+            raise RuntimeError(
+                f'V1 regression smoke: reset date {reset_date!r} does not match public date {web_date!r}'
+            )
+        if abs(initial_cash - 1_000_000.0) > 1e-6:
+            raise RuntimeError(f'V1 regression smoke: invalid reset initial_cash {initial_cash}')
+        for fid, st in states.items():
+            if st.get('execution_model') != EXPECTED_MODEL:
+                raise RuntimeError(
+                    f'V1 regression smoke: {fid} execution_model={st.get("execution_model")!r}'
+                )
+            if abs(float(st.get('initial_cash') or 0.0) - initial_cash) > 1e-6:
+                raise RuntimeError(f'V1 regression smoke: {fid} initial cash differs from reset epoch')
+            if abs(float(st.get('cash') or 0.0) - initial_cash) > 1e-6:
+                raise RuntimeError(f'V1 regression smoke: {fid} cash is not reset-clean')
+            for field in ('positions', 'fills', 'equity_curve', 'pending_targets', 'decisions'):
+                if st.get(field):
+                    raise RuntimeError(f'V1 regression smoke: {fid} reset leaked non-empty {field}')
+        print(
+            f'[v1-regression-smoke] PASS mode=paper_reset date={reset_date} '
+            f'funds={len(FUND_IDS)}'
+        )
+        return {
+            'mode': 'paper_reset',
+            'reset_date': reset_date,
+            'web_date': web_date,
+        }
+
+    if len(settled_dates) != 1 or '' in settled_dates:
+        raise RuntimeError(f'V1 regression smoke: inconsistent last_processed_date values: {sorted(settled_dates)}')
+    if len(plan_dates) != 1 or '' in plan_dates:
+        raise RuntimeError(f'V1 regression smoke: inconsistent conditional_plan_date values: {sorted(plan_dates)}')
+
+    settled_date = next(iter(settled_dates))
+    plan_date = next(iter(plan_dates))
+    if plan_date != settled_date:
+        raise RuntimeError(
+            f'V1 regression smoke: conditional plan date {plan_date} differs from settled date {settled_date}'
+        )
 
     if web_date == settled_date:
         assert_v1_production_gate(settled_date, state_root, web_root)
