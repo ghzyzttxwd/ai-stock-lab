@@ -281,8 +281,11 @@ def build_summary(state_root: Path) -> dict:
             'not_for_production_trading': True,
         },
     }
-    if current_audit.get('event_kind'):
-        summary['audit_event_kind'] = current_audit['event_kind']
+    event_kind = current_audit.get('event_kind')
+    if not event_kind and current_audit.get('target_diagnostics') is not None:
+        event_kind = 'conditional_entries_and_decision'
+    if event_kind:
+        summary['audit_event_kind'] = event_kind
     return summary
 
 
