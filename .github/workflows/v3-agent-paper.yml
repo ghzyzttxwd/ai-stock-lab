@@ -160,8 +160,14 @@ jobs:
               path=Path('agent_state/v3/ledgers')/f'{fund_id}.json'
               if not path.exists(): raise SystemExit(f'missing V3 ledger {fund_id}')
               state=json.load(open(path,encoding='utf-8'))
-              if state.get('last_processed_date') != '${{ steps.td.outputs.date }}':
-                  raise SystemExit(f'stale V3 ledger {fund_id}: {state.get("last_processed_date")}')
+              processed=state.get('last_processed_date')
+              if processed not in (None, '${{ steps.td.outputs.date }}'):
+                  raise SystemExit(f'stale V3 ledger {fund_id}: {processed}')
+              if processed is None:
+                  if state.get('positions') or state.get('fills') or state.get('executed_decision_ids'):
+                      raise SystemExit(f'unprocessed V3 ledger {fund_id} contains active trade state')
+                  if abs(float(state.get('cash') or 0)-float(state.get('initial_cash') or 0)) > 0.01:
+                      raise SystemExit(f'unprocessed V3 ledger {fund_id} is not at reset cash')
               if float(state.get('cash') or 0) < -0.01: raise SystemExit(f'negative cash {fund_id}')
           PY
 
