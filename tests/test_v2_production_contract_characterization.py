@@ -76,6 +76,20 @@ class V2ProductionContractCharacterizationTests(unittest.TestCase):
                 self.assertTrue(fill.get("scheduled_time"), f"{fund_id} conditional sell missing scheduled_time")
                 self.assertTrue(fill.get("actual_clock"), f"{fund_id} conditional sell missing actual_clock")
                 self.assertTrue(fill.get("actual_execution_time"), f"{fund_id} conditional sell missing actual_execution_time")
+
+        if checked == 0:
+            source = payload.get("source_ref") or {}
+            if source.get("reset_version") == "paper-reset-20260826":
+                audit = payload.get("audit_verification") or {}
+                self.assertEqual(payload.get("audit_event_kind"), "paper_reset")
+                self.assertEqual(audit.get("status"), "PASS")
+                self.assertEqual(int(audit.get("events", 0)), 1)
+                for fund_id, fund in _public_funds(payload).items():
+                    metrics = fund.get("metrics") or {}
+                    self.assertEqual(int(metrics.get("fills", 0)), 0, fund_id)
+                    self.assertEqual(fund.get("recent_fills") or [], [], fund_id)
+                return
+
         self.assertGreater(checked, 0, "expected at least one characterized live conditional V2 sell fill")
 
     def test_historical_terminal_failure_cannot_masquerade_as_current_health(self):
