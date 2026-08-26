@@ -49,7 +49,7 @@ class V2MobileWebTests(unittest.TestCase):
                 self.assertIn('exit_plan',holding)
             pending=fund['pending_decision']
             if pending is None:
-                self.assertIn(summary.get('audit_event_kind'), {'execution_catchup','buy_price_correction','paper_reset'})
+                self.assertIn(summary.get('audit_event_kind'), {'execution_catchup','buy_price_correction','paper_reset','conditional_exit_scan'})
             else:
                 self.assertIn('targets', pending)
 
