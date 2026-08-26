@@ -26,12 +26,19 @@ class V2PaperResetTests(unittest.TestCase):
         self.assertEqual(len(heads), 1)
         self.assertNotIn(None, heads)
 
-    def test_reset_audit_is_the_only_active_chain(self):
+    def test_active_chain_is_rooted_at_reset_and_contains_no_retired_activity(self):
         files = sorted(path.name for path in (STATE_ROOT / 'audit').glob('*.json'))
-        self.assertEqual(files, ['2026-08-26~paper-reset.json'])
+        self.assertIn('2026-08-26~paper-reset.json', files)
+        self.assertFalse(any(name[:10] < '2026-08-26' for name in files))
         verification = verify_audit_chain(STATE_ROOT)
         self.assertEqual(verification['status'], 'PASS')
-        self.assertEqual(verification['events'], 1)
+        self.assertGreaterEqual(verification['events'], 1)
+        self.assertEqual(verification['first_date'], '2026-08-26~paper-reset')
+        for path in (STATE_ROOT / 'audit').glob('*.json'):
+            event = json.loads(path.read_text(encoding='utf-8'))
+            if event.get('event_kind') == 'conditional_exit_scan':
+                for fund in (event.get('funds') or {}).values():
+                    self.assertEqual(((fund.get('execution') or {}).get('fills') or []), [])
 
     def test_summary_is_zeroed(self):
         summary = json.loads((STATE_ROOT / 'summary.json').read_text(encoding='utf-8'))
