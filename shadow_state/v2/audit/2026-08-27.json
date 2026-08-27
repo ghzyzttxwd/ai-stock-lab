@@ -1,18 +1,9 @@
 {
-  "summary_version": "v2-shadow-summary-1.2",
-  "updated_at": "2026-08-27",
-  "initial_cash_per_fund": 1000000,
-  "mode": "FORWARD_SHADOW_ONLY",
-  "execution_model": "V2_CONDITIONAL_PLAN_V1",
-  "plan_version": "v2-conditional-plan-v1",
-  "regime": {
-    "label": "risk_on",
-    "score": 69.22,
-    "confidence": 66.45,
-    "reasons": [
-      "上涨家数占优"
-    ]
-  },
+  "schema_version": "v2-shadow-audit-1.0",
+  "event_kind": "conditional_entries_and_decision",
+  "trade_date": "2026-08-27",
+  "previous_trade_date": "2026-08-26",
+  "execution_policy_version": "v1-parity-2026-08-14",
   "source_ref": {
     "snapshot_version": "v2-shadow-data-0.4",
     "snapshot_sha256": "0efb178da71de9f379162cb4bce6b83dbd3c71abed8488a8ecce0308e6fff36f",
@@ -73,6 +64,14 @@
       },
       "missing_critical_execution_bars": []
     }
+  },
+  "regime": {
+    "label": "risk_on",
+    "score": 69.22,
+    "confidence": 66.45,
+    "reasons": [
+      "上涨家数占优"
+    ]
   },
   "target_diagnostics": {
     "stats": {
@@ -195,308 +194,230 @@
     },
     "plan_version": "v2-conditional-plan-v1"
   },
+  "previous_event_hashes": {
+    "A": "37dc3dcb2773dd36f7a164ea0d633d752bbe0ce5e8c50b93796bc5eebf44d3c9",
+    "B": "37dc3dcb2773dd36f7a164ea0d633d752bbe0ce5e8c50b93796bc5eebf44d3c9",
+    "C": "37dc3dcb2773dd36f7a164ea0d633d752bbe0ce5e8c50b93796bc5eebf44d3c9",
+    "D": "37dc3dcb2773dd36f7a164ea0d633d752bbe0ce5e8c50b93796bc5eebf44d3c9",
+    "L": "37dc3dcb2773dd36f7a164ea0d633d752bbe0ce5e8c50b93796bc5eebf44d3c9"
+  },
   "funds": {
     "A": {
-      "fund_id": "A",
-      "name": "V2 保守稳健影子基金",
-      "strategy_family": "v2-shadow",
-      "execution_model": "V2_CONDITIONAL_PLAN_V1",
-      "plan_version": "v2-conditional-plan-v1",
-      "metrics": {
-        "trading_days": 2,
+      "opening_state_sha256": "dca28db131974b8bc2b5664215c2b976e26f71cf41963e6f636fcbac936bea41",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-08-26",
+        "trade_date": "2026-08-27",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 1000000.0,
+        "fills": [
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "side": "BUY",
+            "reference_price": 11.604,
+            "execution_price_field": "conditional_trigger",
+            "price": 11.61,
+            "qty": 4600,
+            "gross": 53406.0,
+            "fees": 16.02,
+            "net_cash_change": -53422.02,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "pullback",
+            "trigger_reason": "intraday_pullback_triggered",
+            "trigger_price": 11.604,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2delay.eastmoney.com', port=443): Read timed out. (read"
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "side": "BUY",
+            "reference_price": 5.878,
+            "execution_price_field": "conditional_trigger",
+            "price": 5.881,
+            "qty": 8100,
+            "gross": 47636.1,
+            "fees": 14.29,
+            "net_cash_change": -47650.39,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "pullback",
+            "trigger_reason": "intraday_pullback_triggered",
+            "trigger_price": 5.878,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Read timed out. (read time"
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.603444",
+            "name": "吉比特",
+            "side": "BUY",
+            "reference_price": 384.022,
+            "execution_price_field": "conditional_trigger",
+            "price": 384.214,
+            "qty": 100,
+            "gross": 38421.4,
+            "fees": 11.53,
+            "net_cash_change": -38432.93,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "pullback",
+            "trigger_reason": "intraday_pullback_triggered",
+            "trigger_price": 384.022,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          }
+        ],
+        "rejected_orders": [
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002033",
+            "name": "丽江股份",
+            "side": "BUY",
+            "target_weight": 0.067039,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "side": "BUY",
+            "target_weight": 0.05401,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "side": "BUY",
+            "target_weight": 0.044039,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.000567",
+            "name": "海德股份",
+            "side": "BUY",
+            "target_weight": 0.054139,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002215",
+            "name": "诺 普 信",
+            "side": "BUY",
+            "target_weight": 0.041122,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600030",
+            "name": "中信证券",
+            "side": "BUY",
+            "target_weight": 0.067039,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.601995",
+            "name": "中金公司",
+            "side": "BUY",
+            "target_weight": 0.067039,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 41.84
+      },
+      "close": {
         "equity": 1000896.66,
         "cash": 860494.66,
-        "position_market_value": 140402.0,
-        "return_pct": 0.0897,
-        "max_drawdown_pct": 0.0,
-        "daily_volatility_pct": 0.0,
-        "fills": 3,
-        "rejected_orders": 7,
-        "turnover_on_initial_capital": 0.139463,
-        "fees": 41.84,
-        "fees_pct_of_initial": 0.004184,
-        "positions": 3,
-        "industry_weights": {
-          "银行": 0.723394,
-          "传媒": 0.276606
-        },
-        "industry_hhi": 0.59981,
-        "effective_industries": 1.6672,
-        "excess_hs300_pct": -0.7703
+        "market_value": 140402.0,
+        "holdings": [
+          {
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "qty": 4600,
+            "avg_cost": 11.6135,
+            "close": 11.62,
+            "market_value": 53452.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.603444",
+            "name": "吉比特",
+            "qty": 100,
+            "avg_cost": 384.3293,
+            "close": 388.36,
+            "market_value": 38836.0,
+            "industry": "传媒",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "qty": 8100,
+            "avg_cost": 5.8828,
+            "close": 5.94,
+            "market_value": 48114.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          }
+        ],
+        "valuation_fallback_symbols": []
       },
-      "holdings": [
-        {
-          "symbol": "sh.601009",
-          "name": "南京银行",
-          "industry": "银行",
-          "qty": 4600,
-          "avg_cost": 11.6135,
-          "last_price": 11.62,
-          "market_value": 53452.0,
-          "weight_pct": 5.3404,
-          "pnl_pct": 0.056,
-          "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-          "opportunity_score": 68.97,
-          "setup": "pullback",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 11.6135,
-            "hard_stop_price": 11.323,
-            "take_profit_price": 12.093,
-            "trailing_activation_price": 11.904,
-            "trailing_drawdown_pct": 0.018,
-            "highest_price": 11.6135,
-            "partial_taken": false,
-            "max_hold_days": 4,
-            "sessions_held": 0,
-            "rotation_exit": false,
-            "rotation_min_price": null,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sz.002948",
-          "name": "青岛银行",
-          "industry": "银行",
-          "qty": 8100,
-          "avg_cost": 5.8828,
-          "last_price": 5.94,
-          "market_value": 48114.0,
-          "weight_pct": 4.8071,
-          "pnl_pct": 0.9723,
-          "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-          "opportunity_score": 66.73,
-          "setup": "pullback",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 5.8828,
-            "hard_stop_price": 5.723,
-            "take_profit_price": 6.146,
-            "trailing_activation_price": 6.042,
-            "trailing_drawdown_pct": 0.018,
-            "highest_price": 5.8828,
-            "partial_taken": false,
-            "max_hold_days": 4,
-            "sessions_held": 0,
-            "rotation_exit": false,
-            "rotation_min_price": null,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sh.603444",
-          "name": "吉比特",
-          "industry": "传媒",
-          "qty": 100,
-          "avg_cost": 384.3293,
-          "last_price": 388.36,
-          "market_value": 38836.0,
-          "weight_pct": 3.8801,
-          "pnl_pct": 1.0488,
-          "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
-          "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
-          "opportunity_score": 62.51,
-          "setup": "pullback",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 384.3293,
-            "hard_stop_price": 370.893,
-            "take_profit_price": 406.499,
-            "trailing_activation_price": 397.765,
-            "trailing_drawdown_pct": 0.0228,
-            "highest_price": 384.3293,
-            "partial_taken": false,
-            "max_hold_days": 4,
-            "sessions_held": 0,
-            "rotation_exit": false,
-            "rotation_min_price": null,
-            "setup": "pullback"
-          }
-        }
-      ],
-      "recent_fills": [
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.601009",
-          "name": "南京银行",
-          "side": "BUY",
-          "reference_price": 11.604,
-          "execution_price_field": "conditional_trigger",
-          "price": 11.61,
-          "qty": 4600,
-          "gross": 53406.0,
-          "fees": 16.02,
-          "net_cash_change": -53422.02,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "intraday_pullback_triggered",
-          "trigger_price": 11.604,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2delay.eastmoney.com', port=443): Read timed out. (read"
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002948",
-          "name": "青岛银行",
-          "side": "BUY",
-          "reference_price": 5.878,
-          "execution_price_field": "conditional_trigger",
-          "price": 5.881,
-          "qty": 8100,
-          "gross": 47636.1,
-          "fees": 14.29,
-          "net_cash_change": -47650.39,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "intraday_pullback_triggered",
-          "trigger_price": 5.878,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Read timed out. (read time"
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.603444",
-          "name": "吉比特",
-          "side": "BUY",
-          "reference_price": 384.022,
-          "execution_price_field": "conditional_trigger",
-          "price": 384.214,
-          "qty": 100,
-          "gross": 38421.4,
-          "fees": 11.53,
-          "net_cash_change": -38432.93,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "intraday_pullback_triggered",
-          "trigger_price": 384.022,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        }
-      ],
-      "recent_rejected_orders": [
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002033",
-          "name": "丽江股份",
-          "side": "BUY",
-          "target_weight": 0.067039,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600919",
-          "name": "江苏银行",
-          "side": "BUY",
-          "target_weight": 0.05401,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002142",
-          "name": "宁波银行",
-          "side": "BUY",
-          "target_weight": 0.044039,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.000567",
-          "name": "海德股份",
-          "side": "BUY",
-          "target_weight": 0.054139,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002215",
-          "name": "诺 普 信",
-          "side": "BUY",
-          "target_weight": 0.041122,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600030",
-          "name": "中信证券",
-          "side": "BUY",
-          "target_weight": 0.067039,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "A",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.601995",
-          "name": "中金公司",
-          "side": "BUY",
-          "target_weight": 0.067039,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        }
-      ],
-      "equity_curve": [
-        {
-          "date": "2026-08-26",
-          "equity": 1000000.0,
-          "cash": 1000000.0,
-          "market_value": 0.0,
-          "fees": 0.0
-        },
-        {
-          "date": "2026-08-27",
-          "equity": 1000896.66,
-          "cash": 860494.66,
-          "market_value": 140402.0,
-          "fees": 41.84
-        }
-      ],
-      "pending_decision": {
+      "drawdown": 0.0,
+      "next_decision": {
         "decision_date": "2026-08-27",
         "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-a-deterministic-0.1",
@@ -963,177 +884,132 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-      "concentration_flags": []
+      "closing_ledger_content_sha256": "362ddbcf3d44e6ca6a22fbfe92d024e3635826872e28a7c3e1b40431f929f132"
     },
     "B": {
-      "fund_id": "B",
-      "name": "V2 趋势追强影子基金",
-      "strategy_family": "v2-shadow",
-      "execution_model": "V2_CONDITIONAL_PLAN_V1",
-      "plan_version": "v2-conditional-plan-v1",
-      "metrics": {
-        "trading_days": 2,
+      "opening_state_sha256": "f4a46ee7aab4fcbb10f7cea1dc282ebde7b6002d705d66c782fabcd0f6b6eeba",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-08-26",
+        "trade_date": "2026-08-27",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 1000000.0,
+        "fills": [
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "side": "BUY",
+            "reference_price": 11.832,
+            "execution_price_field": "conditional_trigger",
+            "price": 11.838,
+            "qty": 7700,
+            "gross": 91152.6,
+            "fees": 27.35,
+            "net_cash_change": -91179.95,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "breakout",
+            "trigger_reason": "intraday_breakout_triggered",
+            "trigger_price": 11.832,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          }
+        ],
+        "rejected_orders": [
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600354",
+            "name": "敦煌种业",
+            "side": "BUY",
+            "target_weight": 0.112012,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.603259",
+            "name": "药明康德",
+            "side": "BUY",
+            "target_weight": 0.121634,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.000426",
+            "name": "兴业银锡",
+            "side": "BUY",
+            "target_weight": 0.091523,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.000703",
+            "name": "恒逸石化",
+            "side": "BUY",
+            "target_weight": 0.116354,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.000737",
+            "name": "北方铜业",
+            "side": "BUY",
+            "target_weight": 0.117064,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 27.35
+      },
+      "close": {
         "equity": 998140.05,
         "cash": 908820.05,
-        "position_market_value": 89320.0,
-        "return_pct": -0.186,
-        "max_drawdown_pct": -0.186,
-        "daily_volatility_pct": 0.0,
-        "fills": 1,
-        "rejected_orders": 5,
-        "turnover_on_initial_capital": 0.091153,
-        "fees": 27.35,
-        "fees_pct_of_initial": 0.002735,
-        "positions": 1,
-        "industry_weights": {
-          "有色金属": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": -1.046
+        "market_value": 89320.0,
+        "holdings": [
+          {
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "qty": 7700,
+            "avg_cost": 11.8416,
+            "close": 11.6,
+            "market_value": 89320.0,
+            "industry": "有色金属",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          }
+        ],
+        "valuation_fallback_symbols": []
       },
-      "holdings": [
-        {
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "industry": "有色金属",
-          "qty": 7700,
-          "avg_cost": 11.8416,
-          "last_price": 11.6,
-          "market_value": 89320.0,
-          "weight_pct": 8.9486,
-          "pnl_pct": -2.0403,
-          "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
-          "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
-          "opportunity_score": 64.34,
-          "setup": "breakout",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 11.8416,
-            "hard_stop_price": 11.131,
-            "take_profit_price": 13.156,
-            "trailing_activation_price": 12.552,
-            "trailing_drawdown_pct": 0.038,
-            "highest_price": 11.8416,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 11.739,
-            "setup": "breakout"
-          }
-        }
-      ],
-      "recent_fills": [
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "side": "BUY",
-          "reference_price": 11.832,
-          "execution_price_field": "conditional_trigger",
-          "price": 11.838,
-          "qty": 7700,
-          "gross": 91152.6,
-          "fees": 27.35,
-          "net_cash_change": -91179.95,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "breakout",
-          "trigger_reason": "intraday_breakout_triggered",
-          "trigger_price": 11.832,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        }
-      ],
-      "recent_rejected_orders": [
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600354",
-          "name": "敦煌种业",
-          "side": "BUY",
-          "target_weight": 0.112012,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.603259",
-          "name": "药明康德",
-          "side": "BUY",
-          "target_weight": 0.121634,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.000426",
-          "name": "兴业银锡",
-          "side": "BUY",
-          "target_weight": 0.091523,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.000703",
-          "name": "恒逸石化",
-          "side": "BUY",
-          "target_weight": 0.116354,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "B",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.000737",
-          "name": "北方铜业",
-          "side": "BUY",
-          "target_weight": 0.117064,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        }
-      ],
-      "equity_curve": [
-        {
-          "date": "2026-08-26",
-          "equity": 1000000.0,
-          "cash": 1000000.0,
-          "market_value": 0.0,
-          "fees": 0.0
-        },
-        {
-          "date": "2026-08-27",
-          "equity": 998140.05,
-          "cash": 908820.05,
-          "market_value": 89320.0,
-          "fees": 27.35
-        }
-      ],
-      "pending_decision": {
+      "drawdown": -0.00186,
+      "next_decision": {
         "decision_date": "2026-08-27",
         "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-b-deterministic-0.1",
@@ -1450,111 +1326,66 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-      "concentration_flags": []
+      "closing_ledger_content_sha256": "ace379fef073bb46e69133b732ecff9bcf3242c502cc7d19e12de2aecb78718e"
     },
     "C": {
-      "fund_id": "C",
-      "name": "V2 短线快攻影子基金",
-      "strategy_family": "v2-shadow",
-      "execution_model": "V2_CONDITIONAL_PLAN_V1",
-      "plan_version": "v2-conditional-plan-v1",
-      "metrics": {
-        "trading_days": 2,
+      "opening_state_sha256": "e97ffa4371255f568a35bd0ddab16813743b3a4f6307ca577a8071b2f7af566a",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-08-26",
+        "trade_date": "2026-08-27",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 1000000.0,
+        "fills": [
+          {
+            "fund_id": "C",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "side": "BUY",
+            "reference_price": 11.832,
+            "execution_price_field": "conditional_trigger",
+            "price": 11.838,
+            "qty": 10300,
+            "gross": 121931.4,
+            "fees": 36.58,
+            "net_cash_change": -121967.98,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "breakout",
+            "trigger_reason": "intraday_breakout_triggered",
+            "trigger_price": 11.832,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          }
+        ],
+        "rejected_orders": [],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 36.58
+      },
+      "close": {
         "equity": 997512.02,
         "cash": 878032.02,
-        "position_market_value": 119480.0,
-        "return_pct": -0.2488,
-        "max_drawdown_pct": -0.2488,
-        "daily_volatility_pct": 0.0,
-        "fills": 1,
-        "rejected_orders": 0,
-        "turnover_on_initial_capital": 0.121931,
-        "fees": 36.58,
-        "fees_pct_of_initial": 0.003658,
-        "positions": 1,
-        "industry_weights": {
-          "有色金属": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": -1.1088
-      },
-      "holdings": [
-        {
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "industry": "有色金属",
-          "qty": 10300,
-          "avg_cost": 11.8416,
-          "last_price": 11.6,
-          "market_value": 119480.0,
-          "weight_pct": 11.9778,
-          "pnl_pct": -2.0403,
-          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
-          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
-          "opportunity_score": 64.34,
-          "setup": "breakout",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 11.8416,
-            "hard_stop_price": 11.131,
-            "take_profit_price": 13.156,
-            "trailing_activation_price": 12.552,
-            "trailing_drawdown_pct": 0.038,
-            "highest_price": 11.8416,
-            "partial_taken": false,
-            "max_hold_days": 2,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 11.739,
-            "setup": "breakout"
+        "market_value": 119480.0,
+        "holdings": [
+          {
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "qty": 10300,
+            "avg_cost": 11.8416,
+            "close": 11.6,
+            "market_value": 119480.0,
+            "industry": "有色金属",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
           }
-        }
-      ],
-      "recent_fills": [
-        {
-          "fund_id": "C",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002716",
-          "name": "湖南白银",
-          "side": "BUY",
-          "reference_price": 11.832,
-          "execution_price_field": "conditional_trigger",
-          "price": 11.838,
-          "qty": 10300,
-          "gross": 121931.4,
-          "fees": 36.58,
-          "net_cash_change": -121967.98,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "breakout",
-          "trigger_reason": "intraday_breakout_triggered",
-          "trigger_price": 11.832,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        }
-      ],
-      "recent_rejected_orders": [],
-      "equity_curve": [
-        {
-          "date": "2026-08-26",
-          "equity": 1000000.0,
-          "cash": 1000000.0,
-          "market_value": 0.0,
-          "fees": 0.0
-        },
-        {
-          "date": "2026-08-27",
-          "equity": 997512.02,
-          "cash": 878032.02,
-          "market_value": 119480.0,
-          "fees": 36.58
-        }
-      ],
-      "pending_decision": {
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.002488,
+      "next_decision": {
         "decision_date": "2026-08-27",
         "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-c-deterministic-0.1",
@@ -1759,247 +1590,191 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-      "concentration_flags": [
-        "effective_industries_below_2",
-        "single_industry_at_least_60pct_of_invested",
-        "top2_industries_at_least_85pct_of_invested"
-      ]
+      "closing_ledger_content_sha256": "f6a200885c411f7723eea15a97a9d2409700d013a2a207f5052bba8d12bf84ef"
     },
     "D": {
-      "fund_id": "D",
-      "name": "V2 综合判断影子基金（规则兜底）",
-      "strategy_family": "v2-shadow",
-      "execution_model": "V2_CONDITIONAL_PLAN_V1",
-      "plan_version": "v2-conditional-plan-v1",
-      "metrics": {
-        "trading_days": 2,
+      "opening_state_sha256": "c41d5d39134568bdc299fb2826729176b163f0a4e04cffed98044f14456b02f5",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-08-26",
+        "trade_date": "2026-08-27",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 1000000.0,
+        "fills": [
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002215",
+            "name": "诺 普 信",
+            "side": "BUY",
+            "reference_price": 10.21,
+            "execution_price_field": "conditional_trigger",
+            "price": 10.215,
+            "qty": 8000,
+            "gross": 81720.0,
+            "fees": 24.52,
+            "net_cash_change": -81744.52,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "breakout",
+            "trigger_reason": "intraday_breakout_triggered",
+            "trigger_price": 10.21,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600251",
+            "name": "冠农股份",
+            "side": "BUY",
+            "reference_price": 10.691,
+            "execution_price_field": "conditional_trigger",
+            "price": 10.696,
+            "qty": 6900,
+            "gross": 73802.4,
+            "fees": 22.14,
+            "net_cash_change": -73824.54,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "breakout",
+            "trigger_reason": "intraday_breakout_triggered",
+            "trigger_price": 10.691,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Read timed out. (read time"
+          }
+        ],
+        "rejected_orders": [
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.603259",
+            "name": "药明康德",
+            "side": "BUY",
+            "target_weight": 0.04872,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600354",
+            "name": "敦煌种业",
+            "side": "BUY",
+            "target_weight": 0.044525,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "side": "BUY",
+            "target_weight": 0.125314,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.000506",
+            "name": "招金黄金",
+            "side": "BUY",
+            "target_weight": 0.033833,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002041",
+            "name": "登海种业",
+            "side": "BUY",
+            "target_weight": 0.037797,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002033",
+            "name": "丽江股份",
+            "side": "BUY",
+            "target_weight": 0.15,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [
+          {
+            "symbol": "sz.002142",
+            "requested_weight": 0.125314,
+            "applied_weight": 0.1,
+            "reason": "d_new_position_cap"
+          },
+          {
+            "symbol": "sz.002033",
+            "requested_weight": 0.15,
+            "applied_weight": 0.1,
+            "reason": "d_new_position_cap"
+          }
+        ],
+        "valuation_fallback_symbols": [],
+        "fees": 46.66
+      },
+      "close": {
         "equity": 1002180.94,
         "cash": 844430.94,
-        "position_market_value": 157750.0,
-        "return_pct": 0.2181,
-        "max_drawdown_pct": 0.0,
-        "daily_volatility_pct": 0.0,
-        "fills": 2,
-        "rejected_orders": 6,
-        "turnover_on_initial_capital": 0.155522,
-        "fees": 46.66,
-        "fees_pct_of_initial": 0.004666,
-        "positions": 2,
-        "industry_weights": {
-          "农林牧渔": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": -0.6419
+        "market_value": 157750.0,
+        "holdings": [
+          {
+            "symbol": "sh.600251",
+            "name": "冠农股份",
+            "qty": 6900,
+            "avg_cost": 10.6992,
+            "close": 10.7,
+            "market_value": 73830.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sz.002215",
+            "name": "诺 普 信",
+            "qty": 8000,
+            "avg_cost": 10.2181,
+            "close": 10.49,
+            "market_value": 83920.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          }
+        ],
+        "valuation_fallback_symbols": []
       },
-      "holdings": [
-        {
-          "symbol": "sz.002215",
-          "name": "诺 普 信",
-          "industry": "农林牧渔",
-          "qty": 8000,
-          "avg_cost": 10.2181,
-          "last_price": 10.49,
-          "market_value": 83920.0,
-          "weight_pct": 8.3737,
-          "pnl_pct": 2.661,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-          "opportunity_score": 79.93,
-          "setup": "breakout",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 10.2181,
-            "hard_stop_price": 9.844,
-            "take_profit_price": 10.91,
-            "trailing_activation_price": 10.592,
-            "trailing_drawdown_pct": 0.02387,
-            "highest_price": 10.2181,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 0,
-            "rotation_exit": false,
-            "rotation_min_price": null,
-            "setup": "breakout"
-          }
-        },
-        {
-          "symbol": "sh.600251",
-          "name": "冠农股份",
-          "industry": "农林牧渔",
-          "qty": 6900,
-          "avg_cost": 10.6992,
-          "last_price": 10.7,
-          "market_value": 73830.0,
-          "weight_pct": 7.3669,
-          "pnl_pct": 0.0075,
-          "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
-          "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
-          "opportunity_score": 76.85,
-          "setup": "breakout",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 10.6992,
-            "hard_stop_price": 10.266,
-            "take_profit_price": 11.501,
-            "trailing_activation_price": 11.133,
-            "trailing_drawdown_pct": 0.02641,
-            "highest_price": 10.6992,
-            "partial_taken": false,
-            "max_hold_days": 3,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 10.732,
-            "setup": "breakout"
-          }
-        }
-      ],
-      "recent_fills": [
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002215",
-          "name": "诺 普 信",
-          "side": "BUY",
-          "reference_price": 10.21,
-          "execution_price_field": "conditional_trigger",
-          "price": 10.215,
-          "qty": 8000,
-          "gross": 81720.0,
-          "fees": 24.52,
-          "net_cash_change": -81744.52,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "breakout",
-          "trigger_reason": "intraday_breakout_triggered",
-          "trigger_price": 10.21,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600251",
-          "name": "冠农股份",
-          "side": "BUY",
-          "reference_price": 10.691,
-          "execution_price_field": "conditional_trigger",
-          "price": 10.696,
-          "qty": 6900,
-          "gross": 73802.4,
-          "fees": 22.14,
-          "net_cash_change": -73824.54,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "breakout",
-          "trigger_reason": "intraday_breakout_triggered",
-          "trigger_price": 10.691,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=ReadTimeout: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Read timed out. (read time"
-        }
-      ],
-      "recent_rejected_orders": [
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.603259",
-          "name": "药明康德",
-          "side": "BUY",
-          "target_weight": 0.04872,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600354",
-          "name": "敦煌种业",
-          "side": "BUY",
-          "target_weight": 0.044525,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002142",
-          "name": "宁波银行",
-          "side": "BUY",
-          "target_weight": 0.125314,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.000506",
-          "name": "招金黄金",
-          "side": "BUY",
-          "target_weight": 0.033833,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002041",
-          "name": "登海种业",
-          "side": "BUY",
-          "target_weight": 0.037797,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "D",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002033",
-          "name": "丽江股份",
-          "side": "BUY",
-          "target_weight": 0.15,
-          "reason": "breakout_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        }
-      ],
-      "equity_curve": [
-        {
-          "date": "2026-08-26",
-          "equity": 1000000.0,
-          "cash": 1000000.0,
-          "market_value": 0.0,
-          "fees": 0.0
-        },
-        {
-          "date": "2026-08-27",
-          "equity": 1002180.94,
-          "cash": 844430.94,
-          "market_value": 157750.0,
-          "fees": 46.66
-        }
-      ],
-      "pending_decision": {
+      "drawdown": 0.0,
+      "next_decision": {
         "decision_date": "2026-08-27",
         "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-d-deterministic-0.1",
@@ -2392,243 +2167,178 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-      "concentration_flags": []
+      "closing_ledger_content_sha256": "22c770e504f85d0f0f936ec6b436115d896b84aed01b3cc44abebe7ca896c877"
     },
     "L": {
-      "fund_id": "L",
-      "name": "V2 长线价值影子基金",
-      "strategy_family": "v2-shadow",
-      "execution_model": "V2_CONDITIONAL_PLAN_V1",
-      "plan_version": "v2-conditional-plan-v1",
-      "metrics": {
-        "trading_days": 2,
+      "opening_state_sha256": "93f489bb99a94a1b1927295a385fb8e66a70d751d9c1ce18176d6a9002ecde69",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-08-26",
+        "trade_date": "2026-08-27",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 1000000.0,
+        "fills": [
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "side": "BUY",
+            "reference_price": 11.604,
+            "execution_price_field": "conditional_trigger",
+            "price": 11.61,
+            "qty": 5500,
+            "gross": 63855.0,
+            "fees": 19.16,
+            "net_cash_change": -63874.16,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "pullback",
+            "trigger_reason": "intraday_pullback_triggered",
+            "trigger_price": 11.604,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "side": "BUY",
+            "reference_price": 5.878,
+            "execution_price_field": "conditional_trigger",
+            "price": 5.881,
+            "qty": 9700,
+            "gross": 57045.7,
+            "fees": 17.11,
+            "net_cash_change": -57062.81,
+            "slippage_bps": 5.0,
+            "plan_version": "v2-conditional-plan-v1",
+            "setup": "pullback",
+            "trigger_reason": "intraday_pullback_triggered",
+            "trigger_price": 5.878,
+            "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
+            "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+          }
+        ],
+        "rejected_orders": [
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "side": "BUY",
+            "target_weight": 0.064812,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "side": "BUY",
+            "target_weight": 0.052847,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002033",
+            "name": "丽江股份",
+            "side": "BUY",
+            "target_weight": 0.11514,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600546",
+            "name": "山煤国际",
+            "side": "BUY",
+            "target_weight": 0.098006,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sh.600801",
+            "name": "华新建材",
+            "side": "BUY",
+            "target_weight": 0.097401,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-08-26",
+            "trade_date": "2026-08-27",
+            "symbol": "sz.002215",
+            "name": "诺 普 信",
+            "side": "BUY",
+            "target_weight": 0.099453,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 36.27
+      },
+      "close": {
         "equity": 1000591.03,
         "cash": 879063.03,
-        "position_market_value": 121528.0,
-        "return_pct": 0.0591,
-        "max_drawdown_pct": 0.0,
-        "daily_volatility_pct": 0.0,
-        "fills": 2,
-        "rejected_orders": 6,
-        "turnover_on_initial_capital": 0.120901,
-        "fees": 36.27,
-        "fees_pct_of_initial": 0.003627,
-        "positions": 2,
-        "industry_weights": {
-          "银行": 1.0
-        },
-        "industry_hhi": 1.0,
-        "effective_industries": 1.0,
-        "excess_hs300_pct": -0.8009
+        "market_value": 121528.0,
+        "holdings": [
+          {
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "qty": 5500,
+            "avg_cost": 11.6135,
+            "close": 11.62,
+            "market_value": 63910.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "qty": 9700,
+            "avg_cost": 5.8828,
+            "close": 5.94,
+            "market_value": 57618.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          }
+        ],
+        "valuation_fallback_symbols": []
       },
-      "holdings": [
-        {
-          "symbol": "sh.601009",
-          "name": "南京银行",
-          "industry": "银行",
-          "qty": 5500,
-          "avg_cost": 11.6135,
-          "last_price": 11.62,
-          "market_value": 63910.0,
-          "weight_pct": 6.3872,
-          "pnl_pct": 0.056,
-          "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-          "opportunity_score": 68.97,
-          "setup": "pullback",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 11.6135,
-            "hard_stop_price": 11.323,
-            "take_profit_price": 12.093,
-            "trailing_activation_price": 11.904,
-            "trailing_drawdown_pct": 0.018,
-            "highest_price": 11.6135,
-            "partial_taken": false,
-            "max_hold_days": 5,
-            "sessions_held": 0,
-            "rotation_exit": true,
-            "rotation_min_price": 11.655,
-            "setup": "pullback"
-          }
-        },
-        {
-          "symbol": "sz.002948",
-          "name": "青岛银行",
-          "industry": "银行",
-          "qty": 9700,
-          "avg_cost": 5.8828,
-          "last_price": 5.94,
-          "market_value": 57618.0,
-          "weight_pct": 5.7584,
-          "pnl_pct": 0.9723,
-          "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
-          "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
-          "opportunity_score": 66.73,
-          "setup": "pullback",
-          "exit_plan": {
-            "plan_version": "v2-conditional-plan-v1",
-            "opened_date": "2026-08-27",
-            "entry_price": 5.8828,
-            "hard_stop_price": 5.723,
-            "take_profit_price": 6.146,
-            "trailing_activation_price": 6.042,
-            "trailing_drawdown_pct": 0.018,
-            "highest_price": 5.8828,
-            "partial_taken": false,
-            "max_hold_days": 5,
-            "sessions_held": 0,
-            "rotation_exit": false,
-            "rotation_min_price": null,
-            "setup": "pullback"
-          }
-        }
-      ],
-      "recent_fills": [
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.601009",
-          "name": "南京银行",
-          "side": "BUY",
-          "reference_price": 11.604,
-          "execution_price_field": "conditional_trigger",
-          "price": 11.61,
-          "qty": 5500,
-          "gross": 63855.0,
-          "fees": 19.16,
-          "net_cash_change": -63874.16,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "intraday_pullback_triggered",
-          "trigger_price": 11.604,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002948",
-          "name": "青岛银行",
-          "side": "BUY",
-          "reference_price": 5.878,
-          "execution_price_field": "conditional_trigger",
-          "price": 5.881,
-          "qty": 9700,
-          "gross": 57045.7,
-          "fees": 17.11,
-          "net_cash_change": -57062.81,
-          "slippage_bps": 5.0,
-          "plan_version": "v2-conditional-plan-v1",
-          "setup": "pullback",
-          "trigger_reason": "intraday_pullback_triggered",
-          "trigger_price": 5.878,
-          "note": "V2 上一交易日条件计划 · 15:10结算当天已触发买入",
-          "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
-        }
-      ],
-      "recent_rejected_orders": [
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600919",
-          "name": "江苏银行",
-          "side": "BUY",
-          "target_weight": 0.064812,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002142",
-          "name": "宁波银行",
-          "side": "BUY",
-          "target_weight": 0.052847,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002033",
-          "name": "丽江股份",
-          "side": "BUY",
-          "target_weight": 0.11514,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600546",
-          "name": "山煤国际",
-          "side": "BUY",
-          "target_weight": 0.098006,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sh.600801",
-          "name": "华新建材",
-          "side": "BUY",
-          "target_weight": 0.097401,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        },
-        {
-          "fund_id": "L",
-          "decision_date": "2026-08-26",
-          "trade_date": "2026-08-27",
-          "symbol": "sz.002215",
-          "name": "诺 普 信",
-          "side": "BUY",
-          "target_weight": 0.099453,
-          "reason": "pullback_not_triggered",
-          "details": {
-            "phase": "conditional_buy"
-          }
-        }
-      ],
-      "equity_curve": [
-        {
-          "date": "2026-08-26",
-          "equity": 1000000.0,
-          "cash": 1000000.0,
-          "market_value": 0.0,
-          "fees": 0.0
-        },
-        {
-          "date": "2026-08-27",
-          "equity": 1000591.03,
-          "cash": 879063.03,
-          "market_value": 121528.0,
-          "fees": 36.27
-        }
-      ],
-      "pending_decision": {
+      "drawdown": 0.0,
+      "next_decision": {
         "decision_date": "2026-08-27",
         "execute_on": "next_session_conditional_entry_and_exit_checks",
         "strategy_version": "v2-l-deterministic-0.1",
@@ -3020,45 +2730,17 @@
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-      "concentration_flags": []
+      "closing_ledger_content_sha256": "982b01a8d387d14f4d3d8a32954621166636c937f7442da24de4696055dff12a"
     }
-  },
-  "audit_head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-  "audit_verification": {
-    "status": "PASS",
-    "events": 4,
-    "head": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef",
-    "first_date": "2026-08-26~paper-reset",
-    "last_date": "2026-08-27"
   },
   "safety": {
     "calls_sol": false,
     "reads_v1_ledger": false,
     "writes_v1_ledger": false,
-    "not_for_production_trading": true
+    "forced_clock_buy": false,
+    "forced_clock_sell": false,
+    "allows_cash": true,
+    "state_root": "shadow_state/v2"
   },
-  "audit_event_kind": "conditional_entries_and_decision",
-  "benchmark": {
-    "name": "沪深300",
-    "symbol": "sh000300",
-    "start_date": "2026-08-26",
-    "end_date": "2026-08-27",
-    "return_pct": 0.86,
-    "source": "tencent-index",
-    "status": "OK",
-    "return_5d_pct": null,
-    "return_20d_pct": null,
-    "return_60d_pct": null,
-    "curve": [
-      {
-        "date": "2026-08-26",
-        "equity": 1000000.0
-      },
-      {
-        "date": "2026-08-27",
-        "equity": 1008602.01
-      }
-    ]
-  }
+  "event_hash": "d80df1374bee32b93b393c605ac91ab054337a446537e2884aa7a37cd2c237ef"
 }
