@@ -52,7 +52,7 @@ class V2PaperResetTests(unittest.TestCase):
         self.assertEqual(summary['plan_version'], 'v2-conditional-plan-v1')
         self.assertIn(summary.get('audit_event_kind'), {
             'paper_reset', 'conditional_exit_scan', 'conditional_entries_and_decision',
-            'execution_catchup', 'buy_price_correction',
+            'execution_catchup', 'buy_price_correction', 'conditional_plan_migration',
         })
         for fund in summary['funds'].values():
             self.assertEqual(fund['execution_model'], 'V2_CONDITIONAL_PLAN_V1')
