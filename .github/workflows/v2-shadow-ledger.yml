@@ -6,6 +6,10 @@ on:
     paths:
       - 'engine_v2/shadow_ledger.py'
       - 'engine_v2/shadow_run.py'
+      - 'engine_v2/shadow_run_split.py'
+      - 'engine_v2/split_execution.py'
+      - 'engine_v2/conditional_plan.py'
+      - 'engine_v2/trade_price_time.py'
       - 'engine_v2/history_cache.py'
       - 'engine_v2/targets.py'
       - 'engine_v2/strategies.py'
@@ -104,12 +108,12 @@ jobs:
           python -m engine_v2.enrichment_resilient --snapshot /tmp/v2-normalized-snapshot.json --output /tmp/v2-enriched-candidates.json
           echo "enrichment_s=$(($(date +%s)-start))" >> /tmp/v2-timings.env
 
-      - name: Advance five isolated 1m shadow ledgers
+      - name: Advance five isolated 1m shadow ledgers with conditional executor
         if: steps.guard.outputs.done != 'true'
         shell: bash
         run: |
           start=$(date +%s)
-          python -m engine_v2.shadow_run \
+          python -m engine_v2.shadow_run_split \
             --snapshot /tmp/v2-normalized-snapshot.json \
             --enriched /tmp/v2-enriched-candidates.json \
             --state-root shadow_state/v2 \
@@ -157,10 +161,18 @@ jobs:
                       raise SystemExit(f'{fund_id} initial cash changed')
                   if state['last_processed_date'] != report['trade_date']:
                       raise SystemExit(f'{fund_id} date mismatch')
+                  if state.get('last_execution_date') != report['trade_date']:
+                      raise SystemExit(f'{fund_id} execution date mismatch')
                   if state['audit_head'] != report['event_hash']:
                       raise SystemExit(f'{fund_id} audit head mismatch')
-                  if state['pending_decision'].get('calls_sol'):
+                  pending=state.get('pending_decision') or {}
+                  if pending.get('calls_sol'):
                       raise SystemExit(f'{fund_id} unexpectedly calls Sol')
+                  if pending.get('execution_model') != 'V2_CONDITIONAL_PLAN_V1':
+                      raise SystemExit(f'{fund_id} pending decision is not conditional')
+                  for target in pending.get('targets') or []:
+                      if (target.get('trade_plan') or {}).get('plan_version') != 'v2-conditional-plan-v1':
+                          raise SystemExit(f'{fund_id} target lacks conditional plan')
               audit=Path(report['audit_path'])
               if not audit.exists():
                   raise SystemExit('immutable audit event missing')
@@ -203,7 +215,7 @@ jobs:
           git config user.name "v2-shadow-bot"
           git config user.email "v2-shadow-bot@users.noreply.github.com"
           git add shadow_state/v2 web/v2/data.json
-          git diff --cached --quiet || git commit -m "v2-data: advance isolated shadow ledgers"
+          git diff --cached --quiet || git commit -m "v2-data: advance isolated conditional shadow ledgers"
           git pull --rebase origin v2-shadow
           git push origin HEAD:v2-shadow
 
@@ -220,5 +232,3 @@ jobs:
             shadow_state/v2/audit/${{ steps.td.outputs.date }}.json
           if-no-files-found: warn
           retention-days: 30
-
-
