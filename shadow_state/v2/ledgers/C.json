@@ -12,7 +12,7 @@
       "avg_cost": 11.8416,
       "opened_date": "2026-08-27",
       "acquired_date": "2026-08-27",
-      "last_price": 11.6,
+      "last_price": 10.84,
       "industry": "有色金属",
       "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
       "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
@@ -45,7 +45,47 @@
       "market_reference_time_unavailable": "RuntimeError: hist_min=ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); pre_min=JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
     }
   ],
-  "rejected_orders": [],
+  "rejected_orders": [
+    {
+      "fund_id": "C",
+      "decision_date": "2026-08-27",
+      "trade_date": "2026-08-31",
+      "symbol": "sz.002636",
+      "name": "金安国纪",
+      "side": "CANCEL",
+      "target_weight": 0.163881,
+      "reason": "stale_pending_decision",
+      "details": {
+        "expected_previous_trade_date": "2026-08-28"
+      }
+    },
+    {
+      "fund_id": "C",
+      "decision_date": "2026-08-27",
+      "trade_date": "2026-08-31",
+      "symbol": "sh.601208",
+      "name": "东材科技",
+      "side": "CANCEL",
+      "target_weight": 0.175576,
+      "reason": "stale_pending_decision",
+      "details": {
+        "expected_previous_trade_date": "2026-08-28"
+      }
+    },
+    {
+      "fund_id": "C",
+      "decision_date": "2026-08-27",
+      "trade_date": "2026-08-31",
+      "symbol": "sz.002942",
+      "name": "新农股份",
+      "side": "CANCEL",
+      "target_weight": 0.22,
+      "reason": "stale_pending_decision",
+      "details": {
+        "expected_previous_trade_date": "2026-08-28"
+      }
+    }
+  ],
   "equity_curve": [
     {
       "date": "2026-08-26",
@@ -60,143 +100,185 @@
       "cash": 878032.02,
       "market_value": 119480.0,
       "fees": 36.58
+    },
+    {
+      "date": "2026-08-31",
+      "equity": 989684.02,
+      "cash": 878032.02,
+      "market_value": 111652.0,
+      "fees": 0.0
     }
   ],
   "pending_decision": {
-    "decision_date": "2026-08-27",
+    "decision_date": "2026-08-31",
     "execute_on": "next_session_conditional_entry_and_exit_checks",
     "strategy_version": "v2-c-deterministic-0.1",
     "target_version": "v2-shadow-targets-conditional-0.3",
     "regime": {
       "label": "risk_on",
-      "score": 69.22,
-      "confidence": 66.45,
-      "reasons": [
-        "上涨家数占优"
-      ]
+      "score": 67.86,
+      "confidence": 65.5,
+      "reasons": []
     },
     "portfolio_stats": {
-      "positions": 3,
-      "exposure": 0.559457,
+      "positions": 4,
+      "exposure": 0.62,
       "max_position": 0.22,
       "industry_weights": {
-        "基础化工": 0.395576,
-        "电子": 0.163881
+        "煤炭": 0.4,
+        "石油石化": 0.22
       },
-      "max_industry": 0.395576,
-      "max_industry_share_of_invested": 0.707071,
+      "max_industry": 0.4,
+      "max_industry_share_of_invested": 0.645161,
       "top2_industry_share_of_invested": 1.0,
-      "industry_hhi": 0.585757,
-      "effective_industries": 1.7072
+      "industry_hhi": 0.542144,
+      "effective_industries": 1.8445
     },
     "targets": [
       {
-        "symbol": "sz.002636",
-        "raw_code": "002636",
-        "name": "金安国纪",
-        "industry": "电子",
-        "industry_code": "801080",
-        "target_weight": 0.163881,
-        "v2_score": 87.14,
+        "symbol": "sh.601101",
+        "raw_code": "601101",
+        "name": "昊华能源",
+        "industry": "煤炭",
+        "industry_code": "801950",
+        "target_weight": 0.127444,
+        "v2_score": 89.96,
         "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
         "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
         "fundamental_ready": true,
-        "limit_status": "limit_up",
-        "opportunity_score": 69.26,
+        "limit_status": "normal",
+        "opportunity_score": 77.1,
         "setup": "breakout",
         "trade_plan": {
           "plan_version": "v2-conditional-plan-v1",
-          "decision_date": "2026-08-27",
+          "decision_date": "2026-08-31",
           "setup": "breakout",
-          "opportunity_score": 69.26,
+          "opportunity_score": 77.1,
           "entry": {
             "mode": "breakout",
             "operator": ">=",
-            "trigger_price": 72.462,
-            "valid_min": 72.462,
-            "valid_max": 73.767
+            "trigger_price": 15.335,
+            "valid_min": 15.335,
+            "valid_max": 15.611
           },
           "exit": {
             "hard_stop_pct": 0.06,
             "reward_risk": 1.85,
             "trailing_drawdown_pct": 0.038,
             "max_hold_days": 2,
-            "estimated_stop_price": 68.115,
-            "estimated_take_profit_price": 80.506
+            "estimated_stop_price": 14.415,
+            "estimated_take_profit_price": 17.038
           },
           "cancel_if_not_triggered_by_close": true
         }
       },
       {
-        "symbol": "sh.601208",
-        "raw_code": "601208",
-        "name": "东材科技",
-        "industry": "基础化工",
-        "industry_code": "801030",
-        "target_weight": 0.175576,
-        "v2_score": 86.39,
+        "symbol": "sh.600403",
+        "raw_code": "600403",
+        "name": "大有能源",
+        "industry": "煤炭",
+        "industry_code": "801950",
+        "target_weight": 0.105803,
+        "v2_score": 89.87,
         "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
         "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
         "fundamental_ready": true,
-        "limit_status": "limit_up",
-        "opportunity_score": 69.73,
+        "limit_status": "normal",
+        "opportunity_score": 74.29,
         "setup": "breakout",
         "trade_plan": {
           "plan_version": "v2-conditional-plan-v1",
-          "decision_date": "2026-08-27",
+          "decision_date": "2026-08-31",
           "setup": "breakout",
-          "opportunity_score": 69.73,
+          "opportunity_score": 74.29,
           "entry": {
             "mode": "breakout",
             "operator": ">=",
-            "trigger_price": 50.811,
-            "valid_min": 50.811,
-            "valid_max": 51.725
+            "trigger_price": 7.858,
+            "valid_min": 7.858,
+            "valid_max": 7.999
           },
           "exit": {
             "hard_stop_pct": 0.06,
             "reward_risk": 1.85,
             "trailing_drawdown_pct": 0.038,
             "max_hold_days": 2,
-            "estimated_stop_price": 47.762,
-            "estimated_take_profit_price": 56.451
+            "estimated_stop_price": 7.386,
+            "estimated_take_profit_price": 8.73
           },
           "cancel_if_not_triggered_by_close": true
         }
       },
       {
-        "symbol": "sz.002942",
-        "raw_code": "002942",
-        "name": "新农股份",
-        "industry": "基础化工",
-        "industry_code": "801030",
+        "symbol": "sh.601898",
+        "raw_code": "601898",
+        "name": "中煤能源",
+        "industry": "煤炭",
+        "industry_code": "801950",
+        "target_weight": 0.166753,
+        "v2_score": 89.6,
+        "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+        "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+        "fundamental_ready": true,
+        "limit_status": "normal",
+        "opportunity_score": 85.55,
+        "setup": "breakout",
+        "trade_plan": {
+          "plan_version": "v2-conditional-plan-v1",
+          "decision_date": "2026-08-31",
+          "setup": "breakout",
+          "opportunity_score": 85.55,
+          "entry": {
+            "mode": "breakout",
+            "operator": ">=",
+            "trigger_price": 16.255,
+            "valid_min": 16.255,
+            "valid_max": 16.466
+          },
+          "exit": {
+            "hard_stop_pct": 0.04266,
+            "reward_risk": 1.85,
+            "trailing_drawdown_pct": 0.02782,
+            "max_hold_days": 2,
+            "estimated_stop_price": 15.561,
+            "estimated_take_profit_price": 17.538
+          },
+          "cancel_if_not_triggered_by_close": true
+        }
+      },
+      {
+        "symbol": "sh.601233",
+        "raw_code": "601233",
+        "name": "桐昆股份",
+        "industry": "石油石化",
+        "industry_code": "801960",
         "target_weight": 0.22,
-        "v2_score": 86.14,
+        "v2_score": 87.0,
         "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
         "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
         "fundamental_ready": true,
-        "limit_status": "limit_up",
-        "opportunity_score": 66.28,
+        "limit_status": "normal",
+        "opportunity_score": 81.59,
         "setup": "breakout",
         "trade_plan": {
           "plan_version": "v2-conditional-plan-v1",
-          "decision_date": "2026-08-27",
+          "decision_date": "2026-08-31",
           "setup": "breakout",
-          "opportunity_score": 66.28,
+          "opportunity_score": 81.59,
           "entry": {
             "mode": "breakout",
             "operator": ">=",
-            "trigger_price": 19.086,
-            "valid_min": 19.086,
-            "valid_max": 19.287
+            "trigger_price": 27.918,
+            "valid_min": 27.918,
+            "valid_max": 28.42
           },
           "exit": {
-            "hard_stop_pct": 0.03458,
+            "hard_stop_pct": 0.06,
             "reward_risk": 1.85,
-            "trailing_drawdown_pct": 0.02255,
+            "trailing_drawdown_pct": 0.038,
             "max_hold_days": 2,
-            "estimated_stop_price": 18.426,
-            "estimated_take_profit_price": 20.307
+            "estimated_stop_price": 26.243,
+            "estimated_take_profit_price": 31.017
           },
           "cancel_if_not_triggered_by_close": true
         }
@@ -204,9 +286,9 @@
     ],
     "source_ref": {
       "snapshot_version": "v2-shadow-data-0.4",
-      "snapshot_sha256": "0efb178da71de9f379162cb4bce6b83dbd3c71abed8488a8ecce0308e6fff36f",
+      "snapshot_sha256": "4f3b91244026ff1b066a287bf3df963adfdb21f64bff1a521ebc4bdd97b57de8",
       "enrichment_version": "v2-history-0.1",
-      "enrichment_sha256": "dde6beb28ee2f927cdc55f7411549a675df7e69d54c229dcaed47e937fa1f7b4",
+      "enrichment_sha256": "e3e8019d22da1b04da0380b8f122adea8af1b5b321237d94b590918b811d5590",
       "target_version": "v2-shadow-targets-conditional-0.3",
       "execution_model": "V2_CONDITIONAL_PLAN_V1",
       "plan_version": "v2-conditional-plan-v1",
@@ -219,8 +301,8 @@
           "BSE",
           "B_SHARES"
         ],
-        "input_candidates": 179,
-        "eligible_candidates": 179,
+        "input_candidates": 180,
+        "eligible_candidates": 180,
         "excluded_non_mainboard_count": 0,
         "excluded_non_mainboard_symbols": []
       },
@@ -237,32 +319,26 @@
         },
         "enrichment_coverage": {
           "preselected": 180,
-          "tencent_current_histories": 179,
-          "eligible_technical_features": 179,
-          "history_ratio": 0.9944,
-          "feature_ratio": 0.9944,
+          "tencent_current_histories": 180,
+          "eligible_technical_features": 180,
+          "history_ratio": 1.0,
+          "feature_ratio": 1.0,
           "history_cache": {
             "cache_version": "v2-tencent-qfq-1",
             "workers": 3,
             "selected": 180,
-            "current_histories": 179,
-            "cache_hits": 168,
-            "incremental_fetches": 1,
-            "adjustment_full_refreshes": 0,
-            "full_fetches": 10,
-            "failures": 1,
-            "elapsed_s": 13.41,
-            "sample_errors": [
-              {
-                "symbol": "sz.001232",
-                "error": "RuntimeError: current/long history unavailable rows=18 asof=2026-08-27"
-              }
-            ]
+            "current_histories": 180,
+            "cache_hits": 0,
+            "incremental_fetches": 79,
+            "adjustment_full_refreshes": 3,
+            "full_fetches": 98,
+            "failures": 0,
+            "elapsed_s": 130.91,
+            "sample_errors": []
           }
         },
         "missing_critical_execution_bars": []
-      },
-      "conditional_plan_migration": true
+      }
     },
     "calls_sol": false,
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
@@ -591,11 +667,246 @@
       "plan_version": "v2-conditional-plan-v1",
       "allow_cash": true,
       "calls_sol": false
+    },
+    {
+      "decision_date": "2026-08-31",
+      "strategy_version": "v2-c-deterministic-0.1",
+      "target_version": "v2-shadow-targets-conditional-0.3",
+      "regime": {
+        "label": "risk_on",
+        "score": 67.86,
+        "confidence": 65.5,
+        "reasons": []
+      },
+      "portfolio_stats": {
+        "positions": 4,
+        "exposure": 0.62,
+        "max_position": 0.22,
+        "industry_weights": {
+          "煤炭": 0.4,
+          "石油石化": 0.22
+        },
+        "max_industry": 0.4,
+        "max_industry_share_of_invested": 0.645161,
+        "top2_industry_share_of_invested": 1.0,
+        "industry_hhi": 0.542144,
+        "effective_industries": 1.8445
+      },
+      "targets": [
+        {
+          "symbol": "sh.601101",
+          "raw_code": "601101",
+          "name": "昊华能源",
+          "industry": "煤炭",
+          "industry_code": "801950",
+          "target_weight": 0.127444,
+          "v2_score": 89.96,
+          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "fundamental_ready": true,
+          "limit_status": "normal",
+          "opportunity_score": 77.1,
+          "setup": "breakout",
+          "trade_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "decision_date": "2026-08-31",
+            "setup": "breakout",
+            "opportunity_score": 77.1,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 15.335,
+              "valid_min": 15.335,
+              "valid_max": 15.611
+            },
+            "exit": {
+              "hard_stop_pct": 0.06,
+              "reward_risk": 1.85,
+              "trailing_drawdown_pct": 0.038,
+              "max_hold_days": 2,
+              "estimated_stop_price": 14.415,
+              "estimated_take_profit_price": 17.038
+            },
+            "cancel_if_not_triggered_by_close": true
+          }
+        },
+        {
+          "symbol": "sh.600403",
+          "raw_code": "600403",
+          "name": "大有能源",
+          "industry": "煤炭",
+          "industry_code": "801950",
+          "target_weight": 0.105803,
+          "v2_score": 89.87,
+          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "fundamental_ready": true,
+          "limit_status": "normal",
+          "opportunity_score": 74.29,
+          "setup": "breakout",
+          "trade_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "decision_date": "2026-08-31",
+            "setup": "breakout",
+            "opportunity_score": 74.29,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 7.858,
+              "valid_min": 7.858,
+              "valid_max": 7.999
+            },
+            "exit": {
+              "hard_stop_pct": 0.06,
+              "reward_risk": 1.85,
+              "trailing_drawdown_pct": 0.038,
+              "max_hold_days": 2,
+              "estimated_stop_price": 7.386,
+              "estimated_take_profit_price": 8.73
+            },
+            "cancel_if_not_triggered_by_close": true
+          }
+        },
+        {
+          "symbol": "sh.601898",
+          "raw_code": "601898",
+          "name": "中煤能源",
+          "industry": "煤炭",
+          "industry_code": "801950",
+          "target_weight": 0.166753,
+          "v2_score": 89.6,
+          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "fundamental_ready": true,
+          "limit_status": "normal",
+          "opportunity_score": 85.55,
+          "setup": "breakout",
+          "trade_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "decision_date": "2026-08-31",
+            "setup": "breakout",
+            "opportunity_score": 85.55,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 16.255,
+              "valid_min": 16.255,
+              "valid_max": 16.466
+            },
+            "exit": {
+              "hard_stop_pct": 0.04266,
+              "reward_risk": 1.85,
+              "trailing_drawdown_pct": 0.02782,
+              "max_hold_days": 2,
+              "estimated_stop_price": 15.561,
+              "estimated_take_profit_price": 17.538
+            },
+            "cancel_if_not_triggered_by_close": true
+          }
+        },
+        {
+          "symbol": "sh.601233",
+          "raw_code": "601233",
+          "name": "桐昆股份",
+          "industry": "石油石化",
+          "industry_code": "801960",
+          "target_weight": 0.22,
+          "v2_score": 87.0,
+          "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+          "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失",
+          "fundamental_ready": true,
+          "limit_status": "normal",
+          "opportunity_score": 81.59,
+          "setup": "breakout",
+          "trade_plan": {
+            "plan_version": "v2-conditional-plan-v1",
+            "decision_date": "2026-08-31",
+            "setup": "breakout",
+            "opportunity_score": 81.59,
+            "entry": {
+              "mode": "breakout",
+              "operator": ">=",
+              "trigger_price": 27.918,
+              "valid_min": 27.918,
+              "valid_max": 28.42
+            },
+            "exit": {
+              "hard_stop_pct": 0.06,
+              "reward_risk": 1.85,
+              "trailing_drawdown_pct": 0.038,
+              "max_hold_days": 2,
+              "estimated_stop_price": 26.243,
+              "estimated_take_profit_price": 31.017
+            },
+            "cancel_if_not_triggered_by_close": true
+          }
+        }
+      ],
+      "source_ref": {
+        "snapshot_version": "v2-shadow-data-0.4",
+        "snapshot_sha256": "4f3b91244026ff1b066a287bf3df963adfdb21f64bff1a521ebc4bdd97b57de8",
+        "enrichment_version": "v2-history-0.1",
+        "enrichment_sha256": "e3e8019d22da1b04da0380b8f122adea8af1b5b321237d94b590918b811d5590",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1",
+        "board_policy": {
+          "version": "retail-mainboard-only-2026-08-19",
+          "scope": "SH_SZ_MAINBOARD_ONLY",
+          "excludes": [
+            "CHINEXT_300_301",
+            "STAR_688_689",
+            "BSE",
+            "B_SHARES"
+          ],
+          "input_candidates": 180,
+          "eligible_candidates": 180,
+          "excluded_non_mainboard_count": 0,
+          "excluded_non_mainboard_symbols": []
+        },
+        "data_quality": {
+          "snapshot_source": "tencent-full",
+          "snapshot_grade": null,
+          "industry_counts": {
+            "industries": 31,
+            "mainboard_stocks": 3193,
+            "component_rows_mainboard": 3193,
+            "duplicate_cross_industry_stocks": 0,
+            "component_failures": 0,
+            "history_failures": 0
+          },
+          "enrichment_coverage": {
+            "preselected": 180,
+            "tencent_current_histories": 180,
+            "eligible_technical_features": 180,
+            "history_ratio": 1.0,
+            "feature_ratio": 1.0,
+            "history_cache": {
+              "cache_version": "v2-tencent-qfq-1",
+              "workers": 3,
+              "selected": 180,
+              "current_histories": 180,
+              "cache_hits": 0,
+              "incremental_fetches": 79,
+              "adjustment_full_refreshes": 3,
+              "full_fetches": 98,
+              "failures": 0,
+              "elapsed_s": 130.91,
+              "sample_errors": []
+            }
+          },
+          "missing_critical_execution_bars": []
+        }
+      },
+      "execution_model": "V2_CONDITIONAL_PLAN_V1",
+      "plan_version": "v2-conditional-plan-v1",
+      "allow_cash": true,
+      "calls_sol": false
     }
   ],
   "created_date": "2026-08-26",
-  "last_processed_date": "2026-08-27",
-  "audit_head": "bbedafd7af34bbcac710919225f89ad14e3a54adb6a4a6a25f86bd6beee6222f",
+  "last_processed_date": "2026-08-31",
+  "audit_head": "71483b465bebd23249281da25002b8aa143adbd4e2cb093cd0519b36eaa13307",
   "execution_policy_version": "v1-parity-2026-08-14",
   "execution_policy": {
     "initial_cash": 1000000.0,
@@ -620,9 +931,9 @@
       "highest_price": 11.8416,
       "partial_taken": false,
       "max_hold_days": 2,
-      "sessions_held": 0,
+      "sessions_held": 1,
       "rotation_exit": true,
-      "rotation_min_price": 11.739,
+      "rotation_min_price": 10.97,
       "setup": "breakout"
     }
   },
@@ -630,7 +941,7 @@
   "conditional_exit_date": "2026-08-26",
   "last_conditional_scan_key": "2026-08-26T14:55",
   "last_conditional_scan_at": "2026-08-26T15:02:19+08:00",
-  "last_execution_date": "2026-08-27",
+  "last_execution_date": "2026-08-31",
   "last_execution_snapshot": {
     "date": "2026-08-26",
     "phase": "conditional_exit_scan",
