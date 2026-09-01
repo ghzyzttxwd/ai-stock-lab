@@ -14,65 +14,12 @@
     ]
   },
   "source_ref": {
-    "snapshot_version": "v2-shadow-data-0.4",
-    "snapshot_sha256": "3dc4b4cdd7b5abfbf4e8e0880fb143f1b6fbde285fb40e71460afe03645966b6",
-    "enrichment_version": "v2-history-0.1",
-    "enrichment_sha256": "7094c92132f4b69b597a5d2013fd41a83a587ad0275860ba317745e1258a16bb",
-    "target_version": "v2-shadow-targets-conditional-0.3",
+    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
     "plan_version": "v2-conditional-plan-v1",
-    "board_policy": {
-      "version": "retail-mainboard-only-2026-08-19",
-      "scope": "SH_SZ_MAINBOARD_ONLY",
-      "excludes": [
-        "CHINEXT_300_301",
-        "STAR_688_689",
-        "BSE",
-        "B_SHARES"
-      ],
-      "input_candidates": 179,
-      "eligible_candidates": 179,
-      "excluded_non_mainboard_count": 0,
-      "excluded_non_mainboard_symbols": []
-    },
-    "data_quality": {
-      "snapshot_source": "sina",
-      "snapshot_grade": null,
-      "industry_counts": {
-        "industries": 31,
-        "mainboard_stocks": 3193,
-        "component_rows_mainboard": 3193,
-        "duplicate_cross_industry_stocks": 0,
-        "component_failures": 0,
-        "history_failures": 0
-      },
-      "enrichment_coverage": {
-        "preselected": 180,
-        "tencent_current_histories": 179,
-        "eligible_technical_features": 179,
-        "history_ratio": 0.9944,
-        "feature_ratio": 0.9944,
-        "history_cache": {
-          "cache_version": "v2-tencent-qfq-1",
-          "workers": 3,
-          "selected": 180,
-          "current_histories": 179,
-          "cache_hits": 0,
-          "incremental_fetches": 89,
-          "adjustment_full_refreshes": 4,
-          "full_fetches": 86,
-          "failures": 1,
-          "elapsed_s": 126.18,
-          "sample_errors": [
-            {
-              "symbol": "sh.601123",
-              "error": "RuntimeError: current/long history unavailable rows=1 asof=2026-09-01"
-            }
-          ]
-        }
-      },
-      "missing_critical_execution_bars": []
-    }
+    "economics_mutated": false,
+    "historical_fills_rewritten": false,
+    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
   },
   "target_diagnostics": {
     "stats": {
@@ -250,7 +197,7 @@
             "highest_price": 11.6135,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -281,7 +228,7 @@
             "highest_price": 5.8828,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -312,7 +259,7 @@
             "highest_price": 384.3293,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": true,
             "rotation_min_price": 388.642,
             "setup": "pullback"
@@ -1140,13 +1087,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+      "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
       "concentration_flags": []
     },
     "B": {
@@ -1235,7 +1183,7 @@
             "highest_price": 11.8416,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": true,
             "rotation_min_price": 10.98,
             "setup": "breakout"
@@ -1926,13 +1874,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+      "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
       "concentration_flags": []
     },
     "C": {
@@ -2052,7 +2001,7 @@
             "highest_price": 11.8416,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": true,
             "rotation_min_price": 10.98,
             "setup": "breakout"
@@ -2463,13 +2412,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+      "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -2593,7 +2543,7 @@
             "highest_price": 10.2181,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": true,
             "rotation_min_price": 10.451,
             "setup": "breakout"
@@ -2624,7 +2574,7 @@
             "highest_price": 10.6992,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": true,
             "rotation_min_price": 11.625,
             "setup": "breakout"
@@ -3481,13 +3431,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+      "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
       "concentration_flags": []
     },
     "L": {
@@ -3543,7 +3494,7 @@
             "highest_price": 11.6135,
             "partial_taken": false,
             "max_hold_days": 5,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -3574,7 +3525,7 @@
             "highest_price": 5.8828,
             "partial_taken": false,
             "max_hold_days": 5,
-            "sessions_held": 3,
+            "sessions_held": 4,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -4305,23 +4256,24 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+      "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
       "concentration_flags": []
     }
   },
-  "audit_head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+  "audit_head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
   "audit_verification": {
     "status": "PASS",
-    "events": 8,
-    "head": "eca564a14da8f219c2d9021f5b4649aabe08168cff0480bee7e2228858f4bcf9",
+    "events": 9,
+    "head": "f57cc5cacf50e5adab63b621bd6f7da2e9fcc5c91abb67bbe04555a2b6ac8a90",
     "first_date": "2026-08-26~paper-reset",
-    "last_date": "2026-09-01"
+    "last_date": "2026-09-01~conditional-plan-migration"
   },
   "safety": {
     "calls_sol": false,
@@ -4329,7 +4281,7 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_entries_and_decision",
+  "audit_event_kind": "conditional_plan_migration",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
