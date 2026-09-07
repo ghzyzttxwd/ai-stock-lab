@@ -15,60 +15,12 @@
     ]
   },
   "source_ref": {
-    "snapshot_version": "v2-shadow-data-0.4",
-    "snapshot_sha256": "6c977b1e7efdf64c4c15f911032b94d60ae542d05e9577a6226de61833c9d689",
-    "enrichment_version": "v2-history-0.1",
-    "enrichment_sha256": "93ed9eca47787955995c98ce7b11abac39f4f1f593d067d8c129c625940849a6",
-    "target_version": "v2-shadow-targets-conditional-0.3",
+    "reason": "replace future fixed-price pending instructions with pre-declared conditional plans",
     "execution_model": "V2_CONDITIONAL_PLAN_V1",
     "plan_version": "v2-conditional-plan-v1",
-    "board_policy": {
-      "version": "retail-mainboard-only-2026-08-19",
-      "scope": "SH_SZ_MAINBOARD_ONLY",
-      "excludes": [
-        "CHINEXT_300_301",
-        "STAR_688_689",
-        "BSE",
-        "B_SHARES"
-      ],
-      "input_candidates": 180,
-      "eligible_candidates": 180,
-      "excluded_non_mainboard_count": 0,
-      "excluded_non_mainboard_symbols": []
-    },
-    "data_quality": {
-      "snapshot_source": "sina",
-      "snapshot_grade": null,
-      "industry_counts": {
-        "industries": 31,
-        "mainboard_stocks": 3193,
-        "component_rows_mainboard": 3193,
-        "duplicate_cross_industry_stocks": 0,
-        "component_failures": 0,
-        "history_failures": 0
-      },
-      "enrichment_coverage": {
-        "preselected": 180,
-        "tencent_current_histories": 180,
-        "eligible_technical_features": 180,
-        "history_ratio": 1.0,
-        "feature_ratio": 1.0,
-        "history_cache": {
-          "cache_version": "v2-tencent-qfq-1",
-          "workers": 3,
-          "selected": 180,
-          "current_histories": 180,
-          "cache_hits": 0,
-          "incremental_fetches": 125,
-          "adjustment_full_refreshes": 4,
-          "full_fetches": 51,
-          "failures": 0,
-          "elapsed_s": 116.28,
-          "sample_errors": []
-        }
-      },
-      "missing_critical_execution_bars": []
-    }
+    "economics_mutated": false,
+    "historical_fills_rewritten": false,
+    "note": "Cash, existing positions, fill history and equity history are preserved; only future plan metadata and protective exit plans are added."
   },
   "target_diagnostics": {
     "stats": {
@@ -245,7 +197,7 @@
             "highest_price": 9.1427,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 9.318,
             "setup": "pullback"
@@ -276,7 +228,7 @@
             "highest_price": 27.5063,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 27.334,
             "setup": "pullback"
@@ -338,7 +290,7 @@
             "highest_price": 11.6135,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -369,7 +321,7 @@
             "highest_price": 5.8828,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -400,7 +352,7 @@
             "highest_price": 384.3293,
             "partial_taken": false,
             "max_hold_days": 4,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -1424,13 +1376,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+      "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
       "concentration_flags": []
     },
     "B": {
@@ -1489,7 +1442,7 @@
             "highest_price": 27.9404,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 25.219,
             "setup": "breakout"
@@ -1520,7 +1473,7 @@
             "highest_price": 6.9921,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 7.222,
             "setup": "breakout"
@@ -1551,7 +1504,7 @@
             "highest_price": 11.8416,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": true,
             "rotation_min_price": 10.828,
             "setup": "breakout"
@@ -1582,7 +1535,7 @@
             "highest_price": 4.0672,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 4.814,
             "setup": "breakout"
@@ -1613,7 +1566,7 @@
             "highest_price": 16.2679,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 14.704,
             "setup": "breakout"
@@ -1644,7 +1597,7 @@
             "highest_price": 18.2125,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 16.192,
             "setup": "breakout"
@@ -2409,13 +2362,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+      "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -2479,7 +2433,7 @@
             "highest_price": 27.9404,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 25.219,
             "setup": "breakout"
@@ -2510,7 +2464,7 @@
             "highest_price": 6.9921,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 7.222,
             "setup": "breakout"
@@ -2541,7 +2495,7 @@
             "highest_price": 16.2679,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 14.704,
             "setup": "breakout"
@@ -2572,7 +2526,7 @@
             "highest_price": 11.8416,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": true,
             "rotation_min_price": 10.828,
             "setup": "breakout"
@@ -2603,7 +2557,7 @@
             "highest_price": 11.0933,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 1,
+            "sessions_held": 2,
             "rotation_exit": true,
             "rotation_min_price": 11.524,
             "setup": "breakout"
@@ -2634,7 +2588,7 @@
             "highest_price": 7.8644,
             "partial_taken": false,
             "max_hold_days": 2,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 6.669,
             "setup": "breakout"
@@ -3181,13 +3135,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+      "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
       "concentration_flags": [
         "effective_industries_below_2",
         "single_industry_at_least_60pct_of_invested",
@@ -3311,7 +3266,7 @@
             "highest_price": 28.6816,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 27.334,
             "setup": "breakout"
@@ -3342,7 +3297,7 @@
             "highest_price": 9.3768,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 8.815,
             "setup": "breakout"
@@ -3373,7 +3328,7 @@
             "highest_price": 10.6992,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "breakout"
@@ -3404,7 +3359,7 @@
             "highest_price": 11.2504,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 10.434,
             "setup": "breakout"
@@ -3435,7 +3390,7 @@
             "highest_price": 18.2125,
             "partial_taken": false,
             "max_hold_days": 3,
-            "sessions_held": 5,
+            "sessions_held": 6,
             "rotation_exit": true,
             "rotation_min_price": 16.192,
             "setup": "breakout"
@@ -4279,13 +4234,14 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+      "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
       "concentration_flags": []
     },
     "L": {
@@ -4373,7 +4329,7 @@
             "highest_price": 11.6135,
             "partial_taken": false,
             "max_hold_days": 5,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -4404,7 +4360,7 @@
             "highest_price": 5.8828,
             "partial_taken": false,
             "max_hold_days": 5,
-            "sessions_held": 9,
+            "sessions_held": 10,
             "rotation_exit": false,
             "rotation_min_price": null,
             "setup": "pullback"
@@ -5280,23 +5236,24 @@
               }
             },
             "missing_critical_execution_bars": []
-          }
+          },
+          "conditional_plan_migration": true
         },
         "calls_sol": false,
         "execution_model": "V2_CONDITIONAL_PLAN_V1",
         "plan_version": "v2-conditional-plan-v1"
       },
-      "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+      "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
       "concentration_flags": []
     }
   },
-  "audit_head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+  "audit_head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
   "audit_verification": {
     "status": "PASS",
-    "events": 14,
-    "head": "2764e6cae878f15baae70f75fc0bf249c8e3c723d961d822c5807b6ead7271a0",
+    "events": 15,
+    "head": "c233fcc1f0982fa71932d568be2a4718a56481af3b49ee7bc548ad43a4703fc9",
     "first_date": "2026-08-26~paper-reset",
-    "last_date": "2026-09-07"
+    "last_date": "2026-09-07~conditional-plan-migration"
   },
   "safety": {
     "calls_sol": false,
@@ -5304,7 +5261,7 @@
     "writes_v1_ledger": false,
     "not_for_production_trading": true
   },
-  "audit_event_kind": "conditional_entries_and_decision",
+  "audit_event_kind": "conditional_plan_migration",
   "benchmark": {
     "name": "沪深300",
     "symbol": "sh000300",
