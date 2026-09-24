@@ -1,0 +1,3094 @@
+{
+  "schema_version": "v2-shadow-audit-1.0",
+  "event_kind": "conditional_entries_and_decision",
+  "trade_date": "2026-09-24",
+  "previous_trade_date": "2026-09-23",
+  "execution_policy_version": "v1-parity-2026-08-14",
+  "source_ref": {
+    "snapshot_version": "v2-shadow-data-0.4",
+    "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+    "enrichment_version": "v2-history-0.1",
+    "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+    "target_version": "v2-shadow-targets-conditional-0.3",
+    "execution_model": "V2_CONDITIONAL_PLAN_V1",
+    "plan_version": "v2-conditional-plan-v1",
+    "board_policy": {
+      "version": "retail-mainboard-only-2026-08-19",
+      "scope": "SH_SZ_MAINBOARD_ONLY",
+      "excludes": [
+        "CHINEXT_300_301",
+        "STAR_688_689",
+        "BSE",
+        "B_SHARES"
+      ],
+      "input_candidates": 180,
+      "eligible_candidates": 180,
+      "excluded_non_mainboard_count": 0,
+      "excluded_non_mainboard_symbols": []
+    },
+    "data_quality": {
+      "snapshot_source": "sina",
+      "snapshot_grade": null,
+      "industry_counts": {
+        "industries": 31,
+        "mainboard_stocks": 3196,
+        "component_rows_mainboard": 3196,
+        "duplicate_cross_industry_stocks": 0,
+        "component_failures": 0,
+        "history_failures": 0
+      },
+      "enrichment_coverage": {
+        "preselected": 180,
+        "tencent_current_histories": 180,
+        "eligible_technical_features": 180,
+        "history_ratio": 1.0,
+        "feature_ratio": 1.0,
+        "history_cache": {
+          "cache_version": "v2-tencent-qfq-1",
+          "workers": 3,
+          "selected": 180,
+          "current_histories": 180,
+          "cache_hits": 0,
+          "incremental_fetches": 136,
+          "adjustment_full_refreshes": 3,
+          "full_fetches": 41,
+          "failures": 0,
+          "elapsed_s": 110.21,
+          "sample_errors": []
+        }
+      },
+      "missing_critical_execution_bars": []
+    }
+  },
+  "regime": {
+    "label": "risk_off",
+    "score": 29.46,
+    "confidence": 83.37,
+    "reasons": [
+      "市场宽度偏弱",
+      "主要指数趋势向下"
+    ]
+  },
+  "target_diagnostics": {
+    "stats": {
+      "A": {
+        "positions": 9,
+        "exposure": 0.184834,
+        "max_position": 0.023256,
+        "industry_weights": {
+          "银行": 0.111983,
+          "房地产": 0.058527,
+          "建筑材料": 0.014324
+        },
+        "max_industry": 0.111983,
+        "max_industry_share_of_invested": 0.605857,
+        "top2_industry_share_of_invested": 0.922503,
+        "industry_hhi": 0.473333,
+        "effective_industries": 2.1127
+      },
+      "B": {
+        "positions": 6,
+        "exposure": 0.11,
+        "max_position": 0.033766,
+        "industry_weights": {
+          "医药生物": 0.059328,
+          "社会服务": 0.018754,
+          "电子": 0.018099,
+          "农林牧渔": 0.013819
+        },
+        "max_industry": 0.059328,
+        "max_industry_share_of_invested": 0.539345,
+        "top2_industry_share_of_invested": 0.709836,
+        "industry_hhi": 0.362815,
+        "effective_industries": 2.7562
+      },
+      "C": {
+        "positions": 0,
+        "exposure": 0,
+        "max_position": 0.0,
+        "industry_weights": {},
+        "max_industry": 0.0,
+        "max_industry_share_of_invested": 0.0,
+        "top2_industry_share_of_invested": 0.0,
+        "industry_hhi": 0,
+        "effective_industries": 0.0
+      },
+      "D": {
+        "positions": 7,
+        "exposure": 0.188192,
+        "max_position": 0.04204,
+        "industry_weights": {
+          "银行": 0.124028,
+          "医药生物": 0.024709,
+          "建筑装饰": 0.013737,
+          "社会服务": 0.013723,
+          "传媒": 0.011995
+        },
+        "max_industry": 0.124028,
+        "max_industry_share_of_invested": 0.65905,
+        "top2_industry_share_of_invested": 0.790347,
+        "industry_hhi": 0.466294,
+        "effective_industries": 2.1446
+      },
+      "L": {
+        "positions": 8,
+        "exposure": 0.35,
+        "max_position": 0.049842,
+        "industry_weights": {
+          "银行": 0.24,
+          "房地产": 0.078067,
+          "建筑材料": 0.031933
+        },
+        "max_industry": 0.24,
+        "max_industry_share_of_invested": 0.685714,
+        "top2_industry_share_of_invested": 0.908763,
+        "industry_hhi": 0.528279,
+        "effective_industries": 1.8929
+      }
+    },
+    "overlap_jaccard": {
+      "A-B": 0.0,
+      "A-C": 0.0,
+      "A-D": 0.2308,
+      "A-L": 0.8889,
+      "B-C": 0.0,
+      "B-D": 0.1818,
+      "B-L": 0.0,
+      "C-D": 0.0,
+      "C-L": 0.0,
+      "D-L": 0.25
+    },
+    "high_overlap_pairs": {
+      "A-L": 0.8889
+    },
+    "concentration_flags": {
+      "B": [],
+      "C": []
+    },
+    "board_policy": {
+      "version": "retail-mainboard-only-2026-08-19",
+      "scope": "SH_SZ_MAINBOARD_ONLY",
+      "excludes": [
+        "CHINEXT_300_301",
+        "STAR_688_689",
+        "BSE",
+        "B_SHARES"
+      ],
+      "input_candidates": 180,
+      "eligible_candidates": 180,
+      "excluded_non_mainboard_count": 0,
+      "excluded_non_mainboard_symbols": []
+    },
+    "plan_version": "v2-conditional-plan-v1"
+  },
+  "previous_event_hashes": {
+    "A": "75d1e0c445e22ca6e0fa6ca622b29f76499c8821bc5eec4600c76c04ee0aac59",
+    "B": "75d1e0c445e22ca6e0fa6ca622b29f76499c8821bc5eec4600c76c04ee0aac59",
+    "C": "75d1e0c445e22ca6e0fa6ca622b29f76499c8821bc5eec4600c76c04ee0aac59",
+    "D": "75d1e0c445e22ca6e0fa6ca622b29f76499c8821bc5eec4600c76c04ee0aac59",
+    "L": "75d1e0c445e22ca6e0fa6ca622b29f76499c8821bc5eec4600c76c04ee0aac59"
+  },
+  "funds": {
+    "A": {
+      "opening_state_sha256": "1f043f0d620b3cc94a1dc04dae863ee7708bf37c61d8987c6ea524a10ee02aa8",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-09-23",
+        "trade_date": "2026-09-24",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 978403.3,
+        "fills": [],
+        "rejected_orders": [
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "side": "BUY",
+            "target_weight": 0.041026,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002966",
+            "name": "苏州银行",
+            "side": "BUY",
+            "target_weight": 0.039384,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "side": "BUY",
+            "target_weight": 0.036436,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "side": "BUY",
+            "target_weight": 0.041577,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600007",
+            "name": "中国国贸",
+            "side": "BUY",
+            "target_weight": 0.056954,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "side": "BUY",
+            "target_weight": 0.041577,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.601628",
+            "name": "中国人寿",
+            "side": "BUY",
+            "target_weight": 0.1,
+            "reason": "already_at_or_above_target",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600638",
+            "name": "新黄浦",
+            "side": "BUY",
+            "target_weight": 0.044103,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600663",
+            "name": "陆家嘴",
+            "side": "BUY",
+            "target_weight": 0.047593,
+            "reason": "insufficient_cash_or_below_lot",
+            "details": {
+              "cash": 282.3,
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "A",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.000042",
+            "name": "中洲控股",
+            "side": "BUY",
+            "target_weight": 0.05135,
+            "reason": "insufficient_cash_or_below_lot",
+            "details": {
+              "cash": 282.3,
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 0
+      },
+      "close": {
+        "equity": 977047.3,
+        "cash": 282.3,
+        "market_value": 976765.0,
+        "holdings": [
+          {
+            "symbol": "sh.600638",
+            "name": "新黄浦",
+            "qty": 9800,
+            "avg_cost": 4.9135,
+            "close": 5.06,
+            "market_value": 49588.0,
+            "industry": "房地产",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.600801",
+            "name": "华新建材",
+            "qty": 4000,
+            "avg_cost": 24.1109,
+            "close": 23.75,
+            "market_value": 95000.0,
+            "industry": "建筑材料",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.600900",
+            "name": "长江电力",
+            "qty": 3400,
+            "avg_cost": 28.3115,
+            "close": 28.36,
+            "market_value": 96424.0,
+            "industry": "公用事业",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "qty": 3400,
+            "avg_cost": 12.1775,
+            "close": 12.26,
+            "market_value": 41684.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "qty": 4600,
+            "avg_cost": 11.6135,
+            "close": 11.95,
+            "market_value": 54970.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601169",
+            "name": "北京银行",
+            "qty": 3000,
+            "avg_cost": 5.6017,
+            "close": 5.49,
+            "market_value": 16470.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601628",
+            "name": "中国人寿",
+            "qty": 2600,
+            "avg_cost": 38.4505,
+            "close": 37.43,
+            "market_value": 97318.0,
+            "industry": "非银金融",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601665",
+            "name": "齐鲁银行",
+            "qty": 2900,
+            "avg_cost": 7.0676,
+            "close": 6.97,
+            "market_value": 20213.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601838",
+            "name": "成都银行",
+            "qty": 1100,
+            "avg_cost": 19.875,
+            "close": 19.04,
+            "market_value": 20944.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.601963",
+            "name": "重庆银行",
+            "qty": 2400,
+            "avg_cost": 11.1925,
+            "close": 11.03,
+            "market_value": 26472.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sh.603444",
+            "name": "吉比特",
+            "qty": 100,
+            "avg_cost": 384.3293,
+            "close": 342.0,
+            "market_value": 34200.0,
+            "industry": "传媒",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.000776",
+            "name": "广发证券",
+            "qty": 3100,
+            "avg_cost": 21.6735,
+            "close": 20.37,
+            "market_value": 63147.0,
+            "industry": "非银金融",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002033",
+            "name": "丽江股份",
+            "qty": 10900,
+            "avg_cost": 9.1427,
+            "close": 8.28,
+            "market_value": 90252.0,
+            "industry": "社会服务",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002128",
+            "name": "电投能源",
+            "qty": 1700,
+            "avg_cost": 28.9777,
+            "close": 27.82,
+            "market_value": 47294.0,
+            "industry": "煤炭",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "qty": 1100,
+            "avg_cost": 34.2302,
+            "close": 34.91,
+            "market_value": 38401.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002648",
+            "name": "卫星化学",
+            "qty": 3600,
+            "avg_cost": 27.5063,
+            "close": 26.64,
+            "market_value": 95904.0,
+            "industry": "基础化工",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "qty": 8100,
+            "avg_cost": 5.8828,
+            "close": 6.04,
+            "market_value": 48924.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          },
+          {
+            "symbol": "sz.002966",
+            "name": "苏州银行",
+            "qty": 4300,
+            "avg_cost": 9.1108,
+            "close": 9.2,
+            "market_value": 39560.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏"
+          }
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.034494,
+      "next_decision": {
+        "decision_date": "2026-09-24",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
+        "strategy_version": "v2-a-deterministic-0.1",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "regime": {
+          "label": "risk_off",
+          "score": 29.46,
+          "confidence": 83.37,
+          "reasons": [
+            "市场宽度偏弱",
+            "主要指数趋势向下"
+          ]
+        },
+        "portfolio_stats": {
+          "positions": 9,
+          "exposure": 0.184834,
+          "max_position": 0.023256,
+          "industry_weights": {
+            "银行": 0.111983,
+            "房地产": 0.058527,
+            "建筑材料": 0.014324
+          },
+          "max_industry": 0.111983,
+          "max_industry_share_of_invested": 0.605857,
+          "top2_industry_share_of_invested": 0.922503,
+          "industry_hhi": 0.473333,
+          "effective_industries": 2.1127
+        },
+        "targets": [
+          {
+            "symbol": "sz.002142",
+            "raw_code": "002142",
+            "name": "宁波银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.022899,
+            "v2_score": 86.7,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.02,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.02,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 34.701,
+                "valid_min": 34.076,
+                "valid_max": 34.701
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 33.833,
+                "estimated_take_profit_price": 36.132
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002966",
+            "raw_code": "002966",
+            "name": "苏州银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.021874,
+            "v2_score": 86.7,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.15,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.15,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 9.145,
+                "valid_min": 8.972,
+                "valid_max": 9.145
+              },
+              "exit": {
+                "hard_stop_pct": 0.02721,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 8.896,
+                "estimated_take_profit_price": 9.555
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.601009",
+            "raw_code": "601009",
+            "name": "南京银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.022785,
+            "v2_score": 86.41,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 71.32,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 71.32,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 11.878,
+                "valid_min": 11.664,
+                "valid_max": 11.878
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 11.581,
+                "estimated_take_profit_price": 12.368
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002948",
+            "raw_code": "002948",
+            "name": "青岛银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.021169,
+            "v2_score": 84.89,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 62.12,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 62.12,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 6.004,
+                "valid_min": 5.894,
+                "valid_max": 6.004
+              },
+              "exit": {
+                "hard_stop_pct": 0.02623,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 5.846,
+                "estimated_take_profit_price": 6.264
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600919",
+            "raw_code": "600919",
+            "name": "江苏银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.023256,
+            "v2_score": 83.89,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.34,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.34,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 12.186,
+                "valid_min": 11.967,
+                "valid_max": 12.186
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 11.882,
+                "estimated_take_profit_price": 12.689
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.000042",
+            "raw_code": "000042",
+            "name": "中洲控股",
+            "industry": "房地产",
+            "industry_code": "801180",
+            "target_weight": 0.020246,
+            "v2_score": 83.25,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 59.64,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 59.64,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 8.2,
+                "valid_min": 8.017,
+                "valid_max": 8.2
+              },
+              "exit": {
+                "hard_stop_pct": 0.03211,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02094,
+                "max_hold_days": 4,
+                "estimated_stop_price": 7.937,
+                "estimated_take_profit_price": 8.635
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600007",
+            "raw_code": "600007",
+            "name": "中国国贸",
+            "industry": "房地产",
+            "industry_code": "801180",
+            "target_weight": 0.023256,
+            "v2_score": 81.91,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 71.26,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 71.26,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 19.663,
+                "valid_min": 19.309,
+                "valid_max": 19.663
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 4,
+                "estimated_stop_price": 19.171,
+                "estimated_take_profit_price": 20.474
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600801",
+            "raw_code": "600801",
+            "name": "华新建材",
+            "industry": "建筑材料",
+            "industry_code": "801710",
+            "target_weight": 0.014324,
+            "v2_score": 80.74,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 58.79,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 58.79,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 23.607,
+                "valid_min": 22.909,
+                "valid_max": 23.607
+              },
+              "exit": {
+                "hard_stop_pct": 0.04256,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02775,
+                "max_hold_days": 4,
+                "estimated_stop_price": 22.603,
+                "estimated_take_profit_price": 25.265
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600663",
+            "raw_code": "600663",
+            "name": "陆家嘴",
+            "industry": "房地产",
+            "industry_code": "801180",
+            "target_weight": 0.015025,
+            "v2_score": 79.84,
+            "thesis": "已验证财务期的盈利/现金流质量合格，波动可控且价格趋势未明显恶化",
+            "invalidation": "财务质量跌破门槛、经营现金流转负、风险显著上升或中期趋势破坏",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 61.32,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 61.32,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 8.658,
+                "valid_min": 8.438,
+                "valid_max": 8.658
+              },
+              "exit": {
+                "hard_stop_pct": 0.03643,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02376,
+                "max_hold_days": 4,
+                "estimated_stop_price": 8.342,
+                "estimated_take_profit_price": 9.178
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          }
+        ],
+        "source_ref": {
+          "snapshot_version": "v2-shadow-data-0.4",
+          "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+          "enrichment_version": "v2-history-0.1",
+          "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+          "target_version": "v2-shadow-targets-conditional-0.3",
+          "execution_model": "V2_CONDITIONAL_PLAN_V1",
+          "plan_version": "v2-conditional-plan-v1",
+          "board_policy": {
+            "version": "retail-mainboard-only-2026-08-19",
+            "scope": "SH_SZ_MAINBOARD_ONLY",
+            "excludes": [
+              "CHINEXT_300_301",
+              "STAR_688_689",
+              "BSE",
+              "B_SHARES"
+            ],
+            "input_candidates": 180,
+            "eligible_candidates": 180,
+            "excluded_non_mainboard_count": 0,
+            "excluded_non_mainboard_symbols": []
+          },
+          "data_quality": {
+            "snapshot_source": "sina",
+            "snapshot_grade": null,
+            "industry_counts": {
+              "industries": 31,
+              "mainboard_stocks": 3196,
+              "component_rows_mainboard": 3196,
+              "duplicate_cross_industry_stocks": 0,
+              "component_failures": 0,
+              "history_failures": 0
+            },
+            "enrichment_coverage": {
+              "preselected": 180,
+              "tencent_current_histories": 180,
+              "eligible_technical_features": 180,
+              "history_ratio": 1.0,
+              "feature_ratio": 1.0,
+              "history_cache": {
+                "cache_version": "v2-tencent-qfq-1",
+                "workers": 3,
+                "selected": 180,
+                "current_histories": 180,
+                "cache_hits": 0,
+                "incremental_fetches": 136,
+                "adjustment_full_refreshes": 3,
+                "full_fetches": 41,
+                "failures": 0,
+                "elapsed_s": 110.21,
+                "sample_errors": []
+              }
+            },
+            "missing_critical_execution_bars": []
+          }
+        },
+        "calls_sol": false,
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
+      },
+      "closing_ledger_content_sha256": "fcb4f4cdab75bdf4c985529ad6ec9084f58debe4975f9825b0a1ca0b95da441c"
+    },
+    "B": {
+      "opening_state_sha256": "9b48e2734e2323645ea0f75f338f513c406a076ea143254976c1b55d6b61b4ed",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-09-23",
+        "trade_date": "2026-09-24",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 886243.61,
+        "fills": [],
+        "rejected_orders": [
+          {
+            "fund_id": "B",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600664",
+            "name": "哈药股份",
+            "side": "BUY",
+            "target_weight": 0.052981,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.603259",
+            "name": "药明康德",
+            "side": "BUY",
+            "target_weight": 0.135769,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600246",
+            "name": "万通发展",
+            "side": "BUY",
+            "target_weight": 0.081642,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600371",
+            "name": "万向德农",
+            "side": "BUY",
+            "target_weight": 0.053467,
+            "reason": "gap_above_max_chase",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "B",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.000739",
+            "name": "普洛药业",
+            "side": "BUY",
+            "target_weight": 0.11125,
+            "reason": "insufficient_cash_or_below_lot",
+            "details": {
+              "cash": 35.61,
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 0
+      },
+      "close": {
+        "equity": 866905.61,
+        "cash": 35.61,
+        "market_value": 866870.0,
+        "holdings": [
+          {
+            "symbol": "sh.600108",
+            "name": "亚盛集团",
+            "qty": 16500,
+            "avg_cost": 4.0672,
+            "close": 4.13,
+            "market_value": 68145.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.600256",
+            "name": "广汇能源",
+            "qty": 16000,
+            "avg_cost": 7.5063,
+            "close": 6.82,
+            "market_value": 109120.0,
+            "industry": "石油石化",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.600313",
+            "name": "农发种业",
+            "qty": 5600,
+            "avg_cost": 7.9144,
+            "close": 6.8,
+            "market_value": 38080.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.601118",
+            "name": "海南橡胶",
+            "qty": 13400,
+            "avg_cost": 6.9921,
+            "close": 6.48,
+            "market_value": 86832.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.601233",
+            "name": "桐昆股份",
+            "qty": 5300,
+            "avg_cost": 27.9404,
+            "close": 23.26,
+            "market_value": 123278.0,
+            "industry": "石油石化",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.601699",
+            "name": "潞安环能",
+            "qty": 4200,
+            "avg_cost": 18.2125,
+            "close": 15.35,
+            "market_value": 64470.0,
+            "industry": "煤炭",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sh.601898",
+            "name": "中煤能源",
+            "qty": 5200,
+            "avg_cost": 16.2679,
+            "close": 14.01,
+            "market_value": 72852.0,
+            "industry": "煤炭",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.000560",
+            "name": "我爱我家",
+            "qty": 100,
+            "avg_cost": 3.495,
+            "close": 3.66,
+            "market_value": 366.0,
+            "industry": "房地产",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.000998",
+            "name": "隆平高科",
+            "qty": 5700,
+            "avg_cost": 9.988,
+            "close": 8.68,
+            "market_value": 49476.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.002041",
+            "name": "登海种业",
+            "qty": 3400,
+            "avg_cost": 11.9016,
+            "close": 9.94,
+            "market_value": 33796.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.002385",
+            "name": "大北农",
+            "qty": 15600,
+            "avg_cost": 3.6771,
+            "close": 3.09,
+            "market_value": 48204.0,
+            "industry": "农林牧渔",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.002493",
+            "name": "荣盛石化",
+            "qty": 7800,
+            "avg_cost": 15.2926,
+            "close": 13.11,
+            "market_value": 102258.0,
+            "industry": "石油石化",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          },
+          {
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "qty": 7700,
+            "avg_cost": 11.8416,
+            "close": 9.09,
+            "market_value": 69993.0,
+            "industry": "有色金属",
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减"
+          }
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.139269,
+      "next_decision": {
+        "decision_date": "2026-09-24",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
+        "strategy_version": "v2-b-deterministic-0.1",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "regime": {
+          "label": "risk_off",
+          "score": 29.46,
+          "confidence": 83.37,
+          "reasons": [
+            "市场宽度偏弱",
+            "主要指数趋势向下"
+          ]
+        },
+        "portfolio_stats": {
+          "positions": 6,
+          "exposure": 0.11,
+          "max_position": 0.033766,
+          "industry_weights": {
+            "医药生物": 0.059328,
+            "社会服务": 0.018754,
+            "电子": 0.018099,
+            "农林牧渔": 0.013819
+          },
+          "max_industry": 0.059328,
+          "max_industry_share_of_invested": 0.539345,
+          "top2_industry_share_of_invested": 0.709836,
+          "industry_hhi": 0.362815,
+          "effective_industries": 2.7562
+        },
+        "targets": [
+          {
+            "symbol": "sz.002172",
+            "raw_code": "002172",
+            "name": "澳洋健康",
+            "industry": "医药生物",
+            "industry_code": "801150",
+            "target_weight": 0.01174,
+            "v2_score": 87.49,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 77.85,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 77.85,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 6.276,
+                "valid_min": 6.276,
+                "valid_max": 6.389
+              },
+              "exit": {
+                "hard_stop_pct": 0.06,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.038,
+                "max_hold_days": 3,
+                "estimated_stop_price": 5.9,
+                "estimated_take_profit_price": 6.973
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600593",
+            "raw_code": "600593",
+            "name": "大连圣亚",
+            "industry": "社会服务",
+            "industry_code": "801210",
+            "target_weight": 0.018754,
+            "v2_score": 86.37,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 78.66,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 78.66,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 51.251,
+                "valid_min": 51.251,
+                "valid_max": 52.141
+              },
+              "exit": {
+                "hard_stop_pct": 0.05704,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.0372,
+                "max_hold_days": 3,
+                "estimated_stop_price": 48.328,
+                "estimated_take_profit_price": 56.659
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.000592",
+            "raw_code": "000592",
+            "name": "平潭发展",
+            "industry": "农林牧渔",
+            "industry_code": "801010",
+            "target_weight": 0.013819,
+            "v2_score": 85.23,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "limit_up",
+            "opportunity_score": 77.77,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 77.77,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 8.879,
+                "valid_min": 8.879,
+                "valid_max": 9.039
+              },
+              "exit": {
+                "hard_stop_pct": 0.06,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.038,
+                "max_hold_days": 3,
+                "estimated_stop_price": 8.346,
+                "estimated_take_profit_price": 9.864
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.603259",
+            "raw_code": "603259",
+            "name": "药明康德",
+            "industry": "医药生物",
+            "industry_code": "801150",
+            "target_weight": 0.033766,
+            "v2_score": 84.8,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 78.36,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 78.36,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 171.371,
+                "valid_min": 171.371,
+                "valid_max": 173.272
+              },
+              "exit": {
+                "hard_stop_pct": 0.03645,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.02377,
+                "max_hold_days": 3,
+                "estimated_stop_price": 165.124,
+                "estimated_take_profit_price": 182.928
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.603122",
+            "raw_code": "603122",
+            "name": "合富中国",
+            "industry": "医药生物",
+            "industry_code": "801150",
+            "target_weight": 0.013822,
+            "v2_score": 84.52,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "limit_up",
+            "opportunity_score": 71.89,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 71.89,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 14.99,
+                "valid_min": 14.99,
+                "valid_max": 15.26
+              },
+              "exit": {
+                "hard_stop_pct": 0.06,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.038,
+                "max_hold_days": 3,
+                "estimated_stop_price": 14.09,
+                "estimated_take_profit_price": 16.654
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.603893",
+            "raw_code": "603893",
+            "name": "瑞芯微",
+            "industry": "电子",
+            "industry_code": "801080",
+            "target_weight": 0.018099,
+            "v2_score": 83.71,
+            "thesis": "强行业中的健康上升趋势，突破与成交持续性共同确认",
+            "invalidation": "行业转弱、趋势跌破关键结构或拥挤度升高且动量衰减",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 77.29,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 77.29,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 228.969,
+                "valid_min": 228.969,
+                "valid_max": 232.154
+              },
+              "exit": {
+                "hard_stop_pct": 0.04571,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.02981,
+                "max_hold_days": 3,
+                "estimated_stop_price": 218.503,
+                "estimated_take_profit_price": 248.331
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          }
+        ],
+        "source_ref": {
+          "snapshot_version": "v2-shadow-data-0.4",
+          "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+          "enrichment_version": "v2-history-0.1",
+          "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+          "target_version": "v2-shadow-targets-conditional-0.3",
+          "execution_model": "V2_CONDITIONAL_PLAN_V1",
+          "plan_version": "v2-conditional-plan-v1",
+          "board_policy": {
+            "version": "retail-mainboard-only-2026-08-19",
+            "scope": "SH_SZ_MAINBOARD_ONLY",
+            "excludes": [
+              "CHINEXT_300_301",
+              "STAR_688_689",
+              "BSE",
+              "B_SHARES"
+            ],
+            "input_candidates": 180,
+            "eligible_candidates": 180,
+            "excluded_non_mainboard_count": 0,
+            "excluded_non_mainboard_symbols": []
+          },
+          "data_quality": {
+            "snapshot_source": "sina",
+            "snapshot_grade": null,
+            "industry_counts": {
+              "industries": 31,
+              "mainboard_stocks": 3196,
+              "component_rows_mainboard": 3196,
+              "duplicate_cross_industry_stocks": 0,
+              "component_failures": 0,
+              "history_failures": 0
+            },
+            "enrichment_coverage": {
+              "preselected": 180,
+              "tencent_current_histories": 180,
+              "eligible_technical_features": 180,
+              "history_ratio": 1.0,
+              "feature_ratio": 1.0,
+              "history_cache": {
+                "cache_version": "v2-tencent-qfq-1",
+                "workers": 3,
+                "selected": 180,
+                "current_histories": 180,
+                "cache_hits": 0,
+                "incremental_fetches": 136,
+                "adjustment_full_refreshes": 3,
+                "full_fetches": 41,
+                "failures": 0,
+                "elapsed_s": 110.21,
+                "sample_errors": []
+              }
+            },
+            "missing_critical_execution_bars": []
+          }
+        },
+        "calls_sol": false,
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
+      },
+      "closing_ledger_content_sha256": "025693e0d4b814f3409b5b1dfe4985f75fa94db94a3046eb0a19674e6fc226a9"
+    },
+    "C": {
+      "opening_state_sha256": "2df99cdb4f9250643e433ffedf7b0226e3f6a2e05feab95c861d375eb2d40935",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-09-23",
+        "trade_date": "2026-09-24",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 890600.43,
+        "fills": [],
+        "rejected_orders": [
+          {
+            "fund_id": "C",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600371",
+            "name": "万向德农",
+            "side": "BUY",
+            "target_weight": 0.066092,
+            "reason": "gap_above_max_chase",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "C",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600246",
+            "name": "万通发展",
+            "side": "BUY",
+            "target_weight": 0.114605,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "C",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600664",
+            "name": "哈药股份",
+            "side": "BUY",
+            "target_weight": 0.092564,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 0
+      },
+      "close": {
+        "equity": 874696.43,
+        "cash": 162.43,
+        "market_value": 874534.0,
+        "holdings": [
+          {
+            "symbol": "sh.600313",
+            "name": "农发种业",
+            "qty": 8500,
+            "avg_cost": 7.9144,
+            "close": 6.8,
+            "market_value": 57800.0,
+            "industry": "农林牧渔",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.600354",
+            "name": "敦煌种业",
+            "qty": 8500,
+            "avg_cost": 9.1367,
+            "close": 9.53,
+            "market_value": 81005.0,
+            "industry": "农林牧渔",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.600403",
+            "name": "大有能源",
+            "qty": 13300,
+            "avg_cost": 7.8644,
+            "close": 7.19,
+            "market_value": 95627.0,
+            "industry": "煤炭",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.600693",
+            "name": "东百集团",
+            "qty": 9200,
+            "avg_cost": 11.0933,
+            "close": 9.76,
+            "market_value": 89792.0,
+            "industry": "商贸零售",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.601118",
+            "name": "海南橡胶",
+            "qty": 21000,
+            "avg_cost": 6.9921,
+            "close": 6.48,
+            "market_value": 136080.0,
+            "industry": "农林牧渔",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.601233",
+            "name": "桐昆股份",
+            "qty": 7700,
+            "avg_cost": 27.9404,
+            "close": 23.26,
+            "market_value": 179102.0,
+            "industry": "石油石化",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sh.601898",
+            "name": "中煤能源",
+            "qty": 10100,
+            "avg_cost": 16.2679,
+            "close": 14.01,
+            "market_value": 141501.0,
+            "industry": "煤炭",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          },
+          {
+            "symbol": "sz.002716",
+            "name": "湖南白银",
+            "qty": 10300,
+            "avg_cost": 11.8416,
+            "close": 9.09,
+            "market_value": 93627.0,
+            "industry": "有色金属",
+            "thesis": "主线板块具有扩散度，个股具备板块核心辨识度和短线资金承接",
+            "invalidation": "主线退潮、龙头地位丢失、炸板/亏钱效应恶化或板块共振消失"
+          }
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.125304,
+      "next_decision": {
+        "decision_date": "2026-09-24",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
+        "strategy_version": "v2-c-deterministic-0.1",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "regime": {
+          "label": "risk_off",
+          "score": 29.46,
+          "confidence": 83.37,
+          "reasons": [
+            "市场宽度偏弱",
+            "主要指数趋势向下"
+          ]
+        },
+        "portfolio_stats": {
+          "positions": 0,
+          "exposure": 0,
+          "max_position": 0.0,
+          "industry_weights": {},
+          "max_industry": 0.0,
+          "max_industry_share_of_invested": 0.0,
+          "top2_industry_share_of_invested": 0.0,
+          "industry_hhi": 0,
+          "effective_industries": 0.0
+        },
+        "targets": [],
+        "source_ref": {
+          "snapshot_version": "v2-shadow-data-0.4",
+          "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+          "enrichment_version": "v2-history-0.1",
+          "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+          "target_version": "v2-shadow-targets-conditional-0.3",
+          "execution_model": "V2_CONDITIONAL_PLAN_V1",
+          "plan_version": "v2-conditional-plan-v1",
+          "board_policy": {
+            "version": "retail-mainboard-only-2026-08-19",
+            "scope": "SH_SZ_MAINBOARD_ONLY",
+            "excludes": [
+              "CHINEXT_300_301",
+              "STAR_688_689",
+              "BSE",
+              "B_SHARES"
+            ],
+            "input_candidates": 180,
+            "eligible_candidates": 180,
+            "excluded_non_mainboard_count": 0,
+            "excluded_non_mainboard_symbols": []
+          },
+          "data_quality": {
+            "snapshot_source": "sina",
+            "snapshot_grade": null,
+            "industry_counts": {
+              "industries": 31,
+              "mainboard_stocks": 3196,
+              "component_rows_mainboard": 3196,
+              "duplicate_cross_industry_stocks": 0,
+              "component_failures": 0,
+              "history_failures": 0
+            },
+            "enrichment_coverage": {
+              "preselected": 180,
+              "tencent_current_histories": 180,
+              "eligible_technical_features": 180,
+              "history_ratio": 1.0,
+              "feature_ratio": 1.0,
+              "history_cache": {
+                "cache_version": "v2-tencent-qfq-1",
+                "workers": 3,
+                "selected": 180,
+                "current_histories": 180,
+                "cache_hits": 0,
+                "incremental_fetches": 136,
+                "adjustment_full_refreshes": 3,
+                "full_fetches": 41,
+                "failures": 0,
+                "elapsed_s": 110.21,
+                "sample_errors": []
+              }
+            },
+            "missing_critical_execution_bars": []
+          }
+        },
+        "calls_sol": false,
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
+      },
+      "closing_ledger_content_sha256": "05cf10af50df249fa9a169618638fedde00abdfb907456cdd99be4ce4942a7c5"
+    },
+    "D": {
+      "opening_state_sha256": "00d3d030eff5fd5e5b12581003459fa3ccaae43291394f84a77003bd9665adbc",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-09-23",
+        "trade_date": "2026-09-24",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 934926.96,
+        "fills": [],
+        "rejected_orders": [
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.601155",
+            "name": "新城控股",
+            "side": "BUY",
+            "target_weight": 0.083143,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.603259",
+            "name": "药明康德",
+            "side": "BUY",
+            "target_weight": 0.130256,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600354",
+            "name": "敦煌种业",
+            "side": "BUY",
+            "target_weight": 0.035863,
+            "reason": "already_at_or_above_target",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.000739",
+            "name": "普洛药业",
+            "side": "BUY",
+            "target_weight": 0.106733,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.000002",
+            "name": "万 科Ａ",
+            "side": "BUY",
+            "target_weight": 0.070966,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "D",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600026",
+            "name": "中远海能",
+            "side": "BUY",
+            "target_weight": 0.073559,
+            "reason": "breakout_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [
+          {
+            "symbol": "sz.000739",
+            "requested_weight": 0.106733,
+            "applied_weight": 0.1,
+            "reason": "d_new_position_cap"
+          }
+        ],
+        "valuation_fallback_symbols": [],
+        "fees": 0
+      },
+      "close": {
+        "equity": 930432.96,
+        "cash": 400.96,
+        "market_value": 930032.0,
+        "holdings": [
+          {
+            "symbol": "sh.600026",
+            "name": "中远海能",
+            "qty": 4300,
+            "avg_cost": 22.3348,
+            "close": 21.4,
+            "market_value": 92020.0,
+            "industry": "交通运输",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.600251",
+            "name": "冠农股份",
+            "qty": 6900,
+            "avg_cost": 10.6992,
+            "close": 10.03,
+            "market_value": 69207.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.600354",
+            "name": "敦煌种业",
+            "qty": 4200,
+            "avg_cost": 9.9394,
+            "close": 9.53,
+            "market_value": 40026.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.600467",
+            "name": "好当家",
+            "qty": 31800,
+            "avg_cost": 2.6248,
+            "close": 2.38,
+            "market_value": 75684.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "qty": 2400,
+            "avg_cost": 12.7028,
+            "close": 12.26,
+            "market_value": 29424.0,
+            "industry": "银行",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.600971",
+            "name": "恒源煤电",
+            "qty": 9500,
+            "avg_cost": 9.3768,
+            "close": 8.46,
+            "market_value": 80370.0,
+            "industry": "煤炭",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.601169",
+            "name": "北京银行",
+            "qty": 4200,
+            "avg_cost": 5.6807,
+            "close": 5.49,
+            "market_value": 23058.0,
+            "industry": "银行",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.601699",
+            "name": "潞安环能",
+            "qty": 2700,
+            "avg_cost": 18.2125,
+            "close": 15.35,
+            "market_value": 41445.0,
+            "industry": "煤炭",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.601872",
+            "name": "招商轮船",
+            "qty": 3100,
+            "avg_cost": 22.6864,
+            "close": 20.93,
+            "market_value": 64883.0,
+            "industry": "交通运输",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.601918",
+            "name": "新集能源",
+            "qty": 4400,
+            "avg_cost": 11.2504,
+            "close": 11.15,
+            "market_value": 49060.0,
+            "industry": "煤炭",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.603259",
+            "name": "药明康德",
+            "qty": 100,
+            "avg_cost": 168.7666,
+            "close": 162.4,
+            "market_value": 16240.0,
+            "industry": "医药生物",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sh.605577",
+            "name": "龙版传媒",
+            "qty": 700,
+            "avg_cost": 14.2741,
+            "close": 16.52,
+            "market_value": 11564.0,
+            "industry": "传媒",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sz.002215",
+            "name": "诺 普 信",
+            "qty": 12700,
+            "avg_cost": 10.4554,
+            "close": 9.62,
+            "market_value": 122174.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sz.002648",
+            "name": "卫星化学",
+            "qty": 3500,
+            "avg_cost": 28.6816,
+            "close": 26.64,
+            "market_value": 93240.0,
+            "industry": "基础化工",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sz.002746",
+            "name": "仙坛股份",
+            "qty": 14300,
+            "avg_cost": 6.8721,
+            "close": 6.19,
+            "market_value": 88517.0,
+            "industry": "农林牧渔",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          },
+          {
+            "symbol": "sz.002966",
+            "name": "苏州银行",
+            "qty": 3600,
+            "avg_cost": 9.3848,
+            "close": 9.2,
+            "market_value": 33120.0,
+            "industry": "银行",
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓"
+          }
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.074544,
+      "next_decision": {
+        "decision_date": "2026-09-24",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
+        "strategy_version": "v2-d-deterministic-0.1",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "regime": {
+          "label": "risk_off",
+          "score": 29.46,
+          "confidence": 83.37,
+          "reasons": [
+            "市场宽度偏弱",
+            "主要指数趋势向下"
+          ]
+        },
+        "portfolio_stats": {
+          "positions": 7,
+          "exposure": 0.188192,
+          "max_position": 0.04204,
+          "industry_weights": {
+            "银行": 0.124028,
+            "医药生物": 0.024709,
+            "建筑装饰": 0.013737,
+            "社会服务": 0.013723,
+            "传媒": 0.011995
+          },
+          "max_industry": 0.124028,
+          "max_industry_share_of_invested": 0.65905,
+          "top2_industry_share_of_invested": 0.790347,
+          "industry_hhi": 0.466294,
+          "effective_industries": 2.1446
+        },
+        "targets": [
+          {
+            "symbol": "sz.002966",
+            "raw_code": "002966",
+            "name": "苏州银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.040158,
+            "v2_score": 77.61,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.15,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 72.15,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 9.439,
+                "valid_min": 9.439,
+                "valid_max": 9.518
+              },
+              "exit": {
+                "hard_stop_pct": 0.02721,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 3,
+                "estimated_stop_price": 9.183,
+                "estimated_take_profit_price": 9.915
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002264",
+            "raw_code": "002264",
+            "name": "新 华 都",
+            "industry": "传媒",
+            "industry_code": "801760",
+            "target_weight": 0.011995,
+            "v2_score": 76.36,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "limit_up",
+            "opportunity_score": 75.29,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 75.29,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 7.42,
+                "valid_min": 7.086,
+                "valid_max": 7.42
+              },
+              "exit": {
+                "hard_stop_pct": 0.06,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.038,
+                "max_hold_days": 3,
+                "estimated_stop_price": 6.975,
+                "estimated_take_profit_price": 8.155
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.601009",
+            "raw_code": "601009",
+            "name": "南京银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.04183,
+            "v2_score": 75.92,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 71.32,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 71.32,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 12.452,
+                "valid_min": 12.452,
+                "valid_max": 12.552
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 3,
+                "estimated_stop_price": 12.141,
+                "estimated_take_profit_price": 13.028
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002142",
+            "raw_code": "002142",
+            "name": "宁波银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.04204,
+            "v2_score": 75.59,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.02,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 72.02,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 36.066,
+                "valid_min": 36.066,
+                "valid_max": 36.355
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 3,
+                "estimated_stop_price": 35.164,
+                "estimated_take_profit_price": 37.734
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.603259",
+            "raw_code": "603259",
+            "name": "药明康德",
+            "industry": "医药生物",
+            "industry_code": "801150",
+            "target_weight": 0.024709,
+            "v2_score": 75.19,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 78.36,
+            "setup": "breakout",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "breakout",
+              "opportunity_score": 78.36,
+              "entry": {
+                "mode": "breakout",
+                "operator": ">=",
+                "trigger_price": 171.371,
+                "valid_min": 171.371,
+                "valid_max": 173.272
+              },
+              "exit": {
+                "hard_stop_pct": 0.03645,
+                "reward_risk": 1.85,
+                "trailing_drawdown_pct": 0.02377,
+                "max_hold_days": 3,
+                "estimated_stop_price": 165.124,
+                "estimated_take_profit_price": 182.928
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002811",
+            "raw_code": "002811",
+            "name": "郑中设计",
+            "industry": "建筑装饰",
+            "industry_code": "801720",
+            "target_weight": 0.013737,
+            "v2_score": 75.12,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 73.96,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 73.96,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 15.331,
+                "valid_min": 14.698,
+                "valid_max": 15.331
+              },
+              "exit": {
+                "hard_stop_pct": 0.05932,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.038,
+                "max_hold_days": 3,
+                "estimated_stop_price": 14.421,
+                "estimated_take_profit_price": 16.831
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600593",
+            "raw_code": "600593",
+            "name": "大连圣亚",
+            "industry": "社会服务",
+            "industry_code": "801210",
+            "target_weight": 0.013723,
+            "v2_score": 74.6,
+            "thesis": "技术、行业地位、已验证财务质量、估值和风险共同支持，作为D的规则兜底候选",
+            "invalidation": "综合评分显著下降、原投资逻辑失效或组合风险约束要求降仓",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 78.66,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 78.66,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 43.977,
+                "valid_min": 42.232,
+                "valid_max": 43.977
+              },
+              "exit": {
+                "hard_stop_pct": 0.05704,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.0372,
+                "max_hold_days": 3,
+                "estimated_stop_price": 41.468,
+                "estimated_take_profit_price": 48.115
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          }
+        ],
+        "source_ref": {
+          "snapshot_version": "v2-shadow-data-0.4",
+          "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+          "enrichment_version": "v2-history-0.1",
+          "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+          "target_version": "v2-shadow-targets-conditional-0.3",
+          "execution_model": "V2_CONDITIONAL_PLAN_V1",
+          "plan_version": "v2-conditional-plan-v1",
+          "board_policy": {
+            "version": "retail-mainboard-only-2026-08-19",
+            "scope": "SH_SZ_MAINBOARD_ONLY",
+            "excludes": [
+              "CHINEXT_300_301",
+              "STAR_688_689",
+              "BSE",
+              "B_SHARES"
+            ],
+            "input_candidates": 180,
+            "eligible_candidates": 180,
+            "excluded_non_mainboard_count": 0,
+            "excluded_non_mainboard_symbols": []
+          },
+          "data_quality": {
+            "snapshot_source": "sina",
+            "snapshot_grade": null,
+            "industry_counts": {
+              "industries": 31,
+              "mainboard_stocks": 3196,
+              "component_rows_mainboard": 3196,
+              "duplicate_cross_industry_stocks": 0,
+              "component_failures": 0,
+              "history_failures": 0
+            },
+            "enrichment_coverage": {
+              "preselected": 180,
+              "tencent_current_histories": 180,
+              "eligible_technical_features": 180,
+              "history_ratio": 1.0,
+              "feature_ratio": 1.0,
+              "history_cache": {
+                "cache_version": "v2-tencent-qfq-1",
+                "workers": 3,
+                "selected": 180,
+                "current_histories": 180,
+                "cache_hits": 0,
+                "incremental_fetches": 136,
+                "adjustment_full_refreshes": 3,
+                "full_fetches": 41,
+                "failures": 0,
+                "elapsed_s": 110.21,
+                "sample_errors": []
+              }
+            },
+            "missing_critical_execution_bars": []
+          }
+        },
+        "calls_sol": false,
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
+      },
+      "closing_ledger_content_sha256": "5269e997e2d9d20096632927b5165b9cbded4f131ff69c711940eb87b211e490"
+    },
+    "L": {
+      "opening_state_sha256": "9b550d80a421ba11204bf7ad6dd79a2e47d3548557fc466f4cdb20c3ab8f488c",
+      "execution": {
+        "phase": "conditional_buy",
+        "decision_date": "2026-09-23",
+        "trade_date": "2026-09-24",
+        "reference_price_field": "conditional_trigger",
+        "reference_equity": 989960.82,
+        "fills": [],
+        "rejected_orders": [
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "side": "BUY",
+            "target_weight": 0.048321,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "side": "BUY",
+            "target_weight": 0.046887,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.002966",
+            "name": "苏州银行",
+            "side": "BUY",
+            "target_weight": 0.047808,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "side": "BUY",
+            "target_weight": 0.048493,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600638",
+            "name": "新黄浦",
+            "side": "BUY",
+            "target_weight": 0.079999,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "side": "BUY",
+            "target_weight": 0.048493,
+            "reason": "pullback_not_triggered",
+            "details": {
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sh.600663",
+            "name": "陆家嘴",
+            "side": "BUY",
+            "target_weight": 0.08,
+            "reason": "insufficient_cash_or_below_lot",
+            "details": {
+              "cash": 331.82,
+              "phase": "conditional_buy"
+            }
+          },
+          {
+            "fund_id": "L",
+            "decision_date": "2026-09-23",
+            "trade_date": "2026-09-24",
+            "symbol": "sz.000042",
+            "name": "中洲控股",
+            "side": "BUY",
+            "target_weight": 0.080001,
+            "reason": "insufficient_cash_or_below_lot",
+            "details": {
+              "cash": 331.82,
+              "phase": "conditional_buy"
+            }
+          }
+        ],
+        "policy_adjustments": [],
+        "valuation_fallback_symbols": [],
+        "fees": 0
+      },
+      "close": {
+        "equity": 986505.82,
+        "cash": 331.82,
+        "market_value": 986174.0,
+        "holdings": [
+          {
+            "symbol": "sh.600638",
+            "name": "新黄浦",
+            "qty": 24000,
+            "avg_cost": 4.9135,
+            "close": 5.06,
+            "market_value": 121440.0,
+            "industry": "房地产",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.600801",
+            "name": "华新建材",
+            "qty": 4800,
+            "avg_cost": 24.0392,
+            "close": 23.75,
+            "market_value": 114000.0,
+            "industry": "建筑材料",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.600919",
+            "name": "江苏银行",
+            "qty": 4100,
+            "avg_cost": 12.1785,
+            "close": 12.26,
+            "market_value": 50266.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.601009",
+            "name": "南京银行",
+            "qty": 5500,
+            "avg_cost": 11.6135,
+            "close": 11.95,
+            "market_value": 65725.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.601169",
+            "name": "北京银行",
+            "qty": 4600,
+            "avg_cost": 5.6017,
+            "close": 5.49,
+            "market_value": 25254.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.601628",
+            "name": "中国人寿",
+            "qty": 3100,
+            "avg_cost": 38.6316,
+            "close": 37.43,
+            "market_value": 116033.0,
+            "industry": "非银金融",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.601665",
+            "name": "齐鲁银行",
+            "qty": 4100,
+            "avg_cost": 7.0762,
+            "close": 6.97,
+            "market_value": 28577.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sh.601963",
+            "name": "重庆银行",
+            "qty": 2900,
+            "avg_cost": 11.2774,
+            "close": 11.03,
+            "market_value": 31987.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.000042",
+            "name": "中洲控股",
+            "qty": 4200,
+            "avg_cost": 8.2065,
+            "close": 8.25,
+            "market_value": 34650.0,
+            "industry": "房地产",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.000776",
+            "name": "广发证券",
+            "qty": 3700,
+            "avg_cost": 21.6735,
+            "close": 20.37,
+            "market_value": 75369.0,
+            "industry": "非银金融",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.000783",
+            "name": "长江证券",
+            "qty": 8900,
+            "avg_cost": 9.0137,
+            "close": 8.28,
+            "market_value": 73692.0,
+            "industry": "非银金融",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.002128",
+            "name": "电投能源",
+            "qty": 3500,
+            "avg_cost": 28.9777,
+            "close": 27.82,
+            "market_value": 97370.0,
+            "industry": "煤炭",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.002142",
+            "name": "宁波银行",
+            "qty": 1300,
+            "avg_cost": 34.215,
+            "close": 34.91,
+            "market_value": 45383.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.002948",
+            "name": "青岛银行",
+            "qty": 9700,
+            "avg_cost": 5.8828,
+            "close": 6.04,
+            "market_value": 58588.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          },
+          {
+            "symbol": "sz.002966",
+            "name": "苏州银行",
+            "qty": 5200,
+            "avg_cost": 9.1275,
+            "close": 9.2,
+            "market_value": 47840.0,
+            "industry": "银行",
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变"
+          }
+        ],
+        "valuation_fallback_symbols": []
+      },
+      "drawdown": -0.022472,
+      "next_decision": {
+        "decision_date": "2026-09-24",
+        "execute_on": "next_session_conditional_entry_and_exit_checks",
+        "strategy_version": "v2-l-deterministic-0.1",
+        "target_version": "v2-shadow-targets-conditional-0.3",
+        "regime": {
+          "label": "risk_off",
+          "score": 29.46,
+          "confidence": 83.37,
+          "reasons": [
+            "市场宽度偏弱",
+            "主要指数趋势向下"
+          ]
+        },
+        "portfolio_stats": {
+          "positions": 8,
+          "exposure": 0.35,
+          "max_position": 0.049842,
+          "industry_weights": {
+            "银行": 0.24,
+            "房地产": 0.078067,
+            "建筑材料": 0.031933
+          },
+          "max_industry": 0.24,
+          "max_industry_share_of_invested": 0.685714,
+          "top2_industry_share_of_invested": 0.908763,
+          "industry_hhi": 0.528279,
+          "effective_industries": 1.8929
+        },
+        "targets": [
+          {
+            "symbol": "sh.601009",
+            "raw_code": "601009",
+            "name": "南京银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.048832,
+            "v2_score": 86.05,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 71.32,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 71.32,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 11.878,
+                "valid_min": 11.664,
+                "valid_max": 11.878
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 5,
+                "estimated_stop_price": 11.581,
+                "estimated_take_profit_price": 12.368
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002142",
+            "raw_code": "002142",
+            "name": "宁波银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.049077,
+            "v2_score": 86.02,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.02,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.02,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 34.701,
+                "valid_min": 34.076,
+                "valid_max": 34.701
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 5,
+                "estimated_stop_price": 33.833,
+                "estimated_take_profit_price": 36.132
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002966",
+            "raw_code": "002966",
+            "name": "苏州银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.04688,
+            "v2_score": 85.82,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.15,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.15,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 9.145,
+                "valid_min": 8.972,
+                "valid_max": 9.145
+              },
+              "exit": {
+                "hard_stop_pct": 0.02721,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 5,
+                "estimated_stop_price": 8.896,
+                "estimated_take_profit_price": 9.555
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.002948",
+            "raw_code": "002948",
+            "name": "青岛银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.045369,
+            "v2_score": 85.41,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 62.12,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 62.12,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 6.004,
+                "valid_min": 5.894,
+                "valid_max": 6.004
+              },
+              "exit": {
+                "hard_stop_pct": 0.02623,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 5,
+                "estimated_stop_price": 5.846,
+                "estimated_take_profit_price": 6.264
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600919",
+            "raw_code": "600919",
+            "name": "江苏银行",
+            "industry": "银行",
+            "industry_code": "801780",
+            "target_weight": 0.049842,
+            "v2_score": 83.65,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 72.34,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 72.34,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 12.186,
+                "valid_min": 11.967,
+                "valid_max": 12.186
+              },
+              "exit": {
+                "hard_stop_pct": 0.025,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.018,
+                "max_hold_days": 5,
+                "estimated_stop_price": 11.882,
+                "estimated_take_profit_price": 12.689
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sz.000042",
+            "raw_code": "000042",
+            "name": "中洲控股",
+            "industry": "房地产",
+            "industry_code": "801180",
+            "target_weight": 0.044631,
+            "v2_score": 83.15,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 59.64,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 59.64,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 8.2,
+                "valid_min": 8.017,
+                "valid_max": 8.2
+              },
+              "exit": {
+                "hard_stop_pct": 0.03211,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02094,
+                "max_hold_days": 5,
+                "estimated_stop_price": 7.937,
+                "estimated_take_profit_price": 8.635
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600801",
+            "raw_code": "600801",
+            "name": "华新建材",
+            "industry": "建筑材料",
+            "industry_code": "801710",
+            "target_weight": 0.031933,
+            "v2_score": 81.08,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 58.79,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 58.79,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 23.607,
+                "valid_min": 22.909,
+                "valid_max": 23.607
+              },
+              "exit": {
+                "hard_stop_pct": 0.04256,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02775,
+                "max_hold_days": 5,
+                "estimated_stop_price": 22.603,
+                "estimated_take_profit_price": 25.265
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          },
+          {
+            "symbol": "sh.600663",
+            "raw_code": "600663",
+            "name": "陆家嘴",
+            "industry": "房地产",
+            "industry_code": "801180",
+            "target_weight": 0.033436,
+            "v2_score": 79.63,
+            "thesis": "已验证财务期的盈利质量和经营现金流良好，估值具有相对吸引力",
+            "invalidation": "盈利/现金流恶化、估值失去安全边际或基本面逻辑改变",
+            "fundamental_ready": true,
+            "limit_status": "normal",
+            "opportunity_score": 61.32,
+            "setup": "pullback",
+            "trade_plan": {
+              "plan_version": "v2-conditional-plan-v1",
+              "decision_date": "2026-09-24",
+              "setup": "pullback",
+              "opportunity_score": 61.32,
+              "entry": {
+                "mode": "pullback",
+                "operator": "<=",
+                "trigger_price": 8.658,
+                "valid_min": 8.438,
+                "valid_max": 8.658
+              },
+              "exit": {
+                "hard_stop_pct": 0.03643,
+                "reward_risk": 1.65,
+                "trailing_drawdown_pct": 0.02376,
+                "max_hold_days": 5,
+                "estimated_stop_price": 8.342,
+                "estimated_take_profit_price": 9.178
+              },
+              "cancel_if_not_triggered_by_close": true
+            }
+          }
+        ],
+        "source_ref": {
+          "snapshot_version": "v2-shadow-data-0.4",
+          "snapshot_sha256": "40bd04e8a24bb795cba4516e580a043667a7545b4f84c9b8b5d212a5c4bccd06",
+          "enrichment_version": "v2-history-0.1",
+          "enrichment_sha256": "a89f0f8b285e730db8513ea50db2cccf5db4a25b982a962515e3c43bb19d16cb",
+          "target_version": "v2-shadow-targets-conditional-0.3",
+          "execution_model": "V2_CONDITIONAL_PLAN_V1",
+          "plan_version": "v2-conditional-plan-v1",
+          "board_policy": {
+            "version": "retail-mainboard-only-2026-08-19",
+            "scope": "SH_SZ_MAINBOARD_ONLY",
+            "excludes": [
+              "CHINEXT_300_301",
+              "STAR_688_689",
+              "BSE",
+              "B_SHARES"
+            ],
+            "input_candidates": 180,
+            "eligible_candidates": 180,
+            "excluded_non_mainboard_count": 0,
+            "excluded_non_mainboard_symbols": []
+          },
+          "data_quality": {
+            "snapshot_source": "sina",
+            "snapshot_grade": null,
+            "industry_counts": {
+              "industries": 31,
+              "mainboard_stocks": 3196,
+              "component_rows_mainboard": 3196,
+              "duplicate_cross_industry_stocks": 0,
+              "component_failures": 0,
+              "history_failures": 0
+            },
+            "enrichment_coverage": {
+              "preselected": 180,
+              "tencent_current_histories": 180,
+              "eligible_technical_features": 180,
+              "history_ratio": 1.0,
+              "feature_ratio": 1.0,
+              "history_cache": {
+                "cache_version": "v2-tencent-qfq-1",
+                "workers": 3,
+                "selected": 180,
+                "current_histories": 180,
+                "cache_hits": 0,
+                "incremental_fetches": 136,
+                "adjustment_full_refreshes": 3,
+                "full_fetches": 41,
+                "failures": 0,
+                "elapsed_s": 110.21,
+                "sample_errors": []
+              }
+            },
+            "missing_critical_execution_bars": []
+          }
+        },
+        "calls_sol": false,
+        "execution_model": "V2_CONDITIONAL_PLAN_V1",
+        "plan_version": "v2-conditional-plan-v1"
+      },
+      "closing_ledger_content_sha256": "18152af5a9904f71f155542aaed09a72289cb172a29702c151f9bfcc288f5d94"
+    }
+  },
+  "safety": {
+    "calls_sol": false,
+    "reads_v1_ledger": false,
+    "writes_v1_ledger": false,
+    "forced_clock_buy": false,
+    "forced_clock_sell": false,
+    "allows_cash": true,
+    "state_root": "shadow_state/v2"
+  },
+  "event_hash": "28daebdefd522c2847116d6eadbaadf7b604ed518399047743d891e96ac91d82"
+}
